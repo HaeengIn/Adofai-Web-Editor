@@ -1,0 +1,213 @@
+{
+  "version": 2,
+  "sounds": [
+    {
+      "name": "Hat",
+      "label": "Hat",
+      "file": "sndHat.wav",
+      "aliases": []
+    },
+    {
+      "name": "Kick",
+      "label": "Kick",
+      "file": "sndKick.wav",
+      "aliases": []
+    },
+    {
+      "name": "Shaker",
+      "label": "Shaker",
+      "file": "sndShaker.wav",
+      "aliases": []
+    },
+    {
+      "name": "Sizzle",
+      "label": "Sizzle",
+      "file": "sndSizzle.wav",
+      "aliases": []
+    },
+    {
+      "name": "Chuck",
+      "label": "Chuck",
+      "file": "sndChuck.wav",
+      "aliases": [
+        "Chunk"
+      ]
+    },
+    {
+      "name": "ShakerLoud",
+      "label": "Shaker (loud)",
+      "file": "sndShakerLoud.wav",
+      "aliases": [
+        "Shaker (loud)"
+      ]
+    },
+    {
+      "name": "None",
+      "label": "None",
+      "file": null,
+      "aliases": []
+    },
+    {
+      "name": "Hammer",
+      "label": "Hammer",
+      "file": "sndHammer.mp3",
+      "aliases": []
+    },
+    {
+      "name": "KickChroma",
+      "label": "Kick Chroma",
+      "file": "sndKickChroma.wav",
+      "aliases": [
+        "Kick Chroma"
+      ]
+    },
+    {
+      "name": "SnareAcoustic2",
+      "label": "Snare Acoustic 2",
+      "file": "sndSnareAcoustic2.wav",
+      "aliases": [
+        "Snare Acoustic 2"
+      ]
+    },
+    {
+      "name": "Sidestick",
+      "label": "Sidestick",
+      "file": "sndSidestick.wav",
+      "aliases": []
+    },
+    {
+      "name": "Stick",
+      "label": "Stick",
+      "file": "sndStick.mp3",
+      "aliases": []
+    },
+    {
+      "name": "ReverbClack",
+      "label": "Reverb Clack",
+      "file": "sndReverbClack.wav",
+      "aliases": [
+        "Reverb Clack"
+      ]
+    },
+    {
+      "name": "Squareshot",
+      "label": "Squareshot",
+      "file": "sndSquareshot.wav",
+      "aliases": []
+    },
+    {
+      "name": "PowerDown",
+      "label": "Slow Down",
+      "file": null,
+      "aliases": [
+        "Slow Down",
+        "SlowDown"
+      ]
+    },
+    {
+      "name": "PowerUp",
+      "label": "Speed Up",
+      "file": null,
+      "aliases": [
+        "Speed Up",
+        "SpeedUp"
+      ]
+    },
+    {
+      "name": "KickHouse",
+      "label": "Kick House",
+      "file": "sndKickHouse.wav",
+      "aliases": [
+        "Kick House"
+      ]
+    },
+    {
+      "name": "KickRupture",
+      "label": "Kick Rupture",
+      "file": "sndKickRupture.wav",
+      "aliases": [
+        "Kick Rupture"
+      ]
+    },
+    {
+      "name": "HatHouse",
+      "label": "Hat House",
+      "file": "sndHatHouse.wav",
+      "aliases": [
+        "Hat House"
+      ]
+    },
+    {
+      "name": "SnareHouse",
+      "label": "Snare House",
+      "file": "sndSnareHouse.wav",
+      "aliases": [
+        "Snare House"
+      ]
+    },
+    {
+      "name": "SnareVapor",
+      "label": "Snare Vapor",
+      "file": "sndSnareVapor.wav",
+      "aliases": [
+        "Snare Vapor"
+      ]
+    },
+    {
+      "name": "ClapHit",
+      "label": "Clap Hit",
+      "file": "sndClapHit.wav",
+      "aliases": [
+        "Clap Hit"
+      ]
+    },
+    {
+      "name": "ClapHitEcho",
+      "label": "Clap Hit Echo",
+      "file": "sndClapHitEcho.mp3",
+      "aliases": [
+        "Clap Hit Echo"
+      ]
+    },
+    {
+      "name": "ReverbClap",
+      "label": "Reverb Clap",
+      "file": "sndReverbClap.mp3",
+      "aliases": [
+        "Reverb Clap"
+      ]
+    },
+    {
+      "name": "FireTile",
+      "label": "Fire Tile",
+      "file": "sndFireTile.wav",
+      "aliases": [
+        "Fire Tile"
+      ]
+    },
+    {
+      "name": "IceTile",
+      "label": "Ice Tile",
+      "file": "sndIceTile.wav",
+      "aliases": [
+        "Ice Tile"
+      ]
+    },
+    {
+      "name": "MorePlanets",
+      "label": "More Planets",
+      "file": null,
+      "aliases": [
+        "More Planets"
+      ]
+    },
+    {
+      "name": "LessPlanets",
+      "label": "Less Planets",
+      "file": null,
+      "aliases": [
+        "Less Planets"
+      ]
+    }
+  ]
+}
