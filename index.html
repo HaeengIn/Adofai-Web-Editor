@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Adofai Web Editor</title>
+  
+  <!-- HTML -->
+  
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style_clean.css">
+</head>
+
+<body>
+
+  <div id="editor" class="ui-empty">
+
+    <!-- MAP -->
+    <main id="map-viewport">
+      
+      <div id="level-toolbar">
+
+        <div id="level-toolbar-actions">
+
+          <button
+            id="project-settings-button"
+            type="button"
+            aria-label="Level settings"
+            title="Level Settings"
+          >
+            ♫
+          </button>
+
+          <button
+            id="editor-settings-button"
+            type="button"
+            aria-label="Editor settings"
+            title="Editor Settings"
+          >
+            ⚙
+          </button>
+
+        </div>
+      
+        <div
+          id="level-title"
+          title="Artist - Song"
+        >
+          Artist - Song
+        </div>
+      
+        <div class="level-toolbar-spacer"></div>
+      
+      </div>
+
+      <div
+        id="editor-info"
+        aria-live="off"
+      ></div>
+
+      <canvas id="canvas"></canvas>
+
+      <div id="level-loading">
+        loading...
+      </div>
+
+    </main>
+
+
+    <!-- 하단 에디터 -->
+    <section id="editor-panel">
+      
+      <div id="editor-tabs">
+
+        <button
+          class="editor-tab active"
+          data-tab="tile"
+          type="button"
+        >
+          <span class="editor-tab-icon">＋</span>
+        </button>
+      
+      </div>
+
+      <div id="angle-panel">
+
+        <!-- =========================
+             일반 각도 편집
+        ========================== -->
+        <div id="single-angle-editor">
+
+          <div id="special-angle-column">
+
+            <button
+              id="fullspin-button"
+              class="editor-control-button"
+            >
+              360°
+            </button>
+
+            <button
+              id="midspin-button"
+              class="editor-control-button"
+            >
+              MID
+            </button>
+
+            <button
+              id="advanced-button"
+              class="editor-control-button advanced-button"
+            >
+              Advanced
+            </button>
+
+          </div>
+
+
+          <div id="quick-angle-area">
+
+            <div class="angle-panel-title">
+              Next Tile Direction
+            </div>
+
+            <div id="quick-angle-ring">
+            
+              <!-- =========================
+                   기존 주요 방향
+              ========================== -->
+            
+              <button
+                class="angle-button angle-0"
+                data-angle="0"
+                aria-label="0 degrees"
+              >
+                →
+              </button>
+            
+              <button
+                class="angle-button angle-45"
+                data-angle="45"
+                aria-label="45 degrees"
+              >
+                ↗
+              </button>
+            
+              <button
+                class="angle-button angle-90"
+                data-angle="90"
+                aria-label="90 degrees"
+              >
+                ↑
+              </button>
+            
+              <button
+                class="angle-button angle-135"
+                data-angle="135"
+                aria-label="135 degrees"
+              >
+                ↖
+              </button>
+            
+              <button
+                class="angle-button angle-180"
+                data-angle="180"
+                aria-label="180 degrees"
+              >
+                ←
+              </button>
+            
+              <button
+                class="angle-button angle-225"
+                data-angle="225"
+                aria-label="225 degrees"
+              >
+                ↙
+              </button>
+            
+              <button
+                class="angle-button angle-270"
+                data-angle="270"
+                aria-label="270 degrees"
+              >
+                ↓
+              </button>
+            
+              <button
+                class="angle-button angle-315"
+                data-angle="315"
+                aria-label="315 degrees"
+              >
+                ↘
+              </button>
+            
+            
+              <!-- =========================
+                   30도 계열 보조 방향
+              ========================== -->
+            
+              <button
+                class="angle-button angle-sub-button angle-30"
+                data-angle="30"
+                aria-label="30 degrees"
+              >
+                30
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-60"
+                data-angle="60"
+                aria-label="60 degrees"
+              >
+                60
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-120"
+                data-angle="120"
+                aria-label="120 degrees"
+              >
+                120
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-150"
+                data-angle="150"
+                aria-label="150 degrees"
+              >
+                150
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-210"
+                data-angle="210"
+                aria-label="210 degrees"
+              >
+                210
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-240"
+                data-angle="240"
+                aria-label="240 degrees"
+              >
+                240
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-300"
+                data-angle="300"
+                aria-label="300 degrees"
+              >
+                300
+              </button>
+            
+              <button
+                class="angle-button angle-sub-button angle-330"
+                data-angle="330"
+                aria-label="330 degrees"
+              >
+                330
+              </button>
+            
+            
+              <!-- 현재 선택 타일 -->
+            
+              <button
+                id="angle-current"
+                aria-label="Current selected tile"
+              >
+                —
+              </button>
+            
+            </div>
+
+          </div>
+
+          <div id="delete-angle-column">
+          
+            <button
+              id="delete-floor-button"
+              aria-label="Delete selected tile"
+            >
+              Delete
+            </button>
+          
+          </div>
+
+        </div>
+
+        <!-- =========================
+             Advanced
+        ========================== -->
+        <div id="advanced-angle-editor">
+        
+          <div id="advanced-header">
+        
+            <button
+              id="advanced-back-button"
+              aria-label="Back"
+            >
+              ‹
+            </button>
+        
+            <span>
+              Advanced
+            </span>
+        
+            <button
+              id="advanced-delete-floor-button"
+              type="button"
+              aria-label="Delete selected tile"
+            >
+              Delete
+            </button>
+        
+          </div>
+        
+        
+          <div id="advanced-angle-info">
+        
+            <div id="advanced-angle-value">
+              0°
+            </div>
+        
+            <button
+              id="snap-toggle-button"
+              type="button"
+              class="active"
+            >
+              15° SNAP
+            </button>
+        
+          </div>
+        
+        
+          <div id="angle-dial-wrap">
+        
+            <div id="angle-dial">
+        
+              <span class="dial-label dial-0">0</span>
+              <span class="dial-label dial-90">90</span>
+              <span class="dial-label dial-180">180</span>
+              <span class="dial-label dial-270">270</span>
+        
+              <div id="angle-dial-needle"></div>
+              <div id="angle-dial-center"></div>
+        
+            </div>
+        
+            <button
+              id="advanced-add-button"
+              aria-label="Add tile"
+            >
+              +
+            </button>
+        
+          </div>
+        
+        </div>
+
+
+        <!-- =========================
+             다중 선택
+        ========================== -->
+        <div id="multi-editor">
+
+          <span id="multi-selection-count">
+            0 tiles selected
+          </span>
+
+          <button id="delete-selected-button">
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- =========================
+           하단 Navigation
+      ========================== -->
+      <!--
+      <nav id="bottom-nav">
+
+        <button
+          id="ctrl-button"
+          class="modifier-button"
+        >
+          Ctrl
+        </button>
+
+        <button
+          id="play-button"
+          aria-label="Play"
+        >
+          ▶
+        </button>
+
+        <button
+          id="shift-button"
+          class="modifier-button"
+        >
+          Shift
+        </button>
+
+      </nav>
+      -->
+
+      <!-- 여기에 추가 -->
+      
+      <div id="event-panel">
+      
+        <div id="event-screen-header">
+      
+          <img
+            id="event-screen-icon"
+            alt=""
+            draggable="false"
+          >
+      
+          <div id="event-screen-heading">
+      
+            <div id="event-screen-title">
+              Event
+            </div>
+      
+            <div id="event-screen-subtitle">
+            </div>
+      
+          </div>
+      
+        </div>
+      
+      
+        <div id="event-screen-body">
+        </div>
+      
+      </div>
+
+      <!-- =========================
+          Event Palette
+      ========================== -->
+
+      <div
+        id="event-palette"
+        aria-label="Add event"
+      >
+        <div id="event-palette-list">
+        </div>
+      </div>
+
+    </section>
+
+
+    <nav id="bottom-nav">
+
+      <button
+        id="prev-floor-button"
+        class="floor-nav-button"
+        aria-label="Previous tile"
+      >
+        ‹
+      </button>
+    
+      <button
+        id="ctrl-button"
+        class="modifier-button"
+      >
+        Ctrl
+      </button>
+    
+      <button
+        id="play-button"
+        aria-label="Play"
+      >
+        ▶
+      </button>
+    
+      <button
+        id="shift-button"
+        class="modifier-button"
+      >
+        Shift
+      </button>
+    
+      <button
+        id="next-floor-button"
+        class="floor-nav-button"
+        aria-label="Next tile"
+      >
+        ›
+      </button>
+    
+    </nav>
+
+  </div>
+
+
+  <!-- =====================================================
+       Project / Level Settings
+  ====================================================== -->
+  <div
+    id="project-settings-overlay"
+    class="project-settings-overlay"
+    hidden
+  >
+    <section
+      id="project-settings-sheet"
+      class="project-settings-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-settings-title"
+    >
+      <header class="project-settings-header">
+        <h2 id="project-settings-title">Level Settings</h2>
+
+        <button
+          id="project-settings-close"
+          class="project-settings-close"
+          type="button"
+          aria-label="Close settings"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="project-settings-scroll">
+
+        <section class="settings-section">
+          <h3>Level File</h3>
+
+          <div class="settings-action-row">
+            <button
+              id="load-level-file-button"
+              class="settings-secondary-button"
+              type="button"
+            >
+              Load Level
+            </button>
+
+            <button
+              id="new-level-button"
+              class="settings-secondary-button"
+              type="button"
+            >
+              New Level
+            </button>
+          </div>
+
+          <button
+            id="download-level-button"
+            class="settings-download-button"
+            type="button"
+          >
+            Download Level
+          </button>
+
+          <div
+            id="settings-level-file-name"
+            class="settings-file-status"
+          >
+            —
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3>Song Settings</h3>
+
+          <label class="settings-field settings-file-field">
+            <span>Song File</span>
+
+            <div class="settings-file-control">
+              <input
+                id="settings-song-filename"
+                type="text"
+                value=""
+                placeholder="No song selected"
+                readonly
+              >
+
+              <button
+                id="choose-song-file-button"
+                type="button"
+                aria-label="Choose song file"
+              >
+                Choose
+              </button>
+            </div>
+          </label>
+
+          <div
+            id="settings-song-status"
+            class="settings-file-status"
+          >
+          </div>
+
+          <label class="settings-field">
+            <span>BPM</span>
+            <input
+              id="settings-bpm"
+              type="number"
+              inputmode="decimal"
+              min="0.001"
+              step="any"
+              value="100"
+            >
+          </label>
+
+          <label class="settings-field">
+            <span>Volume</span>
+            <div class="settings-number-unit">
+              <input
+                id="settings-volume"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                max="100"
+                step="any"
+                value="100"
+              >
+              <span>%</span>
+            </div>
+          </label>
+
+          <label class="settings-field">
+            <span>Offset</span>
+            <div class="settings-number-unit">
+              <input
+                id="settings-offset"
+                type="number"
+                inputmode="decimal"
+                step="any"
+                value="0"
+              >
+              <span>ms</span>
+            </div>
+          </label>
+
+          <label class="settings-field">
+            <span>Pitch</span>
+            <div class="settings-number-unit">
+              <input
+                id="settings-pitch"
+                type="number"
+                inputmode="decimal"
+                min="1"
+                step="any"
+                value="100"
+              >
+              <span>%</span>
+            </div>
+          </label>
+
+
+          <label class="settings-field">
+            <span>Hitsound</span>
+            <select
+              id="settings-hitsound"
+              class="settings-select"
+            >
+              <option value="None">None</option>
+              <option value="Kick" selected>Kick</option>
+            </select>
+          </label>
+
+          <label class="settings-field">
+            <span>Hitsound Volume</span>
+            <div class="settings-number-unit">
+              <input
+                id="settings-hitsound-volume"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                max="100"
+                step="1"
+                value="100"
+              >
+              <span>%</span>
+            </div>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h3>Level Info</h3>
+
+          <label class="settings-field">
+            <span>Artist</span>
+            <input
+              id="settings-artist"
+              type="text"
+              placeholder="Artist"
+            >
+          </label>
+
+          <label class="settings-field">
+            <span>Song Title</span>
+            <input
+              id="settings-song"
+              type="text"
+              placeholder="Song"
+            >
+          </label>
+
+          <label class="settings-field">
+            <span>Author</span>
+            <input
+              id="settings-author"
+              type="text"
+              placeholder="Author"
+            >
+          </label>
+        </section>
+
+        <p class="settings-local-note">
+          When a local .adofai file is selected directly, browser security
+          prevents automatic access to audio files in the same folder.
+          Please choose the song file manually in that case.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- =====================================================
+       Editor Settings
+       These options belong to the web editor, not the level.
+  ====================================================== -->
+  <div
+    id="editor-settings-overlay"
+    class="project-settings-overlay"
+    hidden
+  >
+    <section
+      id="editor-settings-sheet"
+      class="project-settings-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editor-settings-title"
+    >
+      <header class="project-settings-header">
+        <h2 id="editor-settings-title">Editor Settings</h2>
+
+        <button
+          id="editor-settings-close"
+          class="project-settings-close"
+          type="button"
+          aria-label="Close editor settings"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="project-settings-scroll">
+
+        <section class="settings-section">
+          <h3>View</h3>
+
+          <label class="editor-setting-toggle">
+            <span>Grid</span>
+
+            <input
+              id="editor-setting-grid"
+              type="checkbox"
+              checked
+            >
+          </label>
+
+          <label class="editor-setting-toggle">
+            <span>Info</span>
+
+            <input
+              id="editor-setting-info"
+              type="checkbox"
+              checked
+            >
+          </label>
+        </section>
+        
+        <div class="editor-about-footer">
+          <strong>ADOFAI Web Editor</strong>
+          
+          <p>
+            Version 1.0
+          </p>
+
+          <p>
+            This project was created with permission from 7th Beats Games.<br /> It is an unofficial fan-made project and is not affiliated with or endorsed by 7th Beats Games.
+          </p>
+
+          <p>
+            Created by Ssimille | Supporter by CrackThrough, hotduck
+          </p>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+
+  <input
+    id="level-file-input"
+    type="file"
+    accept=".adofai,application/json,text/plain"
+    hidden
+  >
+
+  <input
+    id="song-file-input"
+    type="file"
+    accept="audio/*,.ogg,.mp3,.wav"
+    hidden
+  >
+
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script
+    src="main.js"
+    type="module"
+  ></script>
+
+</body>

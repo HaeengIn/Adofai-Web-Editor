@@ -1,0 +1,5442 @@
+/* =========================================================
+   Theme / Reset
+========================================================= */
+
+:root {
+  --bg-app: #111;
+  --bg-map: #000;
+  --bg-panel: #121212;
+  --bg-panel-alt: #181818;
+  --bg-control: #202020;
+  --bg-control-hover: #303030;
+
+  --border: #444;
+  --border-strong: #505050;
+  --border-panel: #303030;
+
+  --text: #eee;
+  --text-muted: #888;
+  --text-dim: #777;
+
+  --green-bg: #365d3a;
+  --green-border: #69b66e;
+
+  --nav-height:
+    clamp(
+      36px,
+      6vw,
+      62px
+    );
+  --nav-bottom: calc(7px + env(safe-area-inset-bottom));
+  --editor-nav-space: 44px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  background: var(--bg-app);
+
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+button {
+  font: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+
+/* =========================================================
+   App / Map
+========================================================= */
+
+#editor {
+  position: relative;
+
+  width: 100vw;
+
+  height: 100vh;
+  height: 100dvh;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: var(--bg-app);
+
+
+  /* 기본 상태 */
+  --editor-panel-height:
+    calc(
+      50px +
+      env(safe-area-inset-bottom)
+    );
+
+
+  --event-palette-height:
+    calc(
+      30px +
+      env(safe-area-inset-bottom)
+    );
+}
+
+#map-viewport {
+  position: relative;
+
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow: hidden;
+  background: var(--bg-map);
+}
+
+#canvas {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  background: var(--bg-map);
+  touch-action: none;
+}
+
+
+/* =========================================================
+   Level Loading
+========================================================= */
+
+#level-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #000;
+  color: #aaa;
+
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+
+  pointer-events: none;
+
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+#level-loading.hidden {
+  opacity: 0;
+}
+
+
+/* =========================================================
+   Editor Panel / UI Modes
+========================================================= */
+
+#editor-panel {
+  position: relative;
+
+  flex:
+    0 0
+    var(--editor-panel-height);
+
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background:
+    var(--bg-panel);
+
+  border-top:
+    1px solid
+    var(--border-panel);
+
+  transition: none;
+    /*flex-basis 0.18s ease;*/
+}
+
+#editor.ui-single,
+#editor.ui-advanced {
+  --editor-panel-height:
+    clamp(
+      255px,
+      36dvh,
+      285px
+    );
+}
+
+
+#editor.ui-multi {
+  --editor-panel-height:
+    clamp(
+      100px,
+      15dvh,
+      135px
+    );
+}
+
+/* 선택 없음 / 재생 */
+#editor.ui-empty #editor-panel,
+#editor.ui-play #editor-panel {
+  flex-basis: calc(50px + env(safe-area-inset-bottom));
+}
+
+
+/* =========================================================
+   Main Panel Visibility
+========================================================= */
+
+#angle-panel {
+  display: none;
+
+  position: relative;
+
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#editor.ui-single #angle-panel,
+#editor.ui-advanced #angle-panel,
+#editor.ui-multi #angle-panel {
+  display: block;
+}
+
+#single-angle-editor,
+#advanced-angle-editor,
+#multi-editor {
+  display: none;
+}
+
+#editor.ui-single #single-angle-editor {
+  display: grid;
+}
+
+#editor.ui-advanced #advanced-angle-editor {
+  display: grid;
+}
+
+#editor.ui-multi #multi-editor {
+  display: flex;
+}
+
+
+/* =========================================================
+   Editor Tabs
+========================================================= */
+
+#editor-tabs {
+  display: none;
+  align-items: flex-end;
+
+  flex: 0 0 34px;
+
+  width: 100%;
+
+  gap: 3px;
+  padding: 4px 8px 0;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  scrollbar-width: none;
+
+  background: var(--bg-panel-alt);
+  border-bottom: 1px solid var(--border-panel);
+}
+
+#editor-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+#editor.ui-single #editor-tabs,
+#editor.ui-advanced #editor-tabs {
+  display: flex;
+}
+
+.editor-tab {
+  position: relative;
+
+  flex: 0 0 42px;
+
+  height: 29px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+
+  background: #242424;
+  color: #999;
+
+  font-size: 13px;
+
+  touch-action: manipulation;
+}
+
+.editor-tab:active {
+  background: #333;
+}
+
+.editor-tab.active {
+  z-index: 2;
+
+  height: 31px;
+
+  background: var(--bg-panel);
+  color: #fff;
+
+  border-color: #555;
+}
+
+.editor-tab-icon {
+  line-height: 1;
+  pointer-events: none;
+}
+
+img.editor-tab-icon {
+  display: block;
+
+  width: 21px;
+  height: 21px;
+
+  object-fit: contain;
+
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.editor-tab-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+
+  min-width: 11px;
+  height: 11px;
+  padding: 0 2px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 6px;
+
+  background: #555;
+  color: #fff;
+
+  font-size: 7px;
+  font-weight: 700;
+
+  pointer-events: none;
+}
+
+
+/* =========================================================
+   Single Tile Editor
+========================================================= */
+
+#single-angle-editor {
+  width: 100%;
+  height: 100%;
+
+  grid-template-columns: 72px 1fr 72px;
+  align-items: stretch;
+
+  padding-bottom: var(--editor-nav-space);
+}
+
+
+/* ---------- Left special controls ---------- */
+
+#special-angle-column {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+
+  gap: 7px;
+  padding: 9px 0 7px 8px;
+}
+
+.editor-control-button {
+  width: 100%;
+  min-height: 33px;
+
+  padding: 0 4px;
+
+  overflow: hidden;
+  white-space: nowrap;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+
+  background: #222;
+  color: var(--text);
+
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.editor-control-button:active {
+  transform: scale(0.95);
+  background: var(--bg-control-hover);
+}
+
+.editor-control-button.active {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.editor-control-button:disabled {
+  opacity: 0.3;
+}
+
+/* 360 / MID / Advanced를 같은 간격으로 배치 */
+.advanced-button {
+  margin-top: 0;
+}
+
+
+/* ---------- Center angle area ---------- */
+
+#quick-angle-area {
+  min-width: 0;
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  padding-top: 8px;
+}
+
+.angle-panel-title {
+  flex: 0 0 19px;
+
+  margin-bottom: 2px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: var(--text-muted);
+
+  font-size: 10px;
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   Quick Angle Ring
+========================================================= */
+
+#quick-angle-ring {
+  position: relative;
+
+  width: min(142px, 38vw);
+  aspect-ratio: 1;
+
+  flex-shrink: 0;
+
+  margin: 0 auto;
+
+  overflow: visible;
+}
+
+.angle-button {
+  position: absolute;
+
+  width: 34px;
+  height: 34px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transform: translate(-50%, -50%);
+
+  border: 1px solid #515151;
+  border-radius: 9px;
+
+  background: var(--bg-control);
+  color: var(--text);
+
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.angle-button:active {
+  background: #373737;
+}
+
+.angle-button.active {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.angle-button:disabled {
+  opacity: 0.25;
+}
+
+
+/* ---------- Main 45° directions ---------- */
+
+.angle-0   { left: 88%; top: 50%; }
+.angle-45  { left: 77%; top: 23%; }
+.angle-90  { left: 50%; top: 12%; }
+.angle-135 { left: 23%; top: 23%; }
+.angle-180 { left: 12%; top: 50%; }
+.angle-225 { left: 23%; top: 77%; }
+.angle-270 { left: 50%; top: 88%; }
+.angle-315 { left: 77%; top: 77%; }
+
+
+/* ---------- Additional 30° directions ---------- */
+
+.angle-sub-button {
+  z-index: 3;
+
+  width: 21px;
+  height: 21px;
+  min-width: 21px;
+  min-height: 21px;
+
+  padding: 0;
+
+  border-radius: 50%;
+  border-color: #454545;
+
+  background: #1b1b1b;
+  color: #a9a9a9;
+
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.angle-sub-button:active:not(:disabled) {
+  transform: translate(-50%, -50%) scale(0.9);
+  background: #3a3a3a;
+}
+
+.angle-sub-button:disabled {
+  opacity: 0.22;
+}
+
+.angle-30  { left: 97%; top: 28%; }
+.angle-60  { left: 72%; top: 3%; }
+.angle-120 { left: 28%; top: 3%; }
+.angle-150 { left: 3%;  top: 28%; }
+.angle-210 { left: 3%;  top: 72%; }
+.angle-240 { left: 28%; top: 97%; }
+.angle-300 { left: 72%; top: 97%; }
+.angle-330 { left: 97%; top: 72%; }
+
+
+/* ---------- Selected tile label ---------- */
+
+#angle-current {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+
+  width: 45px;
+  height: 45px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transform: translate(-50%, -50%);
+
+  border: 1px solid #606060;
+  border-radius: 50%;
+
+  background: #181818;
+  color: #f2f2f2;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+
+/* ---------- Right delete control ---------- */
+
+#delete-angle-column {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+
+  padding: 9px 8px 7px 0;
+}
+
+#delete-floor-button {
+  width: 100%;
+  min-height: 33px;
+
+  padding: 0 4px;
+
+  border: 1px solid #694949;
+  border-radius: 8px;
+
+  background: #292020;
+  color: #e2bcbc;
+
+  font-size: 10px;
+  font-weight: 650;
+
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+#delete-floor-button:active:not(:disabled) {
+  transform: scale(0.95);
+  background: #3a2929;
+}
+
+#delete-floor-button:disabled {
+  opacity: 0.25;
+}
+
+
+/* =========================================================
+   Advanced Angle Editor
+========================================================= */
+
+#advanced-angle-editor {
+  position: relative;
+
+  width: 100%;
+  height: 100%;
+
+  grid-template-columns: 1fr;
+  grid-template-rows: 38px 45px auto;
+
+  justify-items: center;
+
+  padding-bottom: 0px;
+
+  overflow: hidden;
+}
+
+
+/* ---------- Header ---------- */
+
+#advanced-header {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: 46px 1fr 46px;
+  align-items: center;
+
+  padding: 4px 8px 0;
+
+  color: #fff;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#advanced-header > span:nth-child(2) {
+  text-align: center;
+}
+
+#advanced-back-button {
+  width: 34px;
+  height: 30px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+
+  background: #222;
+  color: #fff;
+
+  font-size: 22px;
+}
+
+#advanced-back-button:active {
+  transform: scale(0.94);
+  background: #333;
+}
+
+
+/* ---------- Angle info ---------- */
+
+#advanced-angle-info {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 3px;
+}
+
+#advanced-angle-value {
+  color: #f0f0f0;
+
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 19px;
+
+  text-align: center;
+}
+
+#snap-toggle-button {
+  height: 19px;
+
+  padding: 0 8px;
+
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
+  background: var(--bg-control);
+  color: var(--text-dim);
+
+  font-size: 8px;
+  font-weight: 700;
+}
+
+#snap-toggle-button.active {
+  background: #292929;
+  color: #aaa;
+  border-color: #555;
+}
+
+#snap-toggle-button:active {
+  transform: scale(0.95);
+}
+
+
+/* ---------- Dial ---------- */
+
+#angle-dial-wrap {
+  position: relative;
+
+  grid-column: 1;
+  grid-row: 3;
+
+  justify-self: center;
+  align-self: start;
+
+  width: min(118px, 31vw);
+  aspect-ratio: 1;
+
+  margin-top: 3px;
+}
+
+#angle-dial {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  margin: 0;
+
+  border: 2px solid #555;
+  border-radius: 50%;
+
+  background: #181818;
+
+  touch-action: none;
+
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#angle-dial::before {
+  content: "";
+
+  position: absolute;
+  inset: 13%;
+
+  border: 1px dashed #343434;
+  border-radius: 50%;
+
+  pointer-events: none;
+}
+
+.dial-label {
+  position: absolute;
+  z-index: 1;
+
+  color: #777;
+
+  font-size: 9px;
+
+  pointer-events: none;
+}
+
+.dial-0 {
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dial-90 {
+  left: 50%;
+  top: 3px;
+  transform: translateX(-50%);
+}
+
+.dial-180 {
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dial-270 {
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+}
+
+#angle-dial-needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+
+  width: 37%;
+  height: 3px;
+
+  transform-origin: 0 50%;
+
+  border-radius: 3px;
+
+  background: #ddd;
+
+  pointer-events: none;
+}
+
+#angle-dial-needle::after {
+  content: "";
+
+  position: absolute;
+  right: -6px;
+  top: 50%;
+
+  width: 12px;
+  height: 12px;
+
+  transform: translateY(-50%);
+
+  border-radius: 50%;
+
+  background: #fff;
+}
+
+/* 과거 DOM이 남아 있어도 숨김 */
+#angle-dial-center,
+#snap-label {
+  display: none !important;
+}
+
+#advanced-add-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+
+  width: 29px;
+  height: 29px;
+  min-width: 29px;
+  min-height: 29px;
+
+  padding: 0;
+  margin: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transform: translate(-50%, -50%);
+
+  border: 1px solid #606060;
+  border-radius: 50%;
+
+  background: #252525;
+  color: #f5f5f5;
+
+  font-size: 21px;
+  font-weight: 300;
+  line-height: 1;
+
+  touch-action: manipulation;
+}
+
+#advanced-add-button:active {
+  transform: translate(-50%, -50%) scale(0.91);
+  background: #373737;
+}
+
+#advanced-add-button:disabled {
+  opacity: 0.3;
+}
+
+
+/* =========================================================
+   Multi Selection
+========================================================= */
+
+#multi-editor {
+  width: 100%;
+  height: 100%;
+
+  padding: 10px 16px /* 46px */;
+
+  align-items: center;
+  justify-content: space-between;
+
+  color: #ddd;
+}
+
+#multi-selection-count {
+  font-size: 12px;
+}
+
+#delete-selected-button {
+  min-width: 64px;
+  height: 34px;
+
+  padding: 0 10px;
+
+  border: 1px solid #755;
+  border-radius: 8px;
+
+  background: #332222;
+  color: var(--text);
+
+  font-size: 11px;
+}
+
+#delete-selected-button:active {
+  transform: scale(0.95);
+}
+
+
+/* =========================================================
+   Event Editor
+========================================================= */
+
+#event-panel {
+  display: none;
+  flex: 1 1 auto;
+  flex-direction: column;
+
+  width: 100%;
+  min-height: 0;
+
+  overflow: hidden;
+
+  /*padding-bottom: var(--editor-nav-space);*/
+  padding-bottom: 0;
+
+  background: var(--bg-panel);
+
+  
+}
+
+#editor.tab-event #angle-panel {
+  display: none !important;
+}
+
+#editor.tab-event #event-panel {
+  display: flex;
+}
+
+
+/* ---------- Event header ---------- */
+
+#event-screen-header {
+  flex: 0 0 48px;
+
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+  padding: 8px 12px;
+
+  border-bottom: 1px solid #292929;
+}
+
+#event-screen-icon {
+  flex: 0 0 30px;
+
+  width: 30px;
+  height: 30px;
+
+  object-fit: contain;
+
+  user-select: none;
+  -webkit-user-select: none;
+
+  pointer-events: none;
+}
+
+#event-screen-heading {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 1px;
+}
+
+#event-screen-title {
+  color: var(--text);
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#event-screen-subtitle {
+  color: var(--text-dim);
+
+  font-size: 9px;
+}
+
+
+/* ---------- Event body ---------- */
+
+#event-screen-body {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow-y: auto;
+
+  padding: 8px 10px 12px;
+}
+
+
+/* ---------- Event cards ---------- */
+
+.event-card {
+  width: 100%;
+
+  margin-bottom: 7px;
+  padding: 8px 10px;
+
+  border: 1px solid #383838;
+  border-radius: 9px;
+
+  background: #1b1b1b;
+}
+
+.event-card-header {
+  width: 100%;
+
+  min-height: 25px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  margin-bottom: 6px;
+}
+
+
+.event-card-title {
+  min-width: 0;
+
+  margin: 0;
+
+  color: #ddd;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+.event-card-delete {
+  flex: 0 0 24px;
+
+  width: 24px;
+  height: 24px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    #654444;
+
+  border-radius:
+    7px;
+
+  background:
+    #2b2020;
+
+  color:
+    #d9aaaa;
+
+  font-size:
+    17px;
+
+  line-height:
+    1;
+}
+
+
+.event-card-delete:active {
+  transform:
+    scale(0.92);
+
+  background:
+    #422a2a;
+}
+
+
+.event-info-row {
+  min-height: 23px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  border-top: 1px solid #292929;
+}
+
+.event-info-label {
+  color: var(--text-dim);
+
+  font-size: 9px;
+}
+
+.event-info-value {
+  color: #ddd;
+
+  font-size: 10px;
+  font-weight: 600;
+}
+
+
+/* ---------- Unsupported event list ---------- */
+
+.unsupported-event-notice {
+  margin-bottom: 9px;
+  padding: 8px 10px;
+
+  border-radius: 8px;
+
+  background: #201c25;
+  color: #9b8fa6;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.unsupported-event-item {
+  min-height: 30px;
+
+  margin-bottom: 4px;
+  padding: 0 10px;
+
+  display: flex;
+  align-items: center;
+
+  border: 1px solid #37323d;
+  border-radius: 7px;
+
+  background: #19171c;
+  color: #bbb;
+
+  font-size: 10px;
+}
+
+
+/* =========================================================
+   Reusable Event Form Controls
+========================================================= */
+
+.event-form-row {
+  width: 100%;
+  min-height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  border-top: 1px solid #292929;
+}
+
+.event-form-label {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  color: #aaa;
+
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+
+/* ---------- Number input ---------- */
+
+.event-form-input {
+  flex: 0 0 112px;
+
+  width: 112px;
+  height: 30px;
+
+  padding: 0 8px;
+
+  border: 1px solid #484848;
+  border-radius: 7px;
+
+  outline: none;
+
+  background: #111;
+  color: var(--text);
+
+  /* 모바일 브라우저 자동 확대 방지 */
+  font-size: 16px;
+
+  text-align: right;
+}
+
+.event-form-input:focus {
+  background: #181818;
+  border-color: #777;
+}
+
+.event-form-input:disabled {
+  opacity: 0.3;
+}
+
+
+/* ---------- Select ---------- */
+
+.event-form-select {
+  flex: 0 0 130px;
+
+  width: 130px;
+  height: 30px;
+
+  padding: 0 7px;
+
+  border: 1px solid #484848;
+  border-radius: 7px;
+
+  outline: none;
+
+  background: #181818;
+  color: var(--text);
+
+  font-size: 16px;
+}
+
+
+/* ---------- Segmented switch ---------- */
+
+.event-segmented {
+  flex:
+    0 0 auto;
+
+  height:
+    clamp(
+      40px,
+      6vw,
+      52px
+    );
+
+  display:
+    flex;
+
+  padding:
+    3px;
+
+  border:
+    1px solid
+    var(--border);
+
+  border-radius:
+    11px;
+
+  background:
+    #111;
+}
+
+
+.event-segment-button {
+
+  min-width:
+    clamp(
+      88px,
+      15vw,
+      130px
+    );
+
+  height:
+    calc(
+      100% -
+      2px
+    );
+
+  padding:
+    0
+    clamp(
+      12px,
+      2vw,
+      18px
+    );
+
+  border:
+    none;
+
+  border-radius:
+    8px;
+
+  background:
+    transparent;
+
+  color:
+    var(--text-dim);
+
+  font-size:
+    clamp(
+      13px,
+      2vw,
+      18px
+    );
+
+  font-weight:
+    700;
+
+  white-space:
+    nowrap;
+}
+
+.event-segment-button.active {
+  background: #3b3b3b;
+  color: #fff;
+}
+
+.event-segment-button:active {
+  background: #4a4a4a;
+}
+
+
+/* =========================================================
+   Floating Bottom Navigation
+========================================================= */
+
+#bottom-nav {
+  position: absolute;
+
+  left: 50%;
+  bottom: var(--nav-bottom);
+
+  z-index: 2000;
+
+
+  /*
+    390px급 휴대폰
+      → 약 184px
+
+    850px급 화면
+      → 약 290px
+
+    대형 화면
+      → 최대 360px
+  */
+  width:
+    clamp(
+      184px,
+      34vw,
+      360px
+    );
+
+
+  height:
+    var(--nav-height);
+
+
+  padding:
+    clamp(
+      3px,
+      0.5vw,
+      6px
+    )
+    clamp(
+      4px,
+      0.6vw,
+      8px
+    );
+
+
+  display:
+    grid;
+
+
+  /*
+    px 고정 대신 비율 배치
+  */
+  grid-template-columns:
+    0.72fr
+    1fr
+    1fr
+    1fr
+    0.72fr;
+
+
+  align-items:
+    center;
+
+  justify-items:
+    center;
+
+
+  transform:
+    translateX(-50%);
+
+
+  border:
+    1px solid
+    var(--border);
+
+
+  border-radius:
+    calc(
+      var(--nav-height) / 2
+    );
+
+
+  background:
+    rgba(
+      28,
+      28,
+      28,
+      0.94
+    );
+
+
+  box-shadow:
+    0
+    3px
+    12px
+    rgba(
+      0,
+      0,
+      0,
+      0.42
+    );
+
+
+  transition:
+    bottom 0.18s ease;
+}
+
+
+/* ---------- Ctrl / Shift ---------- */
+
+.modifier-button {
+  width:
+    92%;
+
+  height:
+    calc(
+      var(--nav-height) -
+      8px
+    );
+
+  padding:
+    0;
+
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+
+  border:
+    none;
+
+
+  border-radius:
+    clamp(
+      11px,
+      1.7vw,
+      16px
+    );
+
+
+  background:
+    transparent;
+
+  color:
+    #d0d0d0;
+
+
+  font-size:
+    clamp(
+      9px,
+      1.4vw,
+      15px
+    );
+
+
+  font-weight:
+    700;
+}
+
+.modifier-button:active {
+  background: #333;
+}
+
+.modifier-button.active {
+  background: #384d3a;
+  color: #b8e7bc;
+}
+
+.modifier-button:disabled {
+  opacity: 0.28;
+}
+
+
+/* ---------- Play ---------- */
+
+#play-button {
+  width:
+    calc(
+      var(--nav-height) -
+      8px
+    );
+
+  height:
+    calc(
+      var(--nav-height) -
+      8px
+    );
+
+
+  padding:
+    0;
+
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+
+  border:
+    1px solid
+    #4e4e4e;
+
+
+  border-radius:
+    clamp(
+      10px,
+      1.5vw,
+      16px
+    );
+
+
+  background:
+    #272727;
+
+  color:
+    #fff;
+
+
+  font-size:
+    clamp(
+      14px,
+      2.3vw,
+      24px
+    );
+
+
+  font-weight:
+    700;
+}
+
+#play-button:active {
+  transform: scale(0.93);
+  background: #353535;
+}
+
+
+/* ---------- Previous / Next ---------- */
+
+.floor-nav-button {
+  width:
+    92%;
+
+  height:
+    calc(
+      var(--nav-height) -
+      8px
+    );
+
+
+  padding:
+    0;
+
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+
+  border:
+    none;
+
+
+  border-radius:
+    clamp(
+      10px,
+      1.5vw,
+      15px
+    );
+
+
+  background:
+    transparent;
+
+  color:
+    #c8c8c8;
+
+
+  font-size:
+    clamp(
+      22px,
+      3vw,
+      34px
+    );
+
+
+  font-weight:
+    400;
+
+  line-height:
+    1;
+
+
+  user-select:
+    none;
+
+  -webkit-user-select:
+    none;
+
+  touch-action:
+    manipulation;
+}
+
+.floor-nav-button:active:not(:disabled) {
+  transform: scale(0.9);
+  background: #333;
+}
+
+.floor-nav-button:disabled {
+  opacity: 0.2;
+}
+
+#editor.ui-play .modifier-button {
+  opacity: 0.28;
+}
+
+#editor.ui-play .floor-nav-button {
+  opacity: 0.2;
+}
+
+
+/* =========================================================
+   Responsive: Short Screens
+========================================================= */
+
+@media (max-height: 650px) {
+
+  #editor.ui-single #editor-panel,
+  #editor.ui-advanced #editor-panel {
+    flex-basis: clamp(185px, 32dvh, 215px);
+  }
+
+  #single-angle-editor {
+    padding-bottom: 0px;
+  }
+
+  #quick-angle-area {
+    padding-top: 5px;
+  }
+
+  #quick-angle-ring {
+    width: min(126px, 35vw);
+  }
+
+  .angle-button {
+    width: 31px;
+    height: 31px;
+
+    font-size: 16px;
+  }
+
+  .angle-sub-button {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+
+    font-size: 6px;
+  }
+
+  #angle-current {
+    width: 40px;
+    height: 40px;
+
+    font-size: 11px;
+  }
+
+  #angle-dial-wrap {
+    width: min(106px, 29vw);
+  }
+
+  #quick-angle-area {
+    padding-top: 5px;
+  }
+
+  #advanced-add-button {
+    width: 27px;
+    height: 27px;
+    min-width: 27px;
+    min-height: 27px;
+
+    font-size: 19px;
+  }
+}
+
+
+/* =========================================================
+   Responsive: Narrow Screens
+========================================================= */
+
+@media (max-width: 360px) {
+
+  #single-angle-editor {
+    grid-template-columns: 64px 1fr 64px;
+  }
+
+  #special-angle-column {
+    padding-left: 6px;
+  }
+
+  #quick-angle-ring {
+    width: min(128px, 38vw);
+  }
+
+  .editor-control-button {
+    font-size: 9px;
+  }
+
+  .angle-sub-button {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+
+    font-size: 6px;
+  }
+
+  #bottom-nav {
+    width: 176px;
+    grid-template-columns: 26px 39px 40px 39px 26px;
+  }
+}
+
+/* 단일 선택 / Advanced */
+
+#editor.ui-single,
+#editor.ui-advanced {
+
+  --editor-panel-height:
+    clamp(
+      210px,
+      36dvh,
+      270px
+    );
+}
+
+
+/* 다중 선택 */
+
+#editor.ui-multi {
+
+  --editor-panel-height:
+    clamp(
+      100px,
+      15dvh,
+      135px
+    );
+}
+
+
+/* 선택 없음 / 재생 */
+
+#editor.ui-empty,
+#editor.ui-play {
+
+  --editor-panel-height:
+    calc(
+      50px +
+      env(safe-area-inset-bottom)
+    );
+}
+
+#editor.ui-single #bottom-nav,
+#editor.ui-advanced #bottom-nav,
+#editor.ui-multi #bottom-nav {
+
+  bottom:
+    calc(
+      var(--editor-panel-height)
+      + 7px
+    );
+}
+
+/* =========================================================
+   Event Palette
+========================================================= */
+
+#event-palette {
+  display: none;
+
+  flex:
+    0 0
+    var(--event-palette-height);
+
+  width: 100%;
+
+  min-width: 0;
+
+  background:
+    #161616;
+
+  border-top:
+    1px solid
+    var(--border-panel);
+}
+
+
+/*
+  타일 하나를 선택하여
+  편집 패널이 열린 경우에만 표시
+*/
+
+#editor.ui-single
+#event-palette,
+
+#editor.ui-advanced
+#event-palette {
+
+  display: flex;
+}
+
+
+/* 가로 스크롤 영역 */
+
+#event-palette-list {
+  flex: 1 1 auto;
+
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding:
+    1px
+    8px
+    calc(
+      1px +
+      env(safe-area-inset-bottom)
+    );
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  scrollbar-width: none;
+
+  overscroll-behavior-x:
+    contain;
+}
+
+
+#event-palette-list::-webkit-scrollbar {
+  display: none;
+}
+
+
+/* 개별 이벤트 버튼 */
+
+.event-palette-button {
+  position: relative;
+
+  flex:
+    0 0 28px;
+
+  width:
+    28px;
+
+  height:
+    28px;
+
+  min-width:
+    28px;
+
+  min-height:
+    28px;
+
+  padding:
+    2px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border:
+    1px solid
+    #404040;
+
+  border-radius:
+    7px;
+
+  background:
+    #222;
+
+  touch-action:
+    manipulation;
+}
+
+
+
+.event-palette-button:active:not(:disabled) {
+
+  transform:
+    scale(0.93);
+
+  background:
+    #333;
+}
+
+
+/*
+  Twirl / Pause처럼
+  이미 하나 존재하여
+  더 추가할 수 없는 이벤트
+*/
+
+.event-palette-button:disabled {
+
+  opacity:
+    0.25;
+}
+
+
+/* 아이콘 */
+
+.event-palette-icon {
+  width:
+    22px;
+
+  height:
+    22px;
+
+  display:
+    block;
+
+  object-fit:
+    contain;
+
+  pointer-events:
+    none;
+
+  user-select:
+    none;
+
+  -webkit-user-select:
+    none;
+}
+
+/* =========================================================
+   Advanced layout fix
+   반드시 CSS 맨 마지막에 추가
+========================================================= */
+
+
+/*
+  Advanced는 일반 타일 편집보다
+  세로 공간을 조금 더 확보한다.
+*/
+#editor.ui-advanced {
+
+  --editor-panel-height:
+    calc(
+      clamp(
+        235px,
+        38dvh,
+        275px
+      )
+      +
+      env(safe-area-inset-bottom)
+    );
+}
+
+
+/*
+  기존:
+    38px
+    45px
+    auto
+
+  수정:
+    제목 영역과 0° 영역 사이를 압축.
+*/
+#advanced-angle-editor {
+
+  grid-template-rows:
+    30px
+    36px
+    minmax(0, 1fr);
+
+  padding-bottom:
+    0;
+}
+
+
+/* =========================
+   Advanced 제목
+========================= */
+
+#advanced-header {
+
+  padding:
+    0
+    8px;
+
+  min-height:
+    30px;
+}
+
+
+/*
+  뒤로가기 버튼도
+  세로 공간에 맞게 약간 축소.
+*/
+#advanced-back-button {
+
+  width:
+    31px;
+
+  height:
+    28px;
+
+  font-size:
+    20px;
+}
+
+
+/* =========================
+   0° + SNAP
+========================= */
+
+#advanced-angle-info {
+
+  gap:
+    0;
+
+  justify-content:
+    flex-start;
+
+  padding-top:
+    1px;
+}
+
+
+#advanced-angle-value {
+
+  font-size:
+    15px;
+
+  line-height:
+    17px;
+}
+
+
+#snap-toggle-button {
+
+  height:
+    18px;
+
+  margin-top:
+    0;
+}
+
+
+/* =========================
+   Dial
+========================= */
+
+#angle-dial-wrap {
+
+  width:
+    min(
+      102px,
+      28vw
+    );
+
+  margin-top:
+    0;
+
+  align-self:
+    start;
+}
+
+
+/* =========================
+   짧은 화면
+========================= */
+
+@media (max-height: 650px) {
+
+  /*
+    기존 CSS에 있는
+
+    #editor.ui-advanced #editor-panel {
+      flex-basis: 185~215px;
+    }
+
+    를 무효화한다.
+  */
+
+  #editor.ui-advanced {
+
+    --editor-panel-height:
+      calc(
+        clamp(
+          235px,
+          40dvh,
+          255px
+        )
+        +
+        env(safe-area-inset-bottom)
+      );
+  }
+
+
+  #editor.ui-advanced
+  #editor-panel {
+
+    flex-basis:
+      var(
+        --editor-panel-height
+      );
+  }
+
+
+  #angle-dial-wrap {
+
+    width:
+      min(
+        98px,
+        27vw
+      );
+  }
+}
+
+/* =========================================================
+   Level Toolbar
+========================================================= */
+
+#level-toolbar {
+  position: absolute;
+
+  top:
+    calc(
+      8px +
+      env(safe-area-inset-top)
+    );
+
+  left: 8px;
+  right: 8px;
+
+  z-index: 80;
+
+  height: 36px;
+
+  display: grid;
+
+  grid-template-columns:
+    36px
+    minmax(0, 1fr)
+    36px;
+
+  align-items: center;
+
+  gap: 8px;
+
+  pointer-events: none;
+}
+
+
+/* 프로젝트 설정 버튼 */
+
+#project-settings-button {
+  width: 36px;
+  height: 36px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    #484848;
+
+  border-radius:
+    10px;
+
+  background:
+    rgba(
+      25,
+      25,
+      25,
+      0.92
+    );
+
+  color:
+    #ddd;
+
+  font-size:
+    18px;
+
+  pointer-events:
+    auto;
+}
+
+
+#project-settings-button:active {
+  transform:
+    scale(0.94);
+
+  background:
+    #303030;
+}
+
+
+/* 곡 제목 */
+
+#level-title {
+  min-width: 0;
+
+  justify-self: center;
+
+  max-width:
+    min(
+      72vw,
+      520px
+    );
+
+  padding:
+    6px 12px;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+
+/*
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.12
+    );
+
+  border-radius:
+    10px;
+
+    
+
+  background:
+    rgba(
+      18,
+      18,
+      18,
+      0.84
+    );
+    */
+
+  color:
+    #eee;
+
+  font-size:
+    12px;
+
+  font-weight:
+    650;
+
+  text-align:
+    center;
+}
+
+
+.level-toolbar-spacer {
+  width: 36px;
+  height: 36px;
+}
+
+/* =========================================================
+   Project Settings Sheet
+========================================================= */
+
+.project-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding:
+    calc(12px + env(safe-area-inset-top))
+    12px
+    calc(12px + env(safe-area-inset-bottom));
+
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.project-settings-overlay[hidden] {
+  display: none !important;
+}
+
+.project-settings-sheet {
+  width: min(430px, 100%);
+  max-height: min(760px, 100%);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border: 1px solid #4a4a4a;
+  border-radius: 16px;
+
+  background: #151515;
+  color: var(--text);
+
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+.project-settings-header {
+  flex: 0 0 50px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 12px 0 16px;
+
+  border-bottom: 1px solid #303030;
+}
+
+.project-settings-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.project-settings-close {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+
+  border: 1px solid #444;
+  border-radius: 10px;
+
+  background: #222;
+  color: #ddd;
+
+  font-size: 23px;
+  line-height: 1;
+}
+
+.project-settings-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  padding: 10px 12px 18px;
+}
+
+.settings-section {
+  margin-bottom: 12px;
+  padding: 10px;
+
+  border: 1px solid #343434;
+  border-radius: 12px;
+
+  background: #1a1a1a;
+}
+
+.settings-section h3 {
+  margin: 0 0 9px;
+
+  color: #eee;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.settings-field {
+  width: 100%;
+  min-height: 48px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  gap: 5px;
+
+  border-top: 1px solid #292929;
+}
+
+.settings-section h3 + .settings-field,
+.settings-section h3 + .settings-action-row {
+  border-top: none;
+}
+
+.settings-field > span:first-child {
+  color: #aaa;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.settings-field input,
+.settings-file-control input {
+  width: 100%;
+  height: 32px;
+
+  padding: 0 9px;
+
+  border: 1px solid #4a4a4a;
+  border-radius: 8px;
+  outline: none;
+
+  background: #101010;
+  color: #eee;
+
+  font-size: 16px;
+}
+
+
+.settings-select {
+  width: 100%;
+  height: 32px;
+
+  padding: 0 9px;
+
+  border: 1px solid #4a4a4a;
+  border-radius: 8px;
+  outline: none;
+
+  background: #101010;
+  color: #eee;
+
+  font-size: 16px;
+}
+
+.settings-select:focus {
+  border-color: #777;
+  background: #171717;
+}
+
+.settings-field input:focus,
+.settings-file-control input:focus {
+  border-color: #777;
+  background: #171717;
+}
+
+.settings-file-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: 6px;
+}
+
+.settings-file-control button,
+.settings-secondary-button {
+  height: 32px;
+
+  padding: 0 10px;
+
+  border: 1px solid #4a4a4a;
+  border-radius: 8px;
+
+  background: #252525;
+  color: #eee;
+
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.settings-file-control button:active,
+.settings-secondary-button:active {
+  transform: scale(0.96);
+  background: #333;
+}
+
+.settings-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+
+  padding-bottom: 8px;
+}
+
+.settings-download-button {
+  width: 100%;
+  height: 34px;
+
+  margin-bottom: 8px;
+  padding: 0 12px;
+
+  border: 1px solid #566c58;
+  border-radius: 8px;
+
+  background: #263329;
+  color: #d9eadb;
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.settings-download-button:active {
+  transform: scale(0.98);
+  background: #314336;
+}
+
+.settings-number-unit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 5px;
+}
+
+.settings-number-unit > span {
+  color: #888;
+  font-size: 10px;
+  text-align: center;
+}
+
+.settings-file-status {
+  min-height: 17px;
+  margin-top: 4px;
+
+  color: #777;
+  font-size: 9px;
+  line-height: 1.4;
+
+  overflow-wrap: anywhere;
+}
+
+.settings-file-status.ok {
+  color: #8dbd91;
+}
+
+.settings-file-status.warning {
+  color: #c9a87a;
+}
+
+.settings-file-status.error {
+  color: #d28e8e;
+}
+
+.settings-local-note {
+  margin: 4px 3px 0;
+
+  color: #6f6f6f;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 520px) {
+  .project-settings-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .project-settings-sheet {
+    width: 100%;
+    max-height: min(86dvh, 760px);
+
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+
+    border-radius: 18px 18px 0 0;
+  }
+}
+
+/* =========================================================
+   Large Portrait UI
+   Tablet / Large portrait screen
+========================================================= */
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+
+  /* =====================================================
+     Panel
+  ===================================================== */
+
+  #editor.ui-single {
+
+    --editor-panel-height:
+      clamp(
+        440px,
+        39dvh,
+        560px
+      );
+  }
+
+
+  #editor.ui-advanced {
+
+    --editor-panel-height:
+      clamp(
+        450px,
+        40dvh,
+        580px
+      );
+  }
+
+
+  #editor {
+
+    --event-palette-height:
+      calc(
+        68px +
+        env(
+          safe-area-inset-bottom
+        )
+      );
+
+    --nav-height:
+      54px;
+  }
+
+
+  /* =====================================================
+     Floating Navigation
+     ‹ Ctrl ▶ Shift ›
+  ===================================================== */
+
+  #bottom-nav {
+
+    width:
+      clamp(
+        270px,
+        38vw,
+        360px
+      );
+
+    padding:
+      5px
+      7px;
+
+    grid-template-columns:
+      0.72fr
+      1fr
+      1fr
+      1fr
+      0.72fr;
+  }
+
+
+  .modifier-button {
+
+    height:
+      44px;
+
+    font-size:
+      14px;
+  }
+
+
+  #play-button {
+
+    width:
+      44px;
+
+    height:
+      44px;
+
+    border-radius:
+      14px;
+
+    font-size:
+      22px;
+  }
+
+
+  .floor-nav-button {
+
+    height:
+      44px;
+
+    font-size:
+      32px;
+  }
+
+
+  /* =====================================================
+     Tabs
+  ===================================================== */
+
+  #editor-tabs {
+
+    flex-basis:
+      68px;
+
+    gap:
+      7px;
+
+    padding:
+      7px
+      14px
+      0;
+  }
+
+
+  .editor-tab {
+
+    flex:
+      0 0 84px;
+
+    height:
+      59px;
+
+    border-radius:
+      15px
+      15px
+      0
+      0;
+
+    font-size:
+      18px;
+  }
+
+
+  .editor-tab.active {
+
+    height:
+      62px;
+  }
+
+
+  img.editor-tab-icon {
+
+    width:
+      43px;
+
+    height:
+      43px;
+  }
+
+
+  .editor-tab-count {
+
+    top:
+      4px;
+
+    right:
+      4px;
+
+    min-width:
+      18px;
+
+    height:
+      18px;
+
+    padding:
+      0
+      4px;
+
+    border-radius:
+      10px;
+
+    font-size:
+      10px;
+  }
+
+
+  /* =====================================================
+     Single Angle Editor
+  ===================================================== */
+
+  #single-angle-editor {
+
+    grid-template-columns:
+      165px
+      1fr
+      165px;
+
+    padding-bottom:
+      66px;
+  }
+
+
+  #special-angle-column {
+
+    gap:
+      15px;
+
+    padding:
+      18px
+      0
+      15px
+      18px;
+  }
+
+
+  #delete-angle-column {
+
+    padding:
+      18px
+      18px
+      15px
+      0;
+  }
+
+
+  .editor-control-button,
+  #delete-floor-button {
+
+    min-height:
+      74px;
+
+    border-radius:
+      16px;
+
+    font-size:
+      20px;
+  }
+
+
+  /* =====================================================
+     Quick Angle Ring
+  ===================================================== */
+
+  .angle-panel-title {
+
+    flex-basis:
+      39px;
+
+    margin-bottom:
+      3px;
+
+    font-size:
+      18px;
+  }
+
+
+  #quick-angle-area {
+
+    padding-top:
+      15px;
+  }
+
+
+  #quick-angle-ring {
+
+    width:
+      min(
+        330px,
+        46vw
+      );
+  }
+
+
+  /*
+    0 / 45 / 90 ...
+  */
+
+  .angle-button {
+
+    width:
+      74px;
+
+    height:
+      74px;
+
+    border-radius:
+      17px;
+
+    font-size:
+      39px;
+  }
+
+
+  /*
+    30 / 60 / 120 ...
+  */
+
+  .angle-sub-button {
+
+    width:
+      43px;
+
+    height:
+      43px;
+
+    min-width:
+      43px;
+
+    min-height:
+      43px;
+
+    border-width:
+      1px;
+
+    font-size:
+      14px;
+  }
+
+
+  /*
+    중앙 #N
+  */
+
+  #angle-current {
+
+    width:
+      100px;
+
+    height:
+      100px;
+
+    font-size:
+      23px;
+  }
+
+
+  /* =====================================================
+     Event Palette
+  ===================================================== */
+
+  #event-palette-list {
+
+    gap:
+      13px;
+
+    padding:
+      4px
+      14px
+      calc(
+        4px +
+        env(
+          safe-area-inset-bottom
+        )
+      );
+  }
+
+
+  .event-palette-button {
+
+    flex:
+      0 0 60px;
+
+    width:
+      60px;
+
+    height:
+      60px;
+
+    min-width:
+      60px;
+
+    min-height:
+      60px;
+
+    padding:
+      5px;
+
+    border-radius:
+      15px;
+  }
+
+
+  .event-palette-icon {
+
+    width:
+      47px;
+
+    height:
+      47px;
+  }
+
+
+  /* =====================================================
+     Advanced
+  ===================================================== */
+
+  #advanced-angle-editor {
+
+    grid-template-rows:
+      48px
+      58px
+      minmax(
+        0,
+        1fr
+      );
+  }
+
+
+  #advanced-header {
+
+    min-height:
+      48px;
+
+    grid-template-columns:
+      70px
+      1fr
+      70px;
+
+    padding:
+      0
+      14px;
+
+    font-size:
+      20px;
+  }
+
+
+  #advanced-back-button {
+
+    width:
+      48px;
+
+    height:
+      45px;
+
+    border-radius:
+      13px;
+
+    font-size:
+      31px;
+  }
+
+
+  /* ---------- Angle value ---------- */
+
+  #advanced-angle-info {
+
+    gap:
+      3px;
+
+    padding-top:
+      2px;
+  }
+
+
+  #advanced-angle-value {
+
+    font-size:
+      24px;
+
+    line-height:
+      27px;
+  }
+
+
+  #snap-toggle-button {
+
+    height:
+      29px;
+
+    padding:
+      0
+      13px;
+
+    border-radius:
+      15px;
+
+    font-size:
+      12px;
+  }
+
+
+  /* =====================================================
+     Advanced Dial
+  ===================================================== */
+
+  #angle-dial-wrap {
+
+    width:
+      min(
+        165px,
+        25vw
+      );
+
+    margin-top:
+      4px;
+  }
+
+
+  #angle-dial {
+
+    border-width:
+      3px;
+  }
+
+
+  .dial-label {
+
+    font-size:
+      14px;
+  }
+
+
+  #angle-dial-needle {
+
+    height:
+      5px;
+
+    border-radius:
+      5px;
+  }
+
+
+  #angle-dial-needle::after {
+
+    right:
+      -9px;
+
+    width:
+      18px;
+
+    height:
+      18px;
+  }
+
+
+  #advanced-add-button {
+
+    width:
+      47px;
+
+    height:
+      47px;
+
+    min-width:
+      47px;
+
+    min-height:
+      47px;
+
+    border-radius:
+      50%;
+
+    font-size:
+      33px;
+  }
+
+
+  /* =====================================================
+     Event editor
+  ===================================================== */
+
+  #event-screen-header {
+
+    flex-basis:
+      70px;
+
+    gap:
+      15px;
+
+    padding:
+      11px
+      18px;
+  }
+
+
+  #event-screen-icon {
+
+    flex-basis:
+      45px;
+
+    width:
+      45px;
+
+    height:
+      45px;
+  }
+
+
+  #event-screen-title {
+
+    font-size:
+      18px;
+  }
+
+
+  #event-screen-subtitle {
+
+    font-size:
+      12px;
+  }
+
+
+  #event-screen-body {
+
+    padding:
+      12px
+      15px
+      18px;
+  }
+
+
+  /* ---------- Event cards ---------- */
+
+  .event-card {
+
+    margin-bottom:
+      11px;
+
+    padding:
+      12px
+      15px;
+
+    border-radius:
+      13px;
+  }
+
+
+  .event-card-title {
+
+    font-size:
+      16px;
+  }
+
+
+  .event-card-delete {
+
+    width:
+      36px;
+
+    height:
+      36px;
+
+    flex-basis:
+      36px;
+
+    border-radius:
+      10px;
+
+    font-size:
+      25px;
+  }
+
+
+  /* =====================================================
+     Event inputs
+  ===================================================== */
+
+  .event-form-row {
+
+    min-height:
+      60px;
+
+    gap:
+      18px;
+  }
+
+
+  .event-form-label {
+
+    font-size:
+      14px;
+  }
+
+
+  .event-form-input {
+
+    flex-basis:
+      165px;
+
+    width:
+      165px;
+
+    height:
+      44px;
+
+    padding:
+      0
+      12px;
+
+    border-radius:
+      10px;
+
+    font-size:
+      18px;
+  }
+
+
+  .event-form-select {
+
+    flex-basis:
+      190px;
+
+    width:
+      190px;
+
+    height:
+      44px;
+
+    border-radius:
+      10px;
+
+    font-size:
+      18px;
+  }
+
+
+  /* =====================================================
+     Multi Selection
+  ===================================================== */
+
+  #multi-editor {
+
+    padding:
+      15px
+      24px;
+  }
+
+
+  #multi-selection-count {
+
+    font-size:
+      17px;
+  }
+
+
+  #delete-selected-button {
+
+    min-width:
+      96px;
+
+    height:
+      50px;
+
+    border-radius:
+      12px;
+
+    font-size:
+      16px;
+  }
+}
+/* =========================================================
+   Large Portrait - Global UI / Settings Scale Fix
+   Add after the existing Large Portrait UI block.
+========================================================= */
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+  /* =====================================================
+     Top toolbar
+  ===================================================== */
+
+  #level-toolbar {
+    top:
+      calc(
+        12px +
+        env(safe-area-inset-top)
+      );
+
+    left: 14px;
+    right: 14px;
+
+    height: 58px;
+
+    grid-template-columns:
+      58px
+      minmax(0, 1fr)
+      58px;
+
+    gap: 12px;
+  }
+
+  #project-settings-button {
+    width: 58px;
+    height: 58px;
+
+    border-radius: 16px;
+
+    font-size: 28px;
+
+    border-width: 1px;
+  }
+
+  #level-title {
+    max-width:
+      min(
+        72vw,
+        700px
+      );
+
+    padding:
+      10px
+      18px;
+
+    font-size: 18px;
+    line-height: 1.25;
+    font-weight: 700;
+
+    text-shadow:
+      0 1px 4px
+      rgba(0, 0, 0, 0.85);
+  }
+
+  .level-toolbar-spacer {
+    width: 58px;
+    height: 58px;
+  }
+
+
+  /* =====================================================
+     Floating navigation
+     Existing large UI was still visually small compared
+     with the enlarged editor controls.
+  ===================================================== */
+
+  #editor {
+    --nav-height: 64px;
+  }
+
+  #bottom-nav {
+    width:
+      clamp(
+        320px,
+        44vw,
+        430px
+      );
+
+    padding:
+      6px
+      9px;
+  }
+
+  .modifier-button {
+    height: 52px;
+    font-size: 16px;
+  }
+
+  #play-button {
+    width: 52px;
+    height: 52px;
+
+    border-radius: 16px;
+
+    font-size: 26px;
+  }
+
+  .floor-nav-button {
+    height: 52px;
+    font-size: 38px;
+  }
+
+
+  /* =====================================================
+     Project settings overlay
+  ===================================================== */
+
+  .project-settings-overlay {
+    padding:
+      calc(
+        26px +
+        env(safe-area-inset-top)
+      )
+      24px
+      calc(
+        26px +
+        env(safe-area-inset-bottom)
+      );
+  }
+
+  .project-settings-sheet {
+    width:
+      min(
+        680px,
+        calc(100vw - 48px)
+      );
+
+    max-height:
+      min(
+        86dvh,
+        980px
+      );
+
+    border-radius: 22px;
+
+    border-width: 1px;
+
+    box-shadow:
+      0 24px 70px
+      rgba(0, 0, 0, 0.62);
+  }
+
+
+  /* =====================================================
+     Settings header
+  ===================================================== */
+
+  .project-settings-header {
+    flex-basis: 72px;
+
+    padding:
+      0
+      18px
+      0
+      22px;
+  }
+
+  .project-settings-header h2 {
+    font-size: 23px;
+    font-weight: 780;
+  }
+
+  .project-settings-close {
+    width: 48px;
+    height: 48px;
+
+    border-radius: 14px;
+
+    font-size: 31px;
+  }
+
+
+  /* =====================================================
+     Settings scroll / sections
+  ===================================================== */
+
+  .project-settings-scroll {
+    padding:
+      16px
+      18px
+      26px;
+  }
+
+  .settings-section {
+    margin-bottom: 18px;
+
+    padding: 16px;
+
+    border-radius: 16px;
+  }
+
+  .settings-section h3 {
+    margin-bottom: 13px;
+
+    font-size: 17px;
+  }
+
+
+  /* =====================================================
+     Settings fields
+  ===================================================== */
+
+  .settings-field {
+    min-height: 69px;
+
+    gap: 8px;
+  }
+
+  .settings-field > span:first-child {
+    font-size: 14px;
+  }
+
+  .settings-field input,
+  .settings-file-control input,
+  .settings-select {
+    height: 46px;
+
+    padding:
+      0
+      13px;
+
+    border-radius: 11px;
+
+    font-size: 18px;
+  }
+
+  .settings-file-control {
+    grid-template-columns:
+      minmax(0, 1fr)
+      84px;
+
+    gap: 9px;
+  }
+
+  .settings-file-control button,
+  .settings-secondary-button {
+    height: 46px;
+
+    padding:
+      0
+      15px;
+
+    border-radius: 11px;
+
+    font-size: 14px;
+  }
+
+
+  /* =====================================================
+     Level file actions / download
+  ===================================================== */
+
+  .settings-action-row {
+    gap: 10px;
+
+    padding-bottom: 12px;
+  }
+
+  .settings-download-button {
+    height: 48px;
+
+    margin-bottom: 12px;
+
+    border-radius: 11px;
+
+    font-size: 14px;
+  }
+
+
+  /* =====================================================
+     Unit fields / statuses
+  ===================================================== */
+
+  .settings-number-unit {
+    grid-template-columns:
+      minmax(0, 1fr)
+      50px;
+
+    gap: 8px;
+  }
+
+  .settings-number-unit > span {
+    font-size: 14px;
+  }
+
+  .settings-file-status {
+    min-height: 24px;
+
+    margin-top: 6px;
+
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .settings-local-note {
+    margin:
+      8px
+      6px
+      0;
+
+    font-size: 12px;
+    line-height: 1.6;
+  }
+}
+
+
+/* =========================================================
+   Medium portrait screens
+   Avoid a sudden jump from phone-size settings to tablet UI.
+========================================================= */
+
+@media
+  (min-width: 521px)
+  and
+  (max-width: 599px)
+  and
+  (orientation: portrait)
+{
+  #level-toolbar {
+    height: 44px;
+
+    grid-template-columns:
+      44px
+      minmax(0, 1fr)
+      44px;
+  }
+
+  #project-settings-button {
+    width: 44px;
+    height: 44px;
+
+    border-radius: 12px;
+
+    font-size: 22px;
+  }
+
+  #level-title {
+    font-size: 15px;
+  }
+
+  .level-toolbar-spacer {
+    width: 44px;
+    height: 44px;
+  }
+
+  .project-settings-sheet {
+    width:
+      min(
+        560px,
+        calc(100vw - 28px)
+      );
+  }
+}
+
+/* =========================================================
+   Responsive Typography
+   Large Portrait
+========================================================= */
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+
+  /* =====================================================
+     Responsive Font Scale
+
+     약 780px 폭 기준:
+     xs ≈ 17px
+     sm ≈ 19.5px
+     md ≈ 22px
+     lg ≈ 25px
+     xl ≈ 29.5px
+
+     가장 큰 글자는 최대 30px.
+  ===================================================== */
+
+  #editor,
+  .project-settings-overlay {
+
+    --font-xs:
+      clamp(
+        14px,
+        2.2vw,
+        18px
+      );
+
+    --font-sm:
+      clamp(
+        16px,
+        2.5vw,
+        20px
+      );
+
+    --font-md:
+      clamp(
+        18px,
+        2.8vw,
+        23px
+      );
+
+    --font-lg:
+      clamp(
+        22px,
+        3.2vw,
+        27px
+      );
+
+    --font-xl:
+      clamp(
+        26px,
+        3.8vw,
+        30px
+      );
+  }
+
+
+  /* =====================================================
+     Top Toolbar
+  ===================================================== */
+
+  #level-toolbar {
+    height: 68px;
+
+    grid-template-columns:
+      62px
+      minmax(0, 1fr)
+      62px;
+
+    gap: 14px;
+  }
+
+
+  #project-settings-button {
+    width: 62px;
+    height: 62px;
+
+    border-radius: 16px;
+
+    font-size:
+      clamp(
+        27px,
+        3.8vw,
+        30px
+      );
+  }
+
+
+  #level-title {
+    max-width:
+      min(
+        76vw,
+        720px
+      );
+
+    padding:
+      10px
+      18px;
+
+    font-size:
+      var(--font-lg);
+
+    font-weight: 750;
+  }
+
+
+  .level-toolbar-spacer {
+    width: 62px;
+    height: 62px;
+  }
+
+
+  /* =====================================================
+     Settings Window
+  ===================================================== */
+
+  .project-settings-sheet {
+    width:
+      min(
+        700px,
+        calc(100% - 32px)
+      );
+
+    border-radius: 22px;
+  }
+
+
+  /* ---------- Main title ---------- */
+
+  .project-settings-header {
+    flex-basis: 78px;
+
+    padding:
+      0
+      20px
+      0
+      24px;
+  }
+
+
+  .project-settings-header h2 {
+    font-size:
+      var(--font-xl);
+
+    font-weight: 800;
+  }
+
+
+  .project-settings-close {
+    width: 52px;
+    height: 52px;
+
+    border-radius: 14px;
+
+    font-size: 30px;
+  }
+
+
+  /* =====================================================
+     Settings Layout
+  ===================================================== */
+
+  .project-settings-scroll {
+    padding:
+      18px
+      20px
+      28px;
+  }
+
+
+  .settings-section {
+    margin-bottom: 20px;
+
+    padding: 18px;
+
+    border-radius: 17px;
+  }
+
+
+  /*
+    "레벨 파일"
+    "곡 설정"
+    "레벨 정보"
+  */
+
+  .settings-section h3 {
+    margin:
+      0
+      0
+      15px;
+
+    font-size:
+      var(--font-lg);
+
+    line-height: 1.25;
+
+    font-weight: 800;
+  }
+
+
+  /* =====================================================
+     Settings Labels
+  ===================================================== */
+
+  .settings-field {
+    min-height: 78px;
+
+    gap: 9px;
+  }
+
+
+  /*
+    곡 파일
+    BPM
+    음량
+    오프셋
+    작곡가
+    곡명
+    만든이
+  */
+
+  .settings-field > span:first-child {
+    font-size:
+      var(--font-sm);
+
+    line-height: 1.3;
+
+    font-weight: 650;
+  }
+
+
+  /* =====================================================
+     Inputs
+  ===================================================== */
+
+  .settings-field input,
+  .settings-file-control input,
+  .settings-select {
+    height: 54px;
+
+    padding:
+      0
+      15px;
+
+    border-radius: 12px;
+
+    font-size:
+      var(--font-md);
+  }
+
+
+  /* =====================================================
+     Song file picker
+  ===================================================== */
+
+  .settings-file-control {
+    grid-template-columns:
+      minmax(0, 1fr)
+      100px;
+
+    gap: 10px;
+  }
+
+
+  .settings-file-control button {
+    height: 54px;
+
+    padding:
+      0
+      14px;
+
+    border-radius: 12px;
+
+    font-size:
+      var(--font-sm);
+
+    font-weight: 750;
+  }
+
+
+  /* =====================================================
+     Level buttons
+  ===================================================== */
+
+  .settings-action-row {
+    gap: 12px;
+
+    padding-bottom: 13px;
+  }
+
+
+  .settings-secondary-button {
+    height: 54px;
+
+    padding:
+      0
+      16px;
+
+    border-radius: 12px;
+
+    font-size:
+      var(--font-sm);
+
+    font-weight: 750;
+  }
+
+
+  .settings-download-button {
+    height: 56px;
+
+    margin-bottom: 13px;
+
+    padding:
+      0
+      18px;
+
+    border-radius: 12px;
+
+    font-size:
+      var(--font-sm);
+
+    font-weight: 800;
+  }
+
+
+  /* =====================================================
+     Units
+  ===================================================== */
+
+  .settings-number-unit {
+    grid-template-columns:
+      minmax(0, 1fr)
+      58px;
+
+    gap: 9px;
+  }
+
+
+  .settings-number-unit > span {
+    font-size:
+      var(--font-sm);
+
+    font-weight: 600;
+  }
+
+
+  /* =====================================================
+     File status / explanation
+  ===================================================== */
+
+  .settings-file-status {
+    min-height: 26px;
+
+    margin-top: 8px;
+
+    font-size:
+      var(--font-xs);
+
+    line-height: 1.45;
+  }
+
+
+  .settings-local-note {
+    margin:
+      10px
+      6px
+      0;
+
+    font-size:
+      var(--font-xs);
+
+    line-height: 1.55;
+  }
+
+
+  /* =====================================================
+     Floating Navigation
+  ===================================================== */
+
+  .modifier-button {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  #play-button {
+    font-size:
+      var(--font-lg);
+  }
+
+
+  .floor-nav-button {
+    font-size:
+      30px;
+  }
+
+
+  /* =====================================================
+     Main Tile Editor
+  ===================================================== */
+
+  .editor-control-button,
+  #delete-floor-button {
+    font-size:
+      var(--font-md);
+  }
+
+
+  .angle-panel-title {
+    font-size:
+      var(--font-sm);
+
+    font-weight: 600;
+  }
+
+
+  #angle-current {
+    font-size:
+      var(--font-lg);
+  }
+
+
+  .angle-button {
+    font-size:
+      30px;
+  }
+
+
+  .angle-sub-button {
+    font-size:
+      var(--font-xs);
+  }
+
+
+  /* =====================================================
+     Tabs
+  ===================================================== */
+
+  .editor-tab {
+    font-size:
+      var(--font-md);
+  }
+
+
+  .editor-tab-count {
+    font-size:
+      var(--font-xs);
+  }
+
+
+  /* =====================================================
+     Advanced
+  ===================================================== */
+
+  #advanced-header {
+    font-size:
+      var(--font-lg);
+  }
+
+
+  #advanced-angle-value {
+    font-size:
+      var(--font-xl);
+
+    line-height: 1.1;
+  }
+
+
+  #snap-toggle-button {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  .dial-label {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  #advanced-back-button {
+    font-size: 30px;
+  }
+
+
+  #advanced-add-button {
+    font-size: 30px;
+  }
+
+
+  /* =====================================================
+     Event Editor
+  ===================================================== */
+
+  #event-screen-title {
+    font-size:
+      var(--font-lg);
+  }
+
+
+  #event-screen-subtitle {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  .event-card-title {
+    font-size:
+      var(--font-md);
+  }
+
+
+  .event-card-delete {
+    font-size:
+      28px;
+  }
+
+
+  .event-form-label {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  .event-form-input,
+  .event-form-select {
+    font-size:
+      var(--font-md);
+  }
+
+
+  .event-info-label {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  .event-info-value {
+    font-size:
+      var(--font-md);
+  }
+
+
+  .unsupported-event-notice,
+  .unsupported-event-item {
+    font-size:
+      var(--font-sm);
+  }
+
+
+  /* =====================================================
+     Multi Selection
+  ===================================================== */
+
+  #multi-selection-count {
+    font-size:
+      var(--font-md);
+  }
+
+
+  #delete-selected-button {
+    font-size:
+      var(--font-md);
+  }
+}
+
+/* =========================================================
+   FINAL: Responsive Advanced Editor + Delete Action
+   Keep this block at the very end of the stylesheet.
+========================================================= */
+
+/*
+  Advanced needs more vertical space than the compact tile editor.
+  The dial scales with both viewport width and panel height.
+*/
+#editor.ui-advanced {
+  --editor-panel-height:
+    clamp(
+      300px,
+      42dvh,
+      380px
+    );
+}
+
+#advanced-angle-editor {
+  grid-template-rows:
+    clamp(38px, 5.5dvh, 48px)
+    clamp(48px, 6.5dvh, 60px)
+    minmax(0, 1fr);
+
+  padding:
+    0
+    10px
+    6px;
+
+  overflow: hidden;
+}
+
+/* Back | Advanced | Delete */
+#advanced-header {
+  width: 100%;
+
+  grid-template-columns:
+    clamp(46px, 13vw, 60px)
+    minmax(0, 1fr)
+    clamp(74px, 21vw, 96px);
+
+  gap:
+    8px;
+
+  min-height: 0;
+
+  padding:
+    4px
+    0
+    0;
+}
+
+#advanced-back-button {
+  justify-self: start;
+}
+
+#advanced-delete-floor-button {
+  justify-self: end;
+
+  width:
+    clamp(
+      70px,
+      19vw,
+      92px
+    );
+
+  height:
+    clamp(
+      30px,
+      5dvh,
+      38px
+    );
+
+  padding:
+    0
+    8px;
+
+  border:
+    1px solid
+    #694949;
+
+  border-radius:
+    9px;
+
+  background:
+    #292020;
+
+  color:
+    #e2bcbc;
+
+  font-size:
+    clamp(
+      10px,
+      2.8vw,
+      14px
+    );
+
+  font-weight:
+    700;
+
+  white-space:
+    nowrap;
+}
+
+#advanced-delete-floor-button:active:not(:disabled) {
+  transform:
+    scale(0.95);
+
+  background:
+    #3a2929;
+}
+
+#advanced-delete-floor-button:disabled {
+  opacity:
+    0.25;
+}
+
+/* Give the angle readout enough room without wasting dial space. */
+#advanced-angle-info {
+  min-height: 0;
+
+  gap:
+    clamp(
+      2px,
+      0.5dvh,
+      5px
+    );
+
+  justify-content:
+    center;
+
+  padding-top:
+    0;
+}
+
+/*
+  Phone portrait:
+  ~150-200 px dial.
+
+  Larger portrait:
+  overridden below to ~240-300 px.
+*/
+#angle-dial-wrap {
+  width:
+    clamp(
+      150px,
+      42vw,
+      210px
+    );
+
+  max-height:
+    100%;
+
+  margin-top:
+    clamp(
+      2px,
+      0.8dvh,
+      8px
+    );
+
+  align-self:
+    start;
+}
+
+/* Dial details scale with the dial itself. */
+.dial-label {
+  font-size:
+    clamp(
+      10px,
+      2.6vw,
+      15px
+    );
+}
+
+#angle-dial-needle {
+  height:
+    clamp(
+      3px,
+      0.6vw,
+      5px
+    );
+}
+
+#angle-dial-needle::after {
+  right:
+    clamp(
+      -9px,
+      -1.5vw,
+      -6px
+    );
+
+  width:
+    clamp(
+      12px,
+      3.5vw,
+      18px
+    );
+
+  height:
+    clamp(
+      12px,
+      3.5vw,
+      18px
+    );
+}
+
+#advanced-add-button {
+  width:
+    clamp(
+      36px,
+      10vw,
+      50px
+    );
+
+  height:
+    clamp(
+      36px,
+      10vw,
+      50px
+    );
+
+  min-width:
+    clamp(
+      36px,
+      10vw,
+      50px
+    );
+
+  min-height:
+    clamp(
+      36px,
+      10vw,
+      50px
+    );
+
+  font-size:
+    clamp(
+      24px,
+      7vw,
+      32px
+    );
+}
+
+/* Very short screens: preserve a usable dial without clipping. */
+@media
+  (max-height: 650px)
+{
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        255px,
+        46dvh,
+        310px
+      );
+  }
+
+  #angle-dial-wrap {
+    width:
+      clamp(
+        130px,
+        34vw,
+        170px
+      );
+  }
+}
+
+/* Large portrait / tablet-sized UI. */
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        520px,
+        42dvh,
+        680px
+      );
+  }
+
+  #advanced-angle-editor {
+    grid-template-rows:
+      clamp(58px, 5dvh, 72px)
+      clamp(72px, 6dvh, 88px)
+      minmax(0, 1fr);
+
+    padding:
+      0
+      20px
+      14px;
+  }
+
+  #advanced-header {
+    grid-template-columns:
+      clamp(72px, 10vw, 94px)
+      minmax(0, 1fr)
+      clamp(120px, 17vw, 150px);
+
+    gap:
+      14px;
+
+    padding-top:
+      8px;
+  }
+
+  #advanced-back-button {
+    width:
+      clamp(
+        54px,
+        7vw,
+        66px
+      );
+
+    height:
+      clamp(
+        50px,
+        6vw,
+        60px
+      );
+
+    font-size:
+      clamp(
+        26px,
+        3.5vw,
+        30px
+      );
+  }
+
+  #advanced-delete-floor-button {
+    width:
+      clamp(
+        112px,
+        15vw,
+        142px
+      );
+
+    height:
+      clamp(
+        50px,
+        6vw,
+        60px
+      );
+
+    border-radius:
+      14px;
+
+    font-size:
+      clamp(
+        18px,
+        2.6vw,
+        22px
+      );
+  }
+
+  #advanced-angle-value {
+    font-size:
+      clamp(
+        24px,
+        3.3vw,
+        30px
+      );
+
+    line-height:
+      1.05;
+  }
+
+  #snap-toggle-button {
+    height:
+      clamp(
+        34px,
+        4.5vw,
+        42px
+      );
+
+    padding:
+      0
+      16px;
+
+    border-radius:
+      18px;
+
+    font-size:
+      clamp(
+        16px,
+        2.3vw,
+        20px
+      );
+  }
+
+  #angle-dial-wrap {
+    width:
+      clamp(
+        240px,
+        34vw,
+        300px
+      );
+
+    margin-top:
+      clamp(
+        6px,
+        1dvh,
+        12px
+      );
+  }
+
+  .dial-label {
+    font-size:
+      clamp(
+        16px,
+        2.4vw,
+        20px
+      );
+  }
+
+  #angle-dial {
+    border-width:
+      3px;
+  }
+
+  #angle-dial-needle {
+    height:
+      clamp(
+        5px,
+        0.7vw,
+        7px
+      );
+  }
+
+  #angle-dial-needle::after {
+    right:
+      -11px;
+
+    width:
+      clamp(
+        20px,
+        3vw,
+        24px
+      );
+
+    height:
+      clamp(
+        20px,
+        3vw,
+        24px
+      );
+  }
+
+  #advanced-add-button {
+    width:
+      clamp(
+        58px,
+        8vw,
+        70px
+      );
+
+    height:
+      clamp(
+        58px,
+        8vw,
+        70px
+      );
+
+    min-width:
+      clamp(
+        58px,
+        8vw,
+        70px
+      );
+
+    min-height:
+      clamp(
+        58px,
+        8vw,
+        70px
+      );
+
+    font-size:
+      30px;
+  }
+}
+
+/* =========================================================
+   Advanced Header - Exact Position Fix
+========================================================= */
+
+#advanced-header {
+  position: relative;
+}
+
+
+/* =========================
+   Back
+   항상 왼쪽 첫 번째 칸
+========================= */
+
+#advanced-back-button {
+  grid-column: 1;
+  grid-row: 1;
+
+  justify-self: start;
+  align-self: center;
+}
+
+
+/* =========================
+   Title
+   Grid와 무관하게 화면 정중앙
+========================= */
+
+#advanced-header > span:nth-child(2) {
+  position: absolute;
+
+  left: 50%;
+  top: 50%;
+
+  transform:
+    translate(
+      -50%,
+      -50%
+    );
+
+  width: max-content;
+  max-width: 45%;
+
+  text-align: center;
+  white-space: nowrap;
+
+  pointer-events: none;
+
+  z-index: 1;
+}
+
+
+/* =========================
+   Delete
+   항상 오른쪽 세 번째 칸
+========================= */
+
+#advanced-delete-floor-button {
+  grid-column: 3;
+  grid-row: 1;
+
+  justify-self: end;
+  align-self: center;
+
+  z-index: 2;
+}
+
+/* =========================================================
+   Advanced Dial - Keep Perfect Circle
+========================================================= */
+
+#angle-dial-wrap {
+
+  /*
+    가로폭뿐 아니라 세로 공간도 고려해서
+    다이얼 크기 자체를 결정한다.
+  */
+  --advanced-dial-size:
+    min(
+      42vw,
+      20dvh,
+      210px
+    );
+
+
+  width:
+    var(--advanced-dial-size) !important;
+
+  height:
+    var(--advanced-dial-size) !important;
+
+
+  min-width:
+    var(--advanced-dial-size);
+
+  min-height:
+    var(--advanced-dial-size);
+
+
+  /*
+    이전 max-height: 100%가
+    다이얼을 세로로 찌그러뜨린 원인.
+  */
+  max-width:
+    none;
+
+  max-height:
+    none;
+
+
+  aspect-ratio:
+    1 / 1;
+
+
+  flex-shrink:
+    0;
+
+  justify-self:
+    center;
+
+  align-self:
+    start;
+}
+
+
+/*
+  실제 원형 다이얼도
+  wrapper와 정확히 같은 정사각형을 사용.
+*/
+#angle-dial {
+
+  width:
+    100% !important;
+
+  height:
+    100% !important;
+
+  aspect-ratio:
+    1 / 1;
+
+  border-radius:
+    50%;
+}
+
+
+/* =========================================================
+   Short Screens
+========================================================= */
+
+@media (max-height: 650px) {
+
+  #angle-dial-wrap {
+
+    --advanced-dial-size:
+      min(
+        38vw,
+        18dvh,
+        170px
+      );
+  }
+}
+
+
+/* =========================================================
+   Large Portrait
+========================================================= */
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+
+  #angle-dial-wrap {
+
+    --advanced-dial-size:
+      min(
+        34vw,
+        26dvh,
+        300px
+      );
+  }
+}
+/* =========================================================
+   FINAL: Level / Editor toolbar actions
+   Level settings and editor settings are intentionally split.
+========================================================= */
+
+#level-toolbar-actions {
+  grid-column: 1;
+  grid-row: 1;
+
+  justify-self: start;
+  align-self: start;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  pointer-events: auto;
+}
+
+#level-title {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.level-toolbar-spacer {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+#project-settings-button,
+#editor-settings-button {
+  width: 36px;
+  height: 36px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #484848;
+  border-radius: 10px;
+
+  background:
+    rgba(
+      25,
+      25,
+      25,
+      0.92
+    );
+
+  color: #ddd;
+
+  font-size: 18px;
+  line-height: 1;
+
+  pointer-events: auto;
+}
+
+#project-settings-button:active,
+#editor-settings-button:active {
+  transform: scale(0.94);
+  background: #303030;
+}
+
+
+/* =========================================================
+   FINAL: Editor Settings controls
+========================================================= */
+
+.editor-setting-toggle {
+  width: 100%;
+  min-height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  color: #ddd;
+
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.editor-setting-toggle input {
+  flex: 0 0 auto;
+
+  width: 22px;
+  height: 22px;
+
+  margin: 0;
+
+  accent-color: #6fa875;
+}
+
+.editor-about-content {
+  color: #aaa;
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.editor-about-content strong {
+  color: #eee;
+
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.editor-about-content p {
+  margin:
+    10px
+    0
+    0;
+}
+
+
+/* =========================================================
+   Medium portrait toolbar actions
+========================================================= */
+
+@media
+  (min-width: 521px)
+  and
+  (max-width: 599px)
+  and
+  (orientation: portrait)
+{
+  #level-toolbar-actions {
+    gap: 8px;
+  }
+
+  #project-settings-button,
+  #editor-settings-button {
+    width: 44px;
+    height: 44px;
+
+    border-radius: 12px;
+
+    font-size: 22px;
+  }
+}
+
+
+/* =========================================================
+   Large portrait toolbar / editor settings
+========================================================= */
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+  #level-toolbar-actions {
+    gap: 10px;
+  }
+
+  #project-settings-button,
+  #editor-settings-button {
+    width: 62px;
+    height: 62px;
+
+    border-radius: 16px;
+
+    font-size: 30px;
+  }
+
+  .editor-setting-toggle {
+    min-height: 64px;
+
+    font-size:
+      var(
+        --font-md,
+        22px
+      );
+  }
+
+  .editor-setting-toggle input {
+    width: 30px;
+    height: 30px;
+  }
+
+  .editor-about-content {
+    font-size:
+      var(
+        --font-sm,
+        19px
+      );
+  }
+
+  .editor-about-content strong {
+    font-size:
+      var(
+        --font-lg,
+        25px
+      );
+  }
+}
+
+/* =========================================================
+   FINAL: Editor Settings About Footer
+   Keep About visually separate from actual settings.
+========================================================= */
+
+.editor-about-footer {
+  margin:
+    18px
+    4px
+    2px;
+
+  padding:
+    16px
+    4px
+    2px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+
+  color:
+    #777;
+
+  font-size:
+    12px;
+
+  line-height:
+    1.6;
+}
+
+.editor-about-footer strong {
+  display:
+    block;
+
+  margin-bottom:
+    5px;
+
+  color:
+    #aaa;
+
+  font-size:
+    13px;
+
+  font-weight:
+    700;
+}
+
+.editor-about-footer p {
+  margin:
+    4px
+    0
+    0;
+}
+
+
+/* Large portrait: keep About readable but intentionally
+   quieter than the actual settings controls. */
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+  .editor-about-footer {
+    margin:
+      26px
+      6px
+      4px;
+
+    padding:
+      20px
+      6px
+      4px;
+
+    font-size:
+      var(
+        --font-xs,
+        17px
+      );
+  }
+
+  .editor-about-footer strong {
+    font-size:
+      var(
+        --font-sm,
+        19px
+      );
+  }
+}
+
+
+
+/* =========================================================
+   FINAL: Rich level title + editor info overlay
+========================================================= */
+
+/*
+  ADOFAI title <size=...> uses 85 as its neutral/default size.
+  The JS parser applies relative percentages to nested spans, so
+  the existing responsive title size remains the visual baseline.
+*/
+#level-title {
+  font-style: normal;
+}
+
+#level-title .level-title-rich-node {
+  white-space: inherit;
+}
+
+/*
+  Plain diagnostic text only: no card, border, or background.
+*/
+#editor-info {
+  position: absolute;
+
+  top:
+    calc(
+      52px +
+      env(safe-area-inset-top)
+    );
+
+  right: 10px;
+
+  z-index: 70;
+
+  max-width: 46vw;
+
+  color:
+    rgba(
+      225,
+      225,
+      225,
+      0.62
+    );
+
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.45;
+
+  text-align: right;
+  white-space: pre;
+
+  font-variant-numeric: tabular-nums;
+
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#editor-info[hidden] {
+  display: none !important;
+}
+
+/* Keep multiple View toggles visually separated. */
+.settings-section
+.editor-setting-toggle +
+.editor-setting-toggle {
+  border-top:
+    1px solid
+    #292929;
+}
+
+@media
+  (min-width: 521px)
+  and
+  (max-width: 599px)
+  and
+  (orientation: portrait)
+{
+  #editor-info {
+    top:
+      calc(
+        64px +
+        env(safe-area-inset-top)
+      );
+
+    right: 12px;
+    font-size: 10px;
+  }
+}
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+  #editor-info {
+    top:
+      calc(
+        92px +
+        env(safe-area-inset-top)
+      );
+
+    right: 18px;
+
+    max-width: 48vw;
+
+    font-size:
+      clamp(
+        11px,
+        1.6vw,
+        14px
+      );
+  }
+}
