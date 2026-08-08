@@ -5440,3 +5440,2350 @@ img.editor-tab-icon {
       );
   }
 }
+
+
+/* =========================================================
+   TESTER FEEDBACK PATCH
+========================================================= */
+
+#advanced-angle-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+#advanced-angle-value {
+  width: clamp(72px, 20vw, 108px);
+  height: clamp(30px, 5dvh, 38px);
+  padding: 0 7px;
+
+  border: 1px solid #444;
+  border-radius: 8px;
+  outline: none;
+
+  background: #111;
+  color: #f0f0f0;
+
+  font-size: clamp(16px, 4.5vw, 22px);
+  font-weight: 700;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#advanced-angle-value:focus {
+  border-color: #777;
+  background: #181818;
+}
+
+#advanced-angle-input-wrap > span {
+  color: #f0f0f0;
+  font-size: clamp(16px, 4.5vw, 22px);
+  font-weight: 700;
+}
+
+#advanced-special-angle-column {
+  grid-column: 1;
+  grid-row: 3;
+
+  justify-self: start;
+  align-self: start;
+
+  z-index: 15;
+  width: 72px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  margin-top: clamp(3px, 0.8dvh, 8px);
+}
+
+#advanced-special-angle-column .editor-control-button {
+  min-height: 34px;
+}
+
+#advanced-delete-floor-button {
+  width: clamp(82px, 23vw, 108px);
+}
+
+#delete-floor-button,
+#advanced-delete-floor-button,
+#delete-selected-button {
+  white-space: nowrap;
+}
+
+@media (min-width: 600px) and (orientation: portrait) {
+  #advanced-angle-value {
+    width: clamp(118px, 16vw, 150px);
+    height: clamp(46px, 6vw, 56px);
+    padding: 0 12px;
+    border-radius: 12px;
+    font-size: var(--font-xl, 28px);
+  }
+
+  #advanced-angle-input-wrap > span {
+    font-size: var(--font-xl, 28px);
+  }
+
+  #advanced-special-angle-column {
+    width: 165px;
+    gap: 15px;
+    margin-top: clamp(6px, 1dvh, 12px);
+  }
+
+  #advanced-special-angle-column .editor-control-button {
+    min-height: 74px;
+    border-radius: 16px;
+    font-size: var(--font-md, 22px);
+  }
+
+  #advanced-delete-floor-button {
+    width: clamp(132px, 18vw, 168px);
+  }
+}
+
+/* First-launch editor notice */
+.editor-welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding:
+    calc(16px + env(safe-area-inset-top))
+    14px
+    calc(16px + env(safe-area-inset-bottom));
+
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.editor-welcome-overlay[hidden] {
+  display: none !important;
+}
+
+.editor-welcome-sheet {
+  width: min(620px, 100%);
+  max-height: min(84dvh, 760px);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  border: 1px solid #484848;
+  border-radius: 16px;
+  background: #151515;
+  color: #ddd;
+
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.62);
+}
+
+.editor-welcome-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 20px 8px;
+}
+
+.editor-welcome-scroll h2 {
+  margin: 0 0 16px;
+  color: #f2f2f2;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.editor-welcome-scroll p {
+  margin: 0 0 14px;
+  color: #aaa;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.editor-welcome-scroll .editor-welcome-note {
+  color: #c2c2c2;
+}
+
+.editor-welcome-continue {
+  flex: 0 0 44px;
+  margin: 10px 20px 18px;
+
+  border: 1px solid #566c58;
+  border-radius: 10px;
+  background: #263329;
+  color: #d9eadb;
+
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.editor-welcome-continue:active {
+  transform: scale(0.98);
+  background: #314336;
+}
+
+@media (max-width: 520px) {
+  .editor-welcome-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .editor-welcome-sheet {
+    width: 100%;
+    max-height: 88dvh;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    border-radius: 18px 18px 0 0;
+  }
+}
+
+@media (min-width: 600px) and (orientation: portrait) {
+  .editor-welcome-sheet {
+    width: min(700px, calc(100vw - 40px));
+    border-radius: 22px;
+  }
+
+  .editor-welcome-scroll {
+    padding: 28px 28px 12px;
+  }
+
+  .editor-welcome-scroll h2 {
+    margin-bottom: 22px;
+    font-size: var(--font-xl, 30px);
+  }
+
+  .editor-welcome-scroll p {
+    margin-bottom: 20px;
+    font-size: var(--font-sm, 19px);
+    line-height: 1.6;
+  }
+
+  .editor-welcome-continue {
+    flex-basis: 58px;
+    margin: 14px 28px 24px;
+    border-radius: 13px;
+    font-size: var(--font-md, 22px);
+  }
+}
+
+
+/* =========================================================
+   PORTRAIT RESPONSIVE LAYOUT V3
+
+   This is the final portrait override layer. It intentionally
+   centralizes phone sizing here so the older incremental mobile
+   rules above cannot make the editor controls collide.
+========================================================= */
+
+/* ---------- Undo / Redo: always available in edit mode ---------- */
+
+#history-toolbar {
+  position: absolute;
+
+  top:
+    calc(
+      8px +
+      env(safe-area-inset-top)
+    );
+
+  right: 8px;
+
+  z-index: 86;
+
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  pointer-events: auto;
+}
+
+.history-button {
+  width: 34px;
+  height: 34px;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #484848;
+  border-radius: 10px;
+
+  background: rgba(25, 25, 25, 0.92);
+  color: #ddd;
+
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.history-button:active:not(:disabled) {
+  transform: scale(0.93);
+  background: #303030;
+}
+
+.history-button:disabled {
+  opacity: 0.24;
+}
+
+
+/* =========================================================
+   Phone portrait
+========================================================= */
+
+@media
+  (orientation: portrait)
+  and
+  (max-width: 599px)
+{
+  #editor {
+    --phone-tabs-height:
+      clamp(31px, 8.4vw, 36px);
+
+    --phone-palette-height:
+      clamp(31px, 8.6vw, 38px);
+
+    --event-palette-height:
+      calc(
+        var(--phone-palette-height) +
+        env(safe-area-inset-bottom)
+      );
+
+    --editor-nav-space: 0px;
+
+    --nav-height:
+      clamp(42px, 11.5vw, 49px);
+  }
+
+
+  /* -------------------------
+     Panel height
+
+     Use visible viewport height rather than only width.
+     This leaves enough room for tabs + direction ring + palette
+     even in Safari/Chrome with large browser chrome.
+  ------------------------- */
+
+  #editor.ui-single {
+    --editor-panel-height:
+      clamp(
+        238px,
+        38dvh,
+        310px
+      );
+  }
+
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        278px,
+        44dvh,
+        350px
+      );
+  }
+
+  #editor.ui-multi {
+    --editor-panel-height:
+      clamp(
+        94px,
+        15dvh,
+        122px
+      );
+  }
+
+  #editor-panel,
+  #angle-panel {
+    min-height: 0;
+  }
+
+  #angle-panel {
+    overflow: hidden;
+  }
+
+
+  /* -------------------------
+     Top map controls
+  ------------------------- */
+
+  #level-toolbar {
+    top:
+      calc(
+        7px +
+        env(safe-area-inset-top)
+      );
+
+    left: 7px;
+    right: 7px;
+
+    height: 36px;
+
+    grid-template-columns:
+      36px
+      minmax(0, 1fr)
+      78px;
+
+    gap: 6px;
+  }
+
+  #level-toolbar-actions {
+    gap: 5px;
+  }
+
+  #project-settings-button,
+  #editor-settings-button {
+    width: 36px;
+    height: 36px;
+
+    border-radius: 10px;
+    font-size: 18px;
+  }
+
+  #level-title {
+    max-width: 50vw;
+
+    padding: 5px 5px;
+
+    font-size:
+      clamp(
+        11px,
+        3.3vw,
+        15px
+      );
+
+    line-height: 1.15;
+  }
+
+  #history-toolbar {
+    top:
+      calc(
+        7px +
+        env(safe-area-inset-top)
+      );
+
+    right: 7px;
+  }
+
+  .history-button {
+    width: 34px;
+    height: 34px;
+
+    border-radius: 10px;
+    font-size: 20px;
+  }
+
+  /* Put diagnostics below the top controls, not beside them. */
+  #editor-info {
+    top:
+      calc(
+        88px +
+        env(safe-area-inset-top)
+      );
+
+    right: 7px;
+
+    max-width:
+      min(
+        64vw,
+        280px
+      );
+
+    overflow: hidden;
+
+    color:
+      rgba(
+        225,
+        225,
+        225,
+        0.58
+      );
+
+    font-size:
+      clamp(
+        7px,
+        2.15vw,
+        9px
+      );
+
+    line-height: 1.42;
+
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+
+  /* -------------------------
+     Floating playback/navigation
+  ------------------------- */
+
+  #bottom-nav {
+    width:
+      clamp(
+        210px,
+        62vw,
+        300px
+      );
+
+    min-width: 0;
+
+    padding: 4px 6px;
+
+    grid-template-columns:
+      0.72fr
+      1fr
+      1fr
+      1fr
+      0.72fr;
+  }
+
+  .modifier-button {
+    height:
+      calc(
+        var(--nav-height) - 8px
+      );
+
+    font-size:
+      clamp(
+        10px,
+        3vw,
+        13px
+      );
+  }
+
+  #play-button {
+    width:
+      calc(
+        var(--nav-height) - 8px
+      );
+
+    height:
+      calc(
+        var(--nav-height) - 8px
+      );
+
+    font-size:
+      clamp(
+        17px,
+        5vw,
+        21px
+      );
+  }
+
+  .floor-nav-button {
+    height:
+      calc(
+        var(--nav-height) - 8px
+      );
+
+    font-size:
+      clamp(
+        22px,
+        6vw,
+        28px
+      );
+  }
+
+
+  /* -------------------------
+     Tabs
+  ------------------------- */
+
+  #editor-tabs {
+    flex-basis:
+      var(--phone-tabs-height);
+
+    height:
+      var(--phone-tabs-height);
+
+    gap: 4px;
+
+    padding:
+      3px
+      7px
+      0;
+  }
+
+  .editor-tab {
+    flex:
+      0 0
+      clamp(
+        39px,
+        11vw,
+        46px
+      );
+
+    height:
+      calc(
+        var(--phone-tabs-height) - 5px
+      );
+
+    border-radius: 8px 8px 0 0;
+  }
+
+  .editor-tab.active {
+    height:
+      calc(
+        var(--phone-tabs-height) - 2px
+      );
+  }
+
+  img.editor-tab-icon {
+    width:
+      clamp(
+        20px,
+        5.7vw,
+        24px
+      );
+
+    height:
+      clamp(
+        20px,
+        5.7vw,
+        24px
+      );
+  }
+
+
+  /* -------------------------
+     Single tile editor
+  ------------------------- */
+
+  #single-angle-editor {
+    grid-template-columns:
+      clamp(62px, 20vw, 82px)
+      minmax(0, 1fr)
+      clamp(62px, 20vw, 82px);
+
+    height: 100%;
+
+    align-items: start;
+
+    padding: 4px 6px 2px;
+  }
+
+  #special-angle-column,
+  #delete-angle-column {
+    min-width: 0;
+
+    gap:
+      clamp(
+        5px,
+        1.5vw,
+        8px
+      );
+
+    padding: 4px 0 0;
+  }
+
+  #special-angle-column {
+    padding-right: 4px;
+  }
+
+  #delete-angle-column {
+    padding-left: 4px;
+  }
+
+  .editor-control-button,
+  #delete-floor-button {
+    min-height:
+      clamp(
+        34px,
+        9.5vw,
+        42px
+      );
+
+    height:
+      clamp(
+        34px,
+        9.5vw,
+        42px
+      );
+
+    padding: 0 3px;
+
+    border-radius:
+      clamp(
+        7px,
+        2.2vw,
+        10px
+      );
+
+    font-size:
+      clamp(
+        8px,
+        2.7vw,
+        11px
+      );
+
+    line-height: 1;
+  }
+
+  #quick-angle-area {
+    min-width: 0;
+    min-height: 0;
+
+    padding-top: 1px;
+
+    overflow: visible;
+  }
+
+  .angle-panel-title {
+    flex-basis:
+      clamp(
+        16px,
+        4.7vw,
+        20px
+      );
+
+    margin-bottom: 0;
+
+    font-size:
+      clamp(
+        8px,
+        2.6vw,
+        10px
+      );
+
+    line-height: 1;
+  }
+
+  #quick-angle-ring {
+    width:
+      min(
+        41vw,
+        20dvh,
+        158px
+      );
+
+    min-width: 108px;
+
+    margin-top: 2px;
+  }
+
+  .angle-button {
+    width:
+      clamp(
+        28px,
+        8.8vw,
+        36px
+      );
+
+    height:
+      clamp(
+        28px,
+        8.8vw,
+        36px
+      );
+
+    border-radius:
+      clamp(
+        7px,
+        2.2vw,
+        9px
+      );
+
+    font-size:
+      clamp(
+        15px,
+        5vw,
+        19px
+      );
+  }
+
+  .angle-sub-button {
+    width:
+      clamp(
+        17px,
+        5.1vw,
+        22px
+      );
+
+    height:
+      clamp(
+        17px,
+        5.1vw,
+        22px
+      );
+
+    min-width:
+      clamp(
+        17px,
+        5.1vw,
+        22px
+      );
+
+    min-height:
+      clamp(
+        17px,
+        5.1vw,
+        22px
+      );
+
+    font-size:
+      clamp(
+        6px,
+        1.9vw,
+        8px
+      );
+  }
+
+  #angle-current {
+    width:
+      clamp(
+        40px,
+        11.7vw,
+        48px
+      );
+
+    height:
+      clamp(
+        40px,
+        11.7vw,
+        48px
+      );
+
+    font-size:
+      clamp(
+        11px,
+        3.1vw,
+        13px
+      );
+  }
+
+
+  /* -------------------------
+     Event palette
+  ------------------------- */
+
+  #event-palette {
+    flex-basis:
+      var(--event-palette-height);
+
+    min-height:
+      var(--event-palette-height);
+  }
+
+  #event-palette-list {
+    justify-content: center;
+
+    gap:
+      clamp(
+        5px,
+        1.7vw,
+        8px
+      );
+
+    padding:
+      2px
+      8px
+      calc(
+        2px +
+        env(safe-area-inset-bottom)
+      );
+  }
+
+  .event-palette-button {
+    flex:
+      0 0
+      clamp(
+        28px,
+        8vw,
+        34px
+      );
+
+    width:
+      clamp(
+        28px,
+        8vw,
+        34px
+      );
+
+    height:
+      clamp(
+        28px,
+        8vw,
+        34px
+      );
+
+    min-width: 0;
+    min-height: 0;
+
+    border-radius: 7px;
+  }
+
+  .event-palette-icon {
+    width: 78%;
+    height: 78%;
+  }
+
+
+  /* -------------------------
+     Advanced editor
+
+     Side controls get dedicated columns; the input, snap button and
+     dial stay on the exact center column. This prevents the dial and
+     360/MID buttons from competing for the same space.
+  ------------------------- */
+
+  #advanced-angle-editor {
+    grid-template-columns:
+      clamp(62px, 20vw, 82px)
+      minmax(0, 1fr)
+      clamp(62px, 20vw, 82px);
+
+    grid-template-rows:
+      clamp(38px, 10vw, 44px)
+      clamp(58px, 15vw, 68px)
+      minmax(0, 1fr);
+
+    column-gap: 5px;
+
+    padding: 2px 6px 4px;
+  }
+
+  #advanced-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+
+    grid-template-columns:
+      clamp(62px, 20vw, 82px)
+      minmax(0, 1fr)
+      clamp(62px, 20vw, 82px);
+
+    gap: 5px;
+
+    min-height: 0;
+    padding: 0;
+
+    font-size:
+      clamp(
+        13px,
+        4vw,
+        16px
+      );
+  }
+
+  #advanced-header > span:nth-child(2) {
+    position: static;
+
+    grid-column: 2;
+    grid-row: 1;
+
+    align-self: center;
+    justify-self: center;
+
+    transform: none;
+
+    max-width: 100%;
+  }
+
+  #advanced-back-button,
+  #advanced-delete-floor-button {
+    height:
+      clamp(
+        34px,
+        9.5vw,
+        42px
+      );
+
+    align-self: center;
+
+    border-radius:
+      clamp(
+        7px,
+        2.2vw,
+        10px
+      );
+  }
+
+  #advanced-back-button {
+    width:
+      clamp(
+        40px,
+        12vw,
+        48px
+      );
+
+    font-size:
+      clamp(
+        21px,
+        6vw,
+        26px
+      );
+  }
+
+  #advanced-delete-floor-button {
+    width: 100%;
+
+    padding: 0 2px;
+
+    font-size:
+      clamp(
+        8px,
+        2.6vw,
+        11px
+      );
+  }
+
+  #advanced-angle-info {
+    grid-column: 2;
+    grid-row: 2;
+
+    width: 100%;
+
+    gap: 4px;
+
+    align-self: center;
+    justify-self: stretch;
+    justify-content: center;
+
+    padding: 0;
+  }
+
+  #advanced-angle-input-wrap {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #advanced-angle-value {
+    width:
+      clamp(
+        72px,
+        25vw,
+        104px
+      );
+
+    height:
+      clamp(
+        32px,
+        8.8vw,
+        38px
+      );
+
+    padding: 0 7px;
+
+    font-size:
+      clamp(
+        16px,
+        5vw,
+        21px
+      );
+  }
+
+  #advanced-angle-input-wrap > span {
+    font-size:
+      clamp(
+        16px,
+        5vw,
+        21px
+      );
+  }
+
+  #snap-toggle-button {
+    min-width:
+      clamp(
+        80px,
+        26vw,
+        108px
+      );
+
+    height:
+      clamp(
+        27px,
+        7.4vw,
+        32px
+      );
+
+    padding: 0 10px;
+
+    border-radius: 10px;
+
+    font-size:
+      clamp(
+        9px,
+        2.8vw,
+        12px
+      );
+  }
+
+  #advanced-special-angle-column {
+    grid-column: 1;
+    grid-row: 2 / 4;
+
+    align-self: start;
+    justify-self: stretch;
+
+    width: auto;
+
+    gap:
+      clamp(
+        6px,
+        1.7vw,
+        9px
+      );
+
+    margin: 0;
+    padding-top: 4px;
+  }
+
+  #advanced-special-angle-column
+  .editor-control-button {
+    min-height:
+      clamp(
+        36px,
+        10vw,
+        43px
+      );
+
+    height:
+      clamp(
+        36px,
+        10vw,
+        43px
+      );
+  }
+
+  #angle-dial-wrap {
+    grid-column: 2;
+    grid-row: 3;
+
+    --advanced-dial-size:
+      min(
+        40vw,
+        20dvh,
+        164px
+      );
+
+    align-self: start;
+    justify-self: center;
+
+    margin-top: 3px;
+  }
+
+  .dial-label {
+    font-size:
+      clamp(
+        9px,
+        2.7vw,
+        12px
+      );
+  }
+
+  #advanced-add-button {
+    width:
+      clamp(
+        36px,
+        10.5vw,
+        44px
+      );
+
+    height:
+      clamp(
+        36px,
+        10.5vw,
+        44px
+      );
+
+    min-width: 0;
+    min-height: 0;
+
+    font-size:
+      clamp(
+        23px,
+        7vw,
+        29px
+      );
+  }
+
+
+  /* -------------------------
+     Event editor forms
+     Prevent wide segmented buttons from forcing horizontal overflow.
+  ------------------------- */
+
+  #event-screen-header {
+    flex-basis:
+      clamp(
+        45px,
+        12vw,
+        52px
+      );
+
+    gap: 8px;
+    padding: 6px 9px;
+  }
+
+  #event-screen-icon {
+    flex-basis:
+      clamp(
+        27px,
+        7.5vw,
+        32px
+      );
+
+    width:
+      clamp(
+        27px,
+        7.5vw,
+        32px
+      );
+
+    height:
+      clamp(
+        27px,
+        7.5vw,
+        32px
+      );
+  }
+
+  #event-screen-body {
+    padding: 6px 8px 9px;
+  }
+
+  .event-card {
+    padding: 7px 8px;
+  }
+
+  .event-form-row {
+    min-height:
+      clamp(
+        40px,
+        11vw,
+        46px
+      );
+
+    gap: 7px;
+  }
+
+  .event-form-label {
+    font-size:
+      clamp(
+        9px,
+        2.8vw,
+        11px
+      );
+  }
+
+  .event-form-input,
+  .event-form-select {
+    flex-basis:
+      min(
+        42vw,
+        142px
+      );
+
+    width:
+      min(
+        42vw,
+        142px
+      );
+
+    max-width: 46vw;
+
+    height:
+      clamp(
+        31px,
+        8.5vw,
+        36px
+      );
+  }
+
+  .event-segmented {
+    flex:
+      0 1
+      min(
+        58vw,
+        220px
+      );
+
+    width:
+      min(
+        58vw,
+        220px
+      );
+
+    max-width: 58vw;
+
+    height:
+      clamp(
+        34px,
+        9.5vw,
+        40px
+      );
+  }
+
+  .event-segment-button {
+    flex: 1 1 50%;
+
+    min-width: 0;
+
+    padding: 0 6px;
+
+    font-size:
+      clamp(
+        9px,
+        2.7vw,
+        12px
+      );
+  }
+}
+
+
+/* =========================================================
+   Extra-small / short portrait phones
+========================================================= */
+
+@media
+  (orientation: portrait)
+  and
+  (max-width: 380px)
+{
+  #editor.ui-single {
+    --editor-panel-height:
+      clamp(
+        230px,
+        39dvh,
+        286px
+      );
+  }
+
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        265px,
+        45dvh,
+        326px
+      );
+  }
+
+  #single-angle-editor,
+  #advanced-angle-editor {
+    grid-template-columns:
+      58px
+      minmax(0, 1fr)
+      58px;
+  }
+
+  #advanced-header {
+    grid-template-columns:
+      58px
+      minmax(0, 1fr)
+      58px;
+  }
+
+  .editor-control-button,
+  #delete-floor-button,
+  #advanced-delete-floor-button {
+    font-size: 8px;
+  }
+
+  #quick-angle-ring {
+    width:
+      min(
+        39vw,
+        18.5dvh,
+        142px
+      );
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-size:
+      min(
+        38vw,
+        18.5dvh,
+        148px
+      );
+  }
+
+  #bottom-nav {
+    width:
+      min(
+        70vw,
+        254px
+      );
+  }
+}
+
+
+@media
+  (orientation: portrait)
+  and
+  (max-height: 620px)
+{
+  #editor.ui-single {
+    --editor-panel-height:
+      clamp(
+        220px,
+        42dvh,
+        260px
+      );
+  }
+
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        250px,
+        48dvh,
+        300px
+      );
+  }
+
+  #quick-angle-ring {
+    width:
+      min(
+        37vw,
+        17dvh,
+        132px
+      );
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-size:
+      min(
+        36vw,
+        17dvh,
+        140px
+      );
+  }
+
+  .angle-panel-title {
+    font-size: 8px;
+  }
+}
+
+
+/* =========================================================
+   Tablet portrait history controls
+========================================================= */
+
+@media
+  (orientation: portrait)
+  and
+  (min-width: 600px)
+{
+  #history-toolbar {
+    top:
+      calc(
+        12px +
+        env(safe-area-inset-top)
+      );
+
+    right: 14px;
+
+    gap: 10px;
+  }
+
+  .history-button {
+    width: 54px;
+    height: 54px;
+
+    border-radius: 15px;
+    font-size: 31px;
+  }
+
+  /* Reserve visual space for the right-side history controls. */
+  #level-title {
+    max-width: 62vw;
+  }
+}
+
+/* =========================================================
+   ALIGNMENT + ADVANCED CLEANUP V4
+
+   Final override layer. Keep this block at the very end.
+   The important rule here is that visual centers no longer depend
+   on asymmetric left/right tool groups.
+========================================================= */
+
+/* =====================================================
+   Map toolbar: title is tied to the viewport center, not to
+   the remaining grid column between the left and right controls.
+===================================================== */
+
+#level-toolbar {
+  position: absolute;
+}
+
+#level-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+
+  grid-column: auto;
+  grid-row: auto;
+
+  justify-self: auto;
+
+  width: max-content;
+  max-width: min(54vw, 720px);
+
+  transform: translate(-50%, -50%);
+
+  text-align: center;
+  transform-origin: center center;
+
+  z-index: 2;
+}
+
+/* Left settings and right history controls stay independently
+   anchored, so neither can push the title away from center. */
+#level-toolbar-actions {
+  position: absolute;
+  left: 0;
+  top: 0;
+
+  grid-column: auto;
+  grid-row: auto;
+}
+
+#history-toolbar {
+  right: 8px;
+}
+
+
+/* =====================================================
+   Single tile editor: enforce symmetric side columns.
+===================================================== */
+
+#single-angle-editor {
+  --single-side-width: clamp(72px, 18vw, 165px);
+
+  grid-template-columns:
+    var(--single-side-width)
+    minmax(0, 1fr)
+    var(--single-side-width);
+}
+
+#quick-angle-area {
+  justify-self: stretch;
+  align-items: center;
+}
+
+#quick-angle-ring,
+.angle-panel-title {
+  align-self: center;
+}
+
+
+/* =====================================================
+   Advanced: one real three-column layout on every screen.
+
+   left controls | exact center | delete
+===================================================== */
+
+#advanced-angle-editor {
+  --advanced-side-width: clamp(72px, 18vw, 165px);
+  --advanced-input-width: clamp(82px, 20vw, 118px);
+
+  grid-template-columns:
+    var(--advanced-side-width)
+    minmax(0, 1fr)
+    var(--advanced-side-width);
+
+  grid-template-rows:
+    clamp(40px, 5dvh, 54px)
+    auto
+    minmax(0, 1fr);
+
+  column-gap: clamp(6px, 1.2vw, 14px);
+  row-gap: clamp(6px, 0.9dvh, 10px);
+
+  justify-items: stretch;
+  align-items: start;
+
+  padding:
+    5px
+    clamp(8px, 1.6vw, 20px)
+    10px;
+}
+
+/* Header uses the SAME side widths as the editor body. */
+#advanced-header {
+  position: static;
+
+  grid-column: 1 / -1;
+  grid-row: 1;
+
+  display: grid;
+  grid-template-columns:
+    var(--advanced-side-width)
+    minmax(0, 1fr)
+    var(--advanced-side-width);
+
+  gap: clamp(6px, 1.2vw, 14px);
+
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+
+  align-items: center;
+}
+
+#advanced-header > span:nth-child(2) {
+  position: static;
+
+  grid-column: 2;
+  grid-row: 1;
+
+  width: auto;
+  max-width: 100%;
+
+  justify-self: center;
+  align-self: center;
+
+  transform: none;
+
+  text-align: center;
+  white-space: nowrap;
+
+  font-size: clamp(14px, 3.6vw, 20px);
+  line-height: 1.15;
+}
+
+#advanced-back-button {
+  grid-column: 1;
+  grid-row: 1;
+
+  justify-self: start;
+  align-self: center;
+}
+
+#advanced-delete-floor-button {
+  grid-column: 3;
+  grid-row: 1;
+
+  justify-self: end;
+  align-self: center;
+}
+
+
+/* ---------- Center angle controls ---------- */
+
+#advanced-angle-info {
+  grid-column: 2;
+  grid-row: 2;
+
+  width: 100%;
+
+  align-self: start;
+  justify-self: stretch;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: clamp(7px, 1dvh, 11px);
+  padding: 0;
+}
+
+/* The degree mark no longer participates in centering the input.
+   The numeric field itself sits on the exact editor centerline. */
+#advanced-angle-input-wrap {
+  position: relative;
+
+  width: 100%;
+  min-height: clamp(34px, 5dvh, 44px);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 0;
+}
+
+#advanced-angle-value {
+  width: var(--advanced-input-width);
+  height: clamp(34px, 5dvh, 42px);
+
+  margin: 0;
+  padding: 0 9px;
+
+  text-align: center !important;
+  text-indent: 0;
+
+  font-size: clamp(16px, 4vw, 21px);
+  line-height: 1;
+}
+
+#advanced-angle-input-wrap > span {
+  position: absolute;
+
+  left:
+    calc(
+      50% +
+      var(--advanced-input-width) / 2 +
+      6px
+    );
+
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-size: clamp(15px, 3.8vw, 20px);
+  line-height: 1;
+}
+
+#snap-toggle-button {
+  min-width: clamp(86px, 22vw, 116px);
+  height: clamp(28px, 4.6dvh, 34px);
+
+  margin: 0;
+  padding: 0 12px;
+
+  border-radius: 11px;
+
+  font-size: clamp(9px, 2.5vw, 12px);
+  line-height: 1;
+
+  align-self: center;
+}
+
+
+/* ---------- Left 360 / MID ---------- */
+
+#advanced-special-angle-column {
+  grid-column: 1;
+  grid-row: 2 / 4;
+
+  width: 100%;
+
+  justify-self: stretch;
+  align-self: start;
+
+  margin: 0;
+  padding-top: 2px;
+
+  gap: clamp(7px, 1dvh, 12px);
+}
+
+
+/* ---------- Dial: exact center column, slightly smaller ---------- */
+
+#angle-dial-wrap {
+  grid-column: 2;
+  grid-row: 3;
+
+  --advanced-dial-size:
+    min(
+      38vw,
+      18dvh,
+      190px
+    );
+
+  justify-self: center;
+  align-self: start;
+
+  margin-top: clamp(5px, 0.8dvh, 9px);
+}
+
+#angle-dial {
+  left: 0;
+  top: 0;
+}
+
+
+/* =====================================================
+   Phone portrait
+===================================================== */
+
+@media
+  (orientation: portrait)
+  and
+  (max-width: 599px)
+{
+  #level-title {
+    max-width: 48vw;
+  }
+
+  #history-toolbar {
+    right: 7px;
+  }
+
+  #single-angle-editor {
+    --single-side-width: clamp(60px, 19vw, 80px);
+  }
+
+  #advanced-angle-editor {
+    --advanced-side-width: clamp(60px, 19vw, 80px);
+    --advanced-input-width: clamp(80px, 25vw, 102px);
+
+    grid-template-rows:
+      clamp(38px, 10vw, 44px)
+      auto
+      minmax(0, 1fr);
+
+    row-gap: 7px;
+
+    padding: 4px 6px 7px;
+  }
+
+  #advanced-header > span:nth-child(2) {
+    font-size: clamp(13px, 4vw, 16px);
+  }
+
+  #advanced-angle-info {
+    gap: 7px;
+  }
+
+  #advanced-angle-value {
+    height: clamp(32px, 8.5vw, 37px);
+    font-size: clamp(16px, 5vw, 20px);
+  }
+
+  #advanced-angle-input-wrap {
+    min-height: clamp(32px, 8.5vw, 37px);
+  }
+
+  #snap-toggle-button {
+    min-width: clamp(82px, 26vw, 104px);
+    height: clamp(27px, 7vw, 31px);
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-size:
+      min(
+        36vw,
+        17.5dvh,
+        150px
+      );
+
+    margin-top: 6px;
+  }
+
+  #advanced-special-angle-column {
+    padding-top: 1px;
+  }
+}
+
+
+/* =====================================================
+   Large portrait / tablet
+===================================================== */
+
+@media
+  (orientation: portrait)
+  and
+  (min-width: 600px)
+{
+  #level-title {
+    max-width: 56vw;
+  }
+
+  #single-angle-editor {
+    --single-side-width: clamp(140px, 19vw, 165px);
+  }
+
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        450px,
+        38dvh,
+        570px
+      );
+  }
+
+  #advanced-angle-editor {
+    --advanced-side-width: clamp(140px, 19vw, 165px);
+    --advanced-input-width: clamp(116px, 16vw, 138px);
+
+    grid-template-rows:
+      clamp(54px, 5dvh, 64px)
+      auto
+      minmax(0, 1fr);
+
+    column-gap: 14px;
+    row-gap: clamp(9px, 0.9dvh, 13px);
+
+    padding: 8px 18px 15px;
+  }
+
+  #advanced-header > span:nth-child(2) {
+    font-size: clamp(20px, 2.8vw, 24px);
+  }
+
+  #advanced-angle-info {
+    gap: clamp(10px, 1dvh, 14px);
+  }
+
+  #advanced-angle-input-wrap {
+    min-height: clamp(46px, 5vw, 52px);
+  }
+
+  #advanced-angle-value {
+    height: clamp(46px, 5vw, 52px);
+
+    padding: 0 12px;
+
+    border-radius: 11px;
+
+    font-size: clamp(22px, 3vw, 26px);
+  }
+
+  #advanced-angle-input-wrap > span {
+    left:
+      calc(
+        50% +
+        var(--advanced-input-width) / 2 +
+        8px
+      );
+
+    font-size: clamp(21px, 2.9vw, 25px);
+  }
+
+  #snap-toggle-button {
+    min-width: clamp(118px, 16vw, 138px);
+    height: clamp(34px, 4.1vw, 40px);
+
+    padding: 0 15px;
+
+    border-radius: 14px;
+
+    font-size: clamp(14px, 2vw, 18px);
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-size:
+      min(
+        28vw,
+        20dvh,
+        250px
+      );
+
+    margin-top: clamp(8px, 1dvh, 12px);
+  }
+
+  #advanced-special-angle-column {
+    gap: 13px;
+    padding-top: 2px;
+  }
+
+  #advanced-special-angle-column
+  .editor-control-button {
+    min-height: clamp(62px, 8vw, 72px);
+    height: clamp(62px, 8vw, 72px);
+  }
+}
+
+
+/* =====================================================
+   Very short portrait screens: preserve spacing first, then size.
+===================================================== */
+
+@media
+  (orientation: portrait)
+  and
+  (max-height: 650px)
+{
+  #advanced-angle-editor {
+    row-gap: 5px;
+  }
+
+  #advanced-angle-info {
+    gap: 5px;
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-size:
+      min(
+        34vw,
+        16.5dvh,
+        138px
+      );
+
+    margin-top: 4px;
+  }
+}
+
+/* Keep the Advanced numeric value visually centered on browsers that
+   expose native number-input steppers. */
+#advanced-angle-value {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+#advanced-angle-value::-webkit-outer-spin-button,
+#advanced-angle-value::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+/* =========================================================
+   ROUND 5: Advanced vertical-fit / clipping fix
+   The dial now consumes only the REAL remaining grid row height.
+   Keep this block at the very end of the stylesheet.
+========================================================= */
+
+/*
+  Previous Advanced rules gave the dial an explicit width AND height.
+  On screens where tabs + event palette leave a shorter angle-panel,
+  that fixed square could be taller than grid row 3 and was clipped.
+
+  New layout:
+    row 1 = compact header
+    row 2 = compact input + snap controls
+    row 3 = all remaining height
+
+  The dial's HEIGHT is driven by row 3, and aspect-ratio derives its width.
+  Therefore it cannot extend into the event palette below.
+*/
+#advanced-angle-editor {
+  grid-template-rows:
+    clamp(36px, 5dvh, 46px)
+    max-content
+    minmax(0, 1fr) !important;
+
+  row-gap:
+    clamp(6px, 0.75dvh, 9px);
+
+  padding:
+    5px
+    clamp(8px, 1.6vw, 18px)
+    10px;
+
+  overflow: hidden;
+}
+
+#advanced-header {
+  min-height: 0;
+}
+
+#advanced-angle-info {
+  gap:
+    clamp(6px, 0.7dvh, 9px);
+
+  min-height: 0;
+}
+
+#advanced-angle-input-wrap {
+  min-height: 0;
+  height:
+    clamp(32px, 4.6dvh, 40px);
+}
+
+#advanced-angle-value {
+  height: 100%;
+  min-height: 0;
+
+  padding:
+    0
+    8px;
+
+  text-align: center !important;
+
+  font-size:
+    clamp(15px, 3.7vw, 20px);
+}
+
+#advanced-angle-input-wrap > span {
+  font-size:
+    clamp(14px, 3.5vw, 19px);
+}
+
+#snap-toggle-button {
+  height:
+    clamp(26px, 3.8dvh, 32px);
+
+  min-height: 0;
+  min-width:
+    clamp(82px, 21vw, 108px);
+
+  padding:
+    0
+    11px;
+
+  font-size:
+    clamp(9px, 2.3vw, 12px);
+}
+
+/*
+  Critical clipping fix.
+  Do NOT give this element a fixed width and fixed height anymore.
+  Grid row 3 owns the available vertical space.
+*/
+#angle-dial-wrap {
+  --advanced-dial-max:
+    min(
+      34vw,
+      190px
+    );
+
+  width: auto !important;
+  height: 100% !important;
+
+  max-width:
+    var(--advanced-dial-max) !important;
+
+  max-height:
+    var(--advanced-dial-max) !important;
+
+  min-width: 0 !important;
+  min-height: 0 !important;
+
+  aspect-ratio:
+    1 / 1;
+
+  justify-self: center;
+  align-self: stretch;
+
+  margin-top: 0 !important;
+  margin-bottom: 0;
+}
+
+#angle-dial {
+  width: 100% !important;
+  height: 100% !important;
+
+  aspect-ratio:
+    1 / 1;
+}
+
+/* Keep the center add button proportional after shrinking the dial. */
+#advanced-add-button {
+  width:
+    clamp(34px, 8vw, 46px);
+
+  height:
+    clamp(34px, 8vw, 46px);
+
+  min-width:
+    clamp(34px, 8vw, 46px);
+
+  min-height:
+    clamp(34px, 8vw, 46px);
+
+  font-size:
+    clamp(22px, 5.8vw, 28px);
+}
+
+/* =====================================================
+   Phone portrait
+===================================================== */
+@media
+  (orientation: portrait)
+  and
+  (max-width: 599px)
+{
+  #advanced-angle-editor {
+    grid-template-rows:
+      clamp(34px, 9vw, 40px)
+      max-content
+      minmax(0, 1fr) !important;
+
+    row-gap: 5px;
+
+    padding:
+      4px
+      6px
+      7px;
+  }
+
+  #advanced-angle-info {
+    gap: 5px;
+  }
+
+  #advanced-angle-input-wrap {
+    height:
+      clamp(30px, 8vw, 34px);
+  }
+
+  #advanced-angle-value {
+    font-size:
+      clamp(15px, 4.7vw, 18px);
+  }
+
+  #snap-toggle-button {
+    height:
+      clamp(25px, 6.5vw, 29px);
+
+    min-width:
+      clamp(78px, 24vw, 98px);
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-max:
+      min(
+        34vw,
+        145px
+      );
+  }
+
+  #advanced-special-angle-column {
+    gap: 6px;
+  }
+}
+
+/* =====================================================
+   Large portrait / tablet
+===================================================== */
+@media
+  (orientation: portrait)
+  and
+  (min-width: 600px)
+{
+  /*
+    Keep enough map space; make controls fit by reducing the
+    Advanced content rather than making the panel taller.
+  */
+  #editor.ui-advanced {
+    --editor-panel-height:
+      clamp(
+        410px,
+        37dvh,
+        520px
+      );
+  }
+
+  #advanced-angle-editor {
+    grid-template-rows:
+      clamp(46px, 4.6dvh, 54px)
+      max-content
+      minmax(0, 1fr) !important;
+
+    row-gap:
+      clamp(7px, 0.7dvh, 10px);
+
+    padding:
+      7px
+      16px
+      12px;
+  }
+
+  #advanced-header > span:nth-child(2) {
+    font-size:
+      clamp(19px, 2.5vw, 22px);
+  }
+
+  #advanced-angle-info {
+    gap:
+      clamp(7px, 0.7dvh, 10px);
+  }
+
+  #advanced-angle-input-wrap {
+    height:
+      clamp(40px, 4.5vw, 46px);
+  }
+
+  #advanced-angle-value {
+    width:
+      clamp(108px, 14vw, 128px);
+
+    padding:
+      0
+      10px;
+
+    border-radius: 10px;
+
+    font-size:
+      clamp(20px, 2.7vw, 24px);
+  }
+
+  #advanced-angle-input-wrap > span {
+    left:
+      calc(
+        50% +
+        clamp(108px, 14vw, 128px) / 2 +
+        7px
+      );
+
+    font-size:
+      clamp(19px, 2.6vw, 23px);
+  }
+
+  #snap-toggle-button {
+    height:
+      clamp(31px, 3.8vw, 36px);
+
+    min-width:
+      clamp(108px, 14vw, 128px);
+
+    padding:
+      0
+      13px;
+
+    border-radius: 13px;
+
+    font-size:
+      clamp(13px, 1.8vw, 16px);
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-max:
+      min(
+        26vw,
+        210px
+      );
+  }
+
+  #advanced-special-angle-column {
+    gap: 10px;
+  }
+
+  #advanced-special-angle-column
+  .editor-control-button {
+    min-height:
+      clamp(54px, 7vw, 64px);
+
+    height:
+      clamp(54px, 7vw, 64px);
+  }
+
+  #advanced-add-button {
+    width:
+      clamp(42px, 5.8vw, 52px);
+
+    height:
+      clamp(42px, 5.8vw, 52px);
+
+    min-width:
+      clamp(42px, 5.8vw, 52px);
+
+    min-height:
+      clamp(42px, 5.8vw, 52px);
+
+    font-size:
+      clamp(24px, 3.5vw, 28px);
+  }
+}
+
+/* =====================================================
+   Very short portrait screens
+===================================================== */
+@media
+  (orientation: portrait)
+  and
+  (max-height: 650px)
+{
+  #advanced-angle-editor {
+    grid-template-rows:
+      34px
+      max-content
+      minmax(0, 1fr) !important;
+
+    row-gap: 4px;
+    padding-bottom: 6px;
+  }
+
+  #advanced-angle-info {
+    gap: 4px;
+  }
+
+  #advanced-angle-input-wrap {
+    height: 29px;
+  }
+
+  #snap-toggle-button {
+    height: 24px;
+  }
+
+  #angle-dial-wrap {
+    --advanced-dial-max:
+      min(
+        31vw,
+        128px
+      );
+  }
+}

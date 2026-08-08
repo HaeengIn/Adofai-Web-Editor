@@ -41,6 +41,13 @@ const EVENT_MARKER_ICONS = {
   snailSlow:
     "./icons/Double_Snail.png",
 
+  /*
+    BPM 변화량이 사실상 동일한 경우.
+    편집 중에만 표시되고 재생 중에는 숨긴다.
+  */
+  equal:
+    "./icons/equal.png",
+
 
   /*
     Twirl 색상.
@@ -76,8 +83,12 @@ function createEventMarkerInfo(
   let marker = null;
 
   /*
-    0  = 별
-    10 = 전용 아이콘
+    마커 표시 우선순위
+
+    30 = 의미 있는 SetSpeed
+    20 = Twirl
+    10 = 거의 변화 없는 SetSpeed (equal)
+     0 = Pause / 기타 generic
 
     같은 우선순위에서는
     뒤의 action이 앞의 action을 덮는다.
@@ -199,9 +210,36 @@ function createEventMarkerInfo(
 
 
       /*
-        빨라짐
+        0.95x ~ 1.05x는 시각적으로 거의 동일한 속도 변화다.
+        편집 중에는 equal.png, Twirl보다 낮은 우선순위,
+        재생 중에는 숨김으로 처리한다.
       */
-      if(ratio > 1){
+      if(
+        Number.isFinite(ratio)
+        &&
+        ratio >= 0.95
+        &&
+        ratio <= 1.05
+      ){
+
+        setMarker(
+          {
+            type:
+              "speed-equal",
+
+            ratio,
+
+            iconSrc:
+              EVENT_MARKER_ICONS.equal
+          },
+
+          10
+        );
+      }
+
+
+      /* 의미 있게 빨라짐 */
+      else if(ratio > 1.05){
 
         setMarker(
           {
@@ -216,15 +254,13 @@ function createEventMarkerInfo(
                 : EVENT_MARKER_ICONS.rabbitFast
           },
 
-          10
+          30
         );
       }
 
 
-      /*
-        느려짐
-      */
-      else if(ratio < 1){
+      /* 의미 있게 느려짐 */
+      else if(ratio < 0.95){
 
         setMarker(
           {
@@ -239,14 +275,11 @@ function createEventMarkerInfo(
                 : EVENT_MARKER_ICONS.snail
           },
 
-          10
+          30
         );
       }
 
 
-      /*
-        BPM 변화가 없는 SetSpeed
-      */
       else{
 
         setMarker(
@@ -320,7 +353,7 @@ function createEventMarkerInfo(
           next 90° -> 0° 회전
           next 0°  -> -90° 회전 (= 시계 90°)
       */
-      const rotationDeg =
+      const baseRotationDeg =
         Number.isFinite(
           nextAbsoluteAngle
         )
@@ -328,6 +361,21 @@ function createEventMarkerInfo(
               nextAbsoluteAngle - 90
             )
           : 0;
+
+
+      /*
+        반시계방향 공전용 Twirl은 현재 결과에서
+        추가로 180° 회전한다.
+      */
+      const rotationDeg =
+        normalizeAngle(
+          baseRotationDeg +
+          (
+            twirlState
+              ? 180
+              : 0
+          )
+        );
 
 
       setMarker(
@@ -362,7 +410,7 @@ function createEventMarkerInfo(
           nextAbsoluteAngle
         },
 
-        10
+        20
       );
 
 
@@ -2611,8 +2659,13 @@ class RuntimeScene{
     */
     mesh.visible =
       !(
-        this.playbackVisualMode &&
-        marker.type === "other"
+        this.playbackVisualMode
+        &&
+        (
+          marker.type === "other"
+          ||
+          marker.type === "speed-equal"
+        )
       );
   
   
@@ -3230,15 +3283,23 @@ this.attachedFloorGroups
   
   
       /*
-        재생 중에는
-        generic marker만 숨김.
+        재생 중에는 generic marker와
+        거의 변화 없는 equal 속도 마커를 숨긴다.
       */
+      const markerType =
+        marker.userData
+          .markerType;
+
+
       marker.visible =
         !(
-          playing &&
-          marker.userData
-            .markerType ===
-            "other"
+          playing
+          &&
+          (
+            markerType === "other"
+            ||
+            markerType === "speed-equal"
+          )
         );
     }
   }
@@ -3447,6 +3508,9 @@ class TileEditorUI {
     this.fullspinButton = null;
     this.midspinButton = null;
 
+    this.advancedFullspinButton = null;
+    this.advancedMidspinButton = null;
+
     this.advancedButton = null;
     this.advancedBackButton = null;
     this.advancedAddButton = null;
@@ -3551,6 +3615,16 @@ class TileEditorUI {
     this.midspinButton =
       document.getElementById(
         "midspin-button"
+      );
+
+    this.advancedFullspinButton =
+      document.getElementById(
+        "advanced-fullspin-button"
+      );
+
+    this.advancedMidspinButton =
+      document.getElementById(
+        "advanced-midspin-button"
       );
 
     this.advancedButton =
@@ -3724,6 +3798,40 @@ class TileEditorUI {
       );
 
 
+    this.advancedFullspinButton
+      ?.addEventListener(
+        "click",
+        () => {
+
+          if(
+            this.advancedFullspinButton.disabled
+          ){
+            return;
+          }
+
+          this.callback
+            .onAddFullspin?.();
+        }
+      );
+
+
+    this.advancedMidspinButton
+      ?.addEventListener(
+        "click",
+        () => {
+
+          if(
+            this.advancedMidspinButton.disabled
+          ){
+            return;
+          }
+
+          this.callback
+            .onAddMidspin?.();
+        }
+      );
+
+
     /* =========================
        Advanced 열기
     ========================= */
@@ -3870,6 +3978,109 @@ class TileEditorUI {
 
           this.callback
             .onDeleteFloor?.();
+        }
+      );
+
+
+    this.advancedAngleValue
+      ?.addEventListener(
+        "input",
+        () => {
+
+          const rawValue =
+            String(
+              this.advancedAngleValue.value ??
+              ""
+            ).trim();
+
+          if(rawValue === ""){
+            return;
+          }
+
+          const value =
+            Number(rawValue);
+
+          if(!Number.isFinite(value)){
+            return;
+          }
+
+          this.dialAngle =
+            normalizeAngle(value);
+
+          if(this.angleDialNeedle){
+
+            this.angleDialNeedle
+              .style.transform =
+                `rotate(${-this.dialAngle}deg)`;
+          }
+        }
+      );
+
+
+    const commitAdvancedAngleInput =
+      () => {
+
+        const rawValue =
+          String(
+            this.advancedAngleValue?.value ??
+            ""
+          ).trim();
+
+        if(rawValue === ""){
+
+          this.setDialAngle(
+            this.dialAngle
+          );
+
+          return;
+        }
+
+        const value =
+          Number(rawValue);
+
+        if(!Number.isFinite(value)){
+
+          this.setDialAngle(
+            this.dialAngle
+          );
+
+          return;
+        }
+
+        this.setDialAngle(
+          value
+        );
+      };
+
+
+    this.advancedAngleValue
+      ?.addEventListener(
+        "change",
+        commitAdvancedAngleInput
+      );
+
+
+    this.advancedAngleValue
+      ?.addEventListener(
+        "blur",
+        commitAdvancedAngleInput
+      );
+
+
+    this.advancedAngleValue
+      ?.addEventListener(
+        "keydown",
+        e => {
+
+          if(e.key === "Enter"){
+
+            e.preventDefault();
+
+            commitAdvancedAngleInput();
+
+            this.advancedAngleValue
+              .blur();
+          }
         }
       );
 
@@ -5420,9 +5631,22 @@ integer = false,
       }
       
       
+      /*
+        SNAP에서는 15° 단위,
+        FREE에서는 소수 둘째 자리까지 유지한다.
+      */
+      if(!this.snapEnabled){
+
+        angle =
+          Math.round(
+            angle * 100
+          ) / 100;
+      }
+
+
       angle =
         normalizeAngle(
-          Math.round(angle)
+          angle
         );
 
 
@@ -5518,8 +5742,13 @@ integer = false,
     if(this.advancedAngleValue){
 
       this.advancedAngleValue
-        .textContent =
-          `${this.dialAngle}°`;
+        .value =
+          String(
+            Number(
+              this.dialAngle
+                .toFixed(4)
+            )
+          );
     }
 
 
@@ -6045,6 +6274,16 @@ integer = false,
     this.midspinButton.disabled =
       !data.canAdd;
 
+    if(this.advancedFullspinButton){
+      this.advancedFullspinButton.disabled =
+        !data.canAdd;
+    }
+
+    if(this.advancedMidspinButton){
+      this.advancedMidspinButton.disabled =
+        !data.canAdd;
+    }
+
     this.advancedButton.disabled =
       !data.canAdd;
 
@@ -6363,7 +6602,8 @@ class Evaluator{
   
   init(
     compiled,
-    t_us
+    t_us,
+    startFloorIndex = null
   ){
 
     this.reset();
@@ -6385,117 +6625,68 @@ class Evaluator{
     this.lastTime_us =
       this.startTime_us;
 
-    const index =
-      this.findFloorIndexByTime_us(
-        this.startTime_us
+    const maxIndex =
+      Math.max(
+        0,
+        (
+          this.compiled?.floors?.length ??
+          1
+        ) - 1
+      );
+
+    let index =
+      Number.isInteger(
+        startFloorIndex
+      )
+        ? startFloorIndex
+        : this.findFloorIndexByTime_us(
+            this.startTime_us
+          );
+
+    index =
+      Math.max(
+        0,
+        Math.min(
+          maxIndex,
+          index
+        )
       );
 
     this.lastIndex =
       index;
 
     /*
-      Restore the camera timeline at an arbitrary playback start.
+      Playback may begin from an arbitrary selected tile.
 
-      The old implementation placed the camera directly on the
-      selected floor. That discarded camera moves that had started
-      before this floor and caused the first N -> N+1 transition to
-      snap.
+      In that case the camera must begin ON that selected tile,
+      not halfway through a camera move that started on an earlier
+      tile in the full level timeline. Otherwise starting from N
+      makes the camera visually lag behind the tile/hitsound state.
 
-      Completed moves are accumulated into playerCameraPosition,
-      while moves that are still in progress are restored to the
-      active list.
+      From here, evaluateAt() only consumes moves N+1, N+2 ... ,
+      so the first transition after the chosen start stays smooth.
     */
-    const cameraMoves =
-      Array.isArray(
-        this.compiled
-          ?.playerCameraPositions
+    const floor =
+      this.compiled?.floors?.[
+        index
+      ];
+
+    this.playerCameraPosition.x =
+      Number.isFinite(
+        Number(floor?.x)
       )
-        ? this.compiled
-            .playerCameraPositions
-        : [];
+        ? Number(floor.x)
+        : 0;
 
-    for(
-      let i = 1;
-      i < cameraMoves.length;
-      i++
-    ){
+    this.playerCameraPosition.y =
+      Number.isFinite(
+        Number(floor?.y)
+      )
+        ? Number(floor.y)
+        : 0;
 
-      const move =
-        cameraMoves[i];
-
-      if(!move){
-        continue;
-      }
-
-      const start_us =
-        Number(
-          move.start_us
-        );
-
-      const duration_us =
-        Number(
-          move.duration_us
-        );
-
-      const dx =
-        Number(
-          move.dx
-        );
-
-      const dy =
-        Number(
-          move.dy
-        );
-
-      if(
-        !Number.isFinite(start_us) ||
-        !Number.isFinite(duration_us) ||
-        duration_us <= 0 ||
-        !Number.isFinite(dx) ||
-        !Number.isFinite(dy)
-      ){
-        continue;
-      }
-
-      const rawEnd_us =
-        Number(
-          move.end_us
-        );
-
-      const end_us =
-        Number.isFinite(rawEnd_us)
-          ? rawEnd_us
-          : start_us +
-            duration_us;
-
-      if(
-        this.startTime_us >=
-        end_us
-      ){
-
-        this.playerCameraPosition.x +=
-          dx;
-
-        this.playerCameraPosition.y +=
-          dy;
-
-        continue;
-      }
-
-      if(
-        this.startTime_us >=
-        start_us
-      ){
-
-        this.activePlayerCameraPositions
-          .push(move);
-
-        continue;
-      }
-
-      /* Camera moves are compiled in chronological order. */
-      break;
-    }
+    this.activePlayerCameraPositions =
+      [];
   }
   
   //특정 시간대 계산
@@ -10286,6 +10477,20 @@ class EditorApp{
     
     this.prevFloorButton = null;
     this.nextFloorButton = null;
+
+    /* =========================
+       Undo / Redo
+    ========================= */
+
+    this.undoButton = null;
+    this.redoButton = null;
+
+    this.undoStack = [];
+    this.redoStack = [];
+
+    this.historyLimit = 120;
+    this.historyRestoring = false;
+    this.historyInitialized = false;
     
     this.editorUI = new TileEditorUI();
     
@@ -10918,6 +11123,9 @@ class EditorApp{
     );
     
     this.initFloorNavigation();
+
+    this.initHistoryControls();
+    this.resetHistory();
     
     
     this.editorUI.init({
@@ -10985,6 +11193,8 @@ class EditorApp{
     this.initProjectSettingsUI();
 
     this.initEditorSettingsUI();
+
+    this.initWelcomeNotice();
 
     this.initResponsiveViewport();
 
@@ -11151,6 +11361,61 @@ class EditorApp{
     */
   }
   
+  /* =========================================================
+     First-launch notice
+  ========================================================= */
+
+  initWelcomeNotice(){
+
+    const overlay =
+      document.getElementById(
+        "editor-welcome-overlay"
+      );
+
+    const closeButton =
+      document.getElementById(
+        "editor-welcome-continue"
+      );
+
+    if(!overlay || !closeButton){
+      return;
+    }
+
+    const storageKey =
+      "adofai-editor-welcome-accepted-v1";
+
+    let alreadyAccepted = false;
+
+    try{
+      alreadyAccepted =
+        localStorage.getItem(storageKey) ===
+        "true";
+    }
+    catch{
+      alreadyAccepted = false;
+    }
+
+    overlay.hidden =
+      alreadyAccepted;
+
+    closeButton.addEventListener(
+      "click",
+      () => {
+
+        overlay.hidden = true;
+
+        try{
+          localStorage.setItem(
+            storageKey,
+            "true"
+          );
+        }
+        catch{}
+      }
+    );
+  }
+
+
   /* =========================================================
      Editor Settings UI
 
@@ -11979,6 +12244,19 @@ class EditorApp{
     }
 
 
+    if(
+      Object.is(
+        this.doc.settings[key],
+        value
+      )
+    ){
+      return true;
+    }
+
+
+    this.recordHistoryBeforeEdit();
+
+
     this.doc.settings[key] =
       value;
 
@@ -12275,6 +12553,9 @@ class EditorApp{
       this.builder.fromProject(
         this.project
       );
+
+
+    this.resetHistory();
 
 
     this.currentLevelSource =
@@ -12826,6 +13107,26 @@ class EditorApp{
     }
   
   
+    const hasChange =
+      Object.entries(
+        patch ?? {}
+      ).some(
+        ([key, value]) =>
+          !Object.is(
+            action?.[key],
+            value
+          )
+      );
+
+
+    if(!hasChange){
+      return true;
+    }
+
+
+    this.recordHistoryBeforeEdit();
+
+
     const updated =
       this.doc.updateAction(
         action,
@@ -12865,6 +13166,18 @@ class EditorApp{
     }
   
   
+    if(
+      !this.doc.actions.includes(
+        action
+      )
+    ){
+      return false;
+    }
+
+
+    this.recordHistoryBeforeEdit();
+
+
     const removed =
       this.doc.removeAction(
         action
@@ -12886,6 +13199,479 @@ class EditorApp{
     return true;
   }
   
+  /* =========================================================
+     Undo / Redo
+
+     A snapshot stores the editable Document plus the current
+     selection. Camera position is intentionally not part of edit
+     history, so Undo/Redo changes the level without jumping the view.
+  ========================================================= */
+
+  initHistoryControls(){
+
+    if(this.historyInitialized){
+      this.updateHistoryButtons();
+      return;
+    }
+
+    this.undoButton =
+      document.getElementById(
+        "undo-button"
+      );
+
+    this.redoButton =
+      document.getElementById(
+        "redo-button"
+      );
+
+    if(
+      !this.undoButton ||
+      !this.redoButton
+    ){
+      throw new Error(
+        "history controls not found"
+      );
+    }
+
+    this.undoButton.addEventListener(
+      "click",
+      () => {
+        this.undo();
+      }
+    );
+
+    this.redoButton.addEventListener(
+      "click",
+      () => {
+        this.redo();
+      }
+    );
+
+    /*
+      Desktop convenience:
+        Ctrl/Cmd + Z       = Undo
+        Ctrl/Cmd + Shift+Z = Redo
+        Ctrl/Cmd + Y       = Redo
+
+      When a text/number field is focused, leave the shortcut to the
+      browser so normal text editing keeps its native undo behavior.
+    */
+    window.addEventListener(
+      "keydown",
+      e => {
+
+        const target = e.target;
+
+        const isEditingField =
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target?.isContentEditable;
+
+        if(isEditingField){
+          return;
+        }
+
+        const modifier =
+          e.ctrlKey ||
+          e.metaKey;
+
+        if(!modifier){
+          return;
+        }
+
+        const key =
+          String(e.key).toLowerCase();
+
+        if(key === "z"){
+
+          e.preventDefault();
+
+          if(e.shiftKey){
+            this.redo();
+          }
+          else{
+            this.undo();
+          }
+        }
+        else if(key === "y"){
+
+          e.preventDefault();
+          this.redo();
+        }
+      }
+    );
+
+    this.historyInitialized = true;
+    this.updateHistoryButtons();
+  }
+
+
+  createHistorySnapshot(){
+
+    if(!this.doc){
+      return null;
+    }
+
+    return {
+
+      document: {
+        ids:
+          structuredClone(
+            this.doc.ids
+          ),
+
+        angles:
+          structuredClone(
+            this.doc.angles
+          ),
+
+        nextId:
+          this.doc.nextId,
+
+        actions:
+          structuredClone(
+            this.doc.actions
+          ),
+
+        settings:
+          structuredClone(
+            this.doc.settings ?? {}
+          )
+      },
+
+      selection: {
+        ids:
+          [
+            ...this.state
+              .selectedFloorIds
+          ],
+
+        activeFloorId:
+          this.state.activeFloorId,
+
+        selectionAnchorId:
+          this.state.selectionAnchorId
+      }
+    };
+  }
+
+
+  recordHistoryBeforeEdit(){
+
+    if(
+      this.historyRestoring ||
+      this.state.mode !== "edit"
+    ){
+      return false;
+    }
+
+    const snapshot =
+      this.createHistorySnapshot();
+
+    if(!snapshot){
+      return false;
+    }
+
+    this.undoStack.push(
+      snapshot
+    );
+
+    if(
+      this.undoStack.length >
+      this.historyLimit
+    ){
+      this.undoStack.splice(
+        0,
+        this.undoStack.length -
+        this.historyLimit
+      );
+    }
+
+    /*
+      A new edit creates a new branch, so old Redo states are no
+      longer reachable.
+    */
+    this.redoStack.length = 0;
+
+    this.updateHistoryButtons();
+
+    return true;
+  }
+
+
+  resetHistory(){
+
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+
+    this.updateHistoryButtons();
+  }
+
+
+  restoreHistorySnapshot(
+    snapshot
+  ){
+
+    if(
+      !snapshot?.document ||
+      !this.doc
+    ){
+      return false;
+    }
+
+    const data =
+      snapshot.document;
+
+    this.doc.ids =
+      structuredClone(
+        data.ids ?? []
+      );
+
+    this.doc.angles =
+      structuredClone(
+        data.angles ?? []
+      );
+
+    this.doc.nextId =
+      Number.isFinite(
+        Number(data.nextId)
+      )
+        ? Number(data.nextId)
+        : this.doc.ids.length;
+
+    this.doc.actions =
+      structuredClone(
+        data.actions ?? []
+      );
+
+    this.doc.settings =
+      structuredClone(
+        data.settings ?? {}
+      );
+
+
+    /* =========================
+       Selection restore
+    ========================= */
+
+    const validIds =
+      new Set(
+        this.doc.ids
+      );
+
+    this.state
+      .selectedFloorIds
+      .clear();
+
+    for(
+      const id
+      of snapshot.selection?.ids ?? []
+    ){
+
+      if(validIds.has(id)){
+        this.state
+          .selectedFloorIds
+          .add(id);
+      }
+    }
+
+    const requestedActive =
+      snapshot.selection
+        ?.activeFloorId ??
+      null;
+
+    this.state.activeFloorId =
+      validIds.has(
+        requestedActive
+      )
+        ? requestedActive
+        : [
+            ...this.state
+              .selectedFloorIds
+          ].at(-1) ?? null;
+
+    const requestedAnchor =
+      snapshot.selection
+        ?.selectionAnchorId ??
+      null;
+
+    this.state.selectionAnchorId =
+      validIds.has(
+        requestedAnchor
+      )
+        ? requestedAnchor
+        : this.state.activeFloorId;
+
+
+    /* =========================
+       Setting side effects
+    ========================= */
+
+    this.syncSettingsToProject();
+    this.updateProjectTitle();
+
+    const volume =
+      Number(
+        this.doc.settings?.volume ??
+        100
+      );
+
+    this.song.setVolume(
+      Number.isFinite(volume)
+        ? Math.max(0, volume) / 100
+        : 1
+    );
+
+    const pitch =
+      Number(
+        this.doc.settings?.pitch ??
+        100
+      );
+
+    const playbackRate =
+      Number.isFinite(pitch) &&
+      pitch > 0
+        ? pitch / 100
+        : 1;
+
+    this.clock.setPlaybackRate(
+      playbackRate
+    );
+
+    this.song.setPlaybackRate(
+      playbackRate
+    );
+
+    this.hitSound.setTimelineRate(
+      playbackRate
+    );
+
+
+    /*
+      Event screens may contain references to the previous action
+      objects. Returning to the tile tab guarantees the restored UI
+      is rebuilt entirely from the new Document snapshot.
+    */
+    if(this.editorUI){
+      this.editorUI.activeTabKey =
+        "tile";
+
+      this.editorUI.isAdvanced =
+        false;
+    }
+
+    this.rebuild();
+    this.refreshProjectSettingsUI();
+
+    return true;
+  }
+
+
+  undo(){
+
+    if(
+      this.state.mode !== "edit" ||
+      this.undoStack.length === 0
+    ){
+      return false;
+    }
+
+    const previous =
+      this.undoStack.pop();
+
+    const current =
+      this.createHistorySnapshot();
+
+    if(current){
+      this.redoStack.push(
+        current
+      );
+    }
+
+    this.historyRestoring = true;
+
+    try{
+      this.restoreHistorySnapshot(
+        previous
+      );
+    }
+    finally{
+      this.historyRestoring = false;
+    }
+
+    this.updateHistoryButtons();
+    this.scheduleAutosave(0);
+
+    return true;
+  }
+
+
+  redo(){
+
+    if(
+      this.state.mode !== "edit" ||
+      this.redoStack.length === 0
+    ){
+      return false;
+    }
+
+    const next =
+      this.redoStack.pop();
+
+    const current =
+      this.createHistorySnapshot();
+
+    if(current){
+      this.undoStack.push(
+        current
+      );
+
+      if(
+        this.undoStack.length >
+        this.historyLimit
+      ){
+        this.undoStack.shift();
+      }
+    }
+
+    this.historyRestoring = true;
+
+    try{
+      this.restoreHistorySnapshot(
+        next
+      );
+    }
+    finally{
+      this.historyRestoring = false;
+    }
+
+    this.updateHistoryButtons();
+    this.scheduleAutosave(0);
+
+    return true;
+  }
+
+
+  updateHistoryButtons(){
+
+    const editable =
+      this.state?.mode === "edit";
+
+    if(this.undoButton){
+      this.undoButton.disabled =
+        !editable ||
+        this.undoStack.length === 0;
+    }
+
+    if(this.redoButton){
+      this.redoButton.disabled =
+        !editable ||
+        this.redoStack.length === 0;
+    }
+  }
+
+
   initFloorNavigation(){
 
     this.prevFloorButton =
@@ -13525,6 +14311,7 @@ class EditorApp{
     });
     
     this.updateFloorNavigationButtons();
+    this.updateHistoryButtons();
   }
   
   setSelectedOutgoingAngle(
@@ -13571,9 +14358,26 @@ class EditorApp{
       ];
   
   
+    const nextAngle =
+      normalizeAngle(angle);
+
+
+    if(
+      Object.is(
+        this.doc.angles[index + 1],
+        nextAngle
+      )
+    ){
+      return true;
+    }
+
+
+    this.recordHistoryBeforeEdit();
+
+
     this.doc.setAngle(
       nextFloorId,
-      normalizeAngle(angle)
+      nextAngle
     );
   
   
@@ -13619,6 +14423,17 @@ class EditorApp{
       ];
   
   
+    if(
+      this.doc.angles[index + 1] ===
+      999
+    ){
+      return true;
+    }
+
+
+    this.recordHistoryBeforeEdit();
+
+
     this.doc.setAngle(
       nextId,
       999
@@ -13684,6 +14499,19 @@ class EditorApp{
       normalizeAngle(
         floor.startAngle
       );
+
+
+    if(
+      Object.is(
+        this.doc.angles[index + 1],
+        fullspinAngle
+      )
+    ){
+      return true;
+    }
+
+
+    this.recordHistoryBeforeEdit();
   
   
     this.doc.setAngle(
@@ -13909,6 +14737,9 @@ class EditorApp{
         : normalizeAngle(angle);
   
   
+    this.recordHistoryBeforeEdit();
+
+
     const newId =
       this.doc.insertAfter(
         selectedId,
@@ -14021,6 +14852,9 @@ class EditorApp{
       Document.removeById()가
       이 타일에 속한 action도 같이 제거함.
     */
+    this.recordHistoryBeforeEdit();
+
+
     const removed =
       this.doc.removeById(
         selectedId
@@ -14157,6 +14991,8 @@ class EditorApp{
     if(removableIds.length === 0){
       return false;
     }
+
+    this.recordHistoryBeforeEdit();
   
     for(const id of removableIds){
       this.doc.removeById(id);
@@ -14443,14 +15279,15 @@ class EditorApp{
   
   
     /*
-      Restore the camera state at the exact level start time
-      before pre-roll begins. This prevents the first playback
-      transition from snapping when playback starts from an
-      arbitrary middle tile.
+      Seed playback camera from the tile the user actually selected.
+      For a middle start, older camera transitions must not leak into
+      the new playback session. The next tile transition is then
+      consumed normally by Evaluator.evaluateAt().
     */
     this.evaluator.init(
       this.compiled,
-      this.playTarget_us
+      this.playTarget_us,
+      selectedIndex
     );
 
     const initialCameraFrame =
@@ -14499,10 +15336,23 @@ class EditorApp{
   
   
     /*
-      pre-roll 중에는 히트사운드 없음.
-      실제 target에 도착할 때 시작.
+      Hitsounds are armed BEFORE the pre-roll finishes.
+
+      start() skips every event before playTarget_us, while update()
+      can schedule the first target hit slightly ahead of time using
+      the AudioContext clock. This avoids the old behavior where the
+      first hit was only created after the render frame had already
+      crossed the target tile.
     */
-    this.hitSound.stop();
+    this.hitSound.start(
+      this.compiled
+        .hitSoundEvents,
+
+      this.compiled
+        .countdownHitTimes_us,
+
+      this.playTarget_us
+    );
   
   
     this.playButton.setPlaying(
@@ -14517,6 +15367,16 @@ class EditorApp{
   
         const t_us =
           this.clock.getTime_us();
+
+        /*
+          Always advance the audio scheduler, including during
+          pre-roll. Events before playTarget_us were filtered by
+          HitSoundSystem.start(), so this remains silent before the
+          chosen start but lets the first target hit land exactly.
+        */
+        this.hitSound.update(
+          t_us
+        );
           
         const visualTime_us =
           Math.max(
@@ -14555,18 +15415,6 @@ class EditorApp{
   
           this.levelStarted =
             true;
-  
-  
-          this.hitSound.start(
-
-            this.compiled
-              .hitSoundEvents,
-          
-            this.compiled
-              .countdownHitTimes_us,
-          
-            this.playTarget_us
-          );
 
             
   
@@ -14595,17 +15443,6 @@ class EditorApp{
           this.playbackFloorIndex =
             this.playTargetIndex;
         }
-  
-  
-        /*
-          ==========================
-          히트사운드
-          ==========================
-        */
-  
-        this.hitSound.update(
-          t_us
-        );
   
   
         /*
@@ -14723,11 +15560,19 @@ class EditorApp{
         this.playTargetIndex;
     }
     else{
+
+      const visualTime_us =
+        Math.max(
+          this.playTarget_us ?? -Infinity,
+          t_us -
+          this.editorVisualOffset_ms *
+          1000
+        );
   
       index =
         this.evaluator
           .findFloorIndexByTime_us(
-            t_us
+            visualTime_us
           );
     }
   
@@ -15528,6 +16373,19 @@ class EditorApp{
 
       모두 검사한다.
     */
+    if(
+      !this.doc.canAddAction(
+        floorId,
+        eventType
+      )
+    ){
+      return null;
+    }
+
+
+    this.recordHistoryBeforeEdit();
+
+
     const action =
       this.doc.addAction(
         floorId,
