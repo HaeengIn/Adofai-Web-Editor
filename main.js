@@ -9676,9 +9676,21 @@ class Compiler{
         midspinCount++
       }
       else{
-        //현재 각도가 999면 => 이전 각도 사용
+        // 현재 각도가 999면 => 연속 MID 개수의 홀짝에 따라
+        // 실제 절대각을 복원한다.
+        //
+        // anchor=A 기준:
+        //   첫 번째 999 -> reverse(A)
+        //   두 번째 999 -> A
+        //   세 번째 999 -> reverse(A) ...
+        //
+        // 기존 코드는 MID run을 빠져나올 때 항상 reverse(prevAngle)을
+        // 사용해서, 999가 짝수 개 연속된 경우 시작 방향이 180° 뒤집혔다.
         if(nowAngle === 999){
-          nowAngle = reverseAngle(prevAngle);
+          nowAngle =
+            midspinCount % 2 === 0
+              ? prevAngle
+              : reverseAngle(prevAngle);
         }
         //각도 구하기
         angle = setAngle(nowAngle, nextAngle);
