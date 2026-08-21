@@ -823,6 +823,10 @@
               checked
             >
           </label>
+        </section>
+
+        <section class="settings-section">
+          <h3>Debug</h3>
 
           <label class="editor-setting-toggle">
             <span>Info</span>
@@ -833,6 +837,34 @@
               checked
             >
           </label>
+
+          <button
+            id="editor-open-logs-button"
+            class="settings-secondary-button editor-settings-wide-button"
+            type="button"
+          >
+            Open Debug Logs
+          </button>
+
+          <p class="settings-local-note">
+            Debug logs contain editor actions, warnings, and errors that can be copied when reporting a bug.
+          </p>
+        </section>
+
+        <section class="settings-section">
+          <h3>Storage</h3>
+
+          <button
+            id="editor-clear-cache-button"
+            class="settings-danger-button"
+            type="button"
+          >
+            Clear All Editor Cache
+          </button>
+
+          <p class="settings-local-note">
+            Deletes the autosaved level, cached local song, editor preferences, and saved debug logs from this browser.
+          </p>
         </section>
         
         <div class="editor-about-footer">
@@ -847,11 +879,66 @@
           </p>
 
           <p>
-            Created by Ssimille | Special thanks by hotduck, PowerFactory, Almcsur
+            Created by Ssimille | Special thanks by hotduck, PowerFactory, Almcsur, sajabe
           </p>
         </div>
 
       </div>
+    </section>
+  </div>
+
+
+  <!-- =====================================================
+       Debug Log Viewer
+  ====================================================== -->
+  <div
+    id="editor-log-overlay"
+    class="project-settings-overlay"
+    hidden
+  >
+    <section
+      id="editor-log-sheet"
+      class="project-settings-sheet editor-log-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editor-log-title"
+    >
+      <header class="project-settings-header">
+        <h2 id="editor-log-title">Debug Logs</h2>
+
+        <button
+          id="editor-log-close"
+          class="project-settings-close"
+          type="button"
+          aria-label="Close debug logs"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="editor-log-actions">
+        <button
+          id="editor-log-copy"
+          class="settings-secondary-button"
+          type="button"
+        >
+          Copy Logs
+        </button>
+
+        <button
+          id="editor-log-clear"
+          class="settings-secondary-button"
+          type="button"
+        >
+          Clear Logs
+        </button>
+      </div>
+
+      <pre
+        id="editor-log-output"
+        class="editor-log-output"
+        aria-live="polite"
+      ></pre>
     </section>
   </div>
 
@@ -872,38 +959,57 @@
     >
       <div class="editor-welcome-scroll">
 
-        <h2 id="editor-welcome-title">
-          ADOFAI Web Level Editor에 오신 것을 환영합니다!
-        </h2>
+        <section class="editor-welcome-language" lang="en">
+          <h2 id="editor-welcome-title">
+            Welcome to the ADOFAI Web Level Editor!
+          </h2>
 
-        <p>
-          이 비공식 팬메이드 에디터에서는 A Dance of Fire and Ice 커스텀 레벨을 만들고,
-          다른 제작자의 레벨을 불러와 편집하거나 플레이할 수 있습니다. 이 프로젝트는
-          7th Beat Games의 허가를 받아 제작되었지만 공식 제품은 아니며, 7th Beat Games가
-          직접 운영하거나 보증하는 에디터가 아닙니다.
-        </p>
+          <p>
+            This unofficial fan-made editor can create, import, edit, and preview A Dance of Fire and Ice custom levels.
+            It was made with permission from 7th Beat Games, but it is not an official product and is not operated or endorsed by 7th Beat Games.
+          </p>
 
-        <p>
-          레벨이나 플레이 영상·방송을 공개하기 전에는 반드시 곡의 작곡가가 커스텀 레벨
-          사용을 허가했는지 확인해주세요. 이미 허가 또는 거부 의사를 밝힌 작곡가에게
-          반복해서 연락하지 말고, 다른 리듬게임에 사용된 음악의 사용 허가를 별도로
-          요청하는 행동도 피해주시기 바랍니다.
-        </p>
+          <p>
+            Before publicly sharing a level, video, or stream, please make sure the song's artist permits custom-level usage.
+            Respect artists who have already allowed or declined usage, and avoid repeatedly contacting them for permission.
+          </p>
 
-        <p>
-          레벨에 포함한 음악·이미지·기타 사용자 제작 콘텐츠에 대한 권리와 책임은 해당
-          콘텐츠를 사용하는 제작자에게 있습니다. ADOFAI의 이용약관과 사용자 제작 콘텐츠
-          규칙, 그리고 각 권리자의 조건을 존중해주세요.
-        </p>
+          <p>
+            You are responsible for the music, images, and other user-generated assets included in your level.
+            Please follow the ADOFAI license, user-generated content rules, and each rights holder's conditions.
+          </p>
 
-        <p class="editor-welcome-note">
-          이 웹 에디터는 마지막 레벨을 브라우저에 자동 저장할 수 있지만, 중요한 작업은
-          주기적으로 .adofai 파일로 직접 내려받아 별도로 백업하는 것을 권장합니다.
-        </p>
+          <p class="editor-welcome-note">
+            The editor can autosave your latest work in this browser, but important projects should still be downloaded as .adofai files and backed up separately.
+          </p>
+        </section>
 
-        <p>
-          읽어주셔서 감사합니다. 즐겁게 만들어보세요!
-        </p>
+        <div class="editor-welcome-divider" aria-hidden="true"></div>
+
+        <section class="editor-welcome-language" lang="ko">
+          <h2>
+            ADOFAI Web Level Editor에 오신 것을 환영합니다!
+          </h2>
+
+          <p>
+            이 비공식 팬메이드 에디터에서는 A Dance of Fire and Ice 커스텀 레벨을 만들고, 불러오고, 편집하고, 미리 재생할 수 있습니다.
+            이 프로젝트는 7th Beat Games의 허가를 받아 제작되었지만 공식 제품은 아니며, 7th Beat Games가 직접 운영하거나 보증하는 에디터가 아닙니다.
+          </p>
+
+          <p>
+            레벨이나 플레이 영상·방송을 공개하기 전에는 곡의 작곡가가 커스텀 레벨 사용을 허가했는지 확인해주세요.
+            이미 허가 또는 거부 의사를 밝힌 작곡가의 결정을 존중하고 반복해서 허가를 요청하지 말아주세요.
+          </p>
+
+          <p>
+            레벨에 포함한 음악·이미지·기타 사용자 제작 콘텐츠의 권리와 책임은 해당 콘텐츠를 사용하는 제작자에게 있습니다.
+            ADOFAI 이용약관과 사용자 제작 콘텐츠 규칙, 각 권리자의 조건을 준수해주세요.
+          </p>
+
+          <p class="editor-welcome-note">
+            이 웹 에디터는 마지막 작업을 브라우저에 자동 저장할 수 있지만, 중요한 작업은 주기적으로 .adofai 파일로 내려받아 별도로 백업하는 것을 권장합니다.
+          </p>
+        </section>
 
       </div>
 
@@ -916,6 +1022,14 @@
       </button>
     </section>
   </div>
+
+
+  <div
+    id="editor-toast-container"
+    class="editor-toast-container"
+    aria-live="polite"
+    aria-atomic="false"
+  ></div>
 
 
   <input

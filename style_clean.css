@@ -7787,3 +7787,211 @@ img.editor-tab-icon {
       );
   }
 }
+
+/* =========================================================
+   RELEASE CANDIDATE: Debug / storage / notification UI
+========================================================= */
+
+.editor-settings-wide-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.settings-danger-button {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+
+  border: 1px solid #754b4b;
+  border-radius: 9px;
+
+  background: #2c1f1f;
+  color: #e7bcbc;
+
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.settings-danger-button:active {
+  transform: scale(0.98);
+  background: #3d2929;
+}
+
+/* More detailed debug text can wrap on narrow phones instead of
+   forcing a single very wide line over the map. */
+#editor-info {
+  max-width: min(68vw, 560px);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Debug log viewer ---------- */
+.editor-log-sheet {
+  height: min(78dvh, 760px);
+}
+
+.editor-log-actions {
+  flex: 0 0 auto;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+
+  padding: 10px 12px;
+  border-bottom: 1px solid #303030;
+}
+
+.editor-log-output {
+  flex: 1 1 auto;
+  min-height: 0;
+
+  margin: 0;
+  padding: 12px;
+
+  overflow: auto;
+  overscroll-behavior: contain;
+
+  background: #0d0d0d;
+  color: #bcbcbc;
+
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+
+  font-size: 10px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Toast notifications ---------- */
+.editor-toast-container {
+  position: fixed;
+  left: 50%;
+  bottom:
+    calc(
+      18px +
+      env(safe-area-inset-bottom)
+    );
+
+  z-index: 20000;
+
+  width: min(88vw, 460px);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+
+  transform: translateX(-50%);
+
+  pointer-events: none;
+}
+
+.editor-toast {
+  width: fit-content;
+  max-width: 100%;
+
+  padding: 9px 12px;
+
+  border: 1px solid #4b4b4b;
+  border-radius: 10px;
+
+  background: rgba(28, 28, 28, 0.96);
+  color: #eee;
+
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: center;
+
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.editor-toast.success {
+  border-color: #526d55;
+  color: #d3ead6;
+}
+
+.editor-toast.warning {
+  border-color: #766346;
+  color: #ead8b8;
+}
+
+.editor-toast.error {
+  border-color: #784f4f;
+  color: #efc1c1;
+}
+
+.editor-toast.leaving {
+  opacity: 0;
+  transform: translateY(5px);
+}
+
+/* ---------- Bilingual welcome ---------- */
+.editor-welcome-language h2 {
+  margin-top: 0;
+}
+
+.editor-welcome-divider {
+  height: 1px;
+  margin: 20px 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 520px) {
+  .editor-log-sheet {
+    height: min(86dvh, 760px);
+  }
+
+  .editor-log-output {
+    font-size: 9px;
+  }
+
+  .editor-toast-container {
+    bottom:
+      calc(
+        12px +
+        env(safe-area-inset-bottom)
+      );
+  }
+}
+
+@media
+  (min-width: 600px)
+  and
+  (orientation: portrait)
+{
+  .settings-danger-button,
+  .editor-settings-wide-button {
+    min-height: 54px;
+    border-radius: 12px;
+    font-size: var(--font-sm, 19px);
+  }
+
+  .editor-log-actions {
+    gap: 12px;
+    padding: 14px 18px;
+  }
+
+  .editor-log-output {
+    padding: 18px;
+    font-size: clamp(12px, 1.8vw, 16px);
+  }
+
+  .editor-toast {
+    padding: 13px 17px;
+    border-radius: 13px;
+    font-size: var(--font-sm, 19px);
+  }
+}
