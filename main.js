@@ -12,6 +12,278 @@ const normalizeAngle = (a) => {return ((a % 360) + 360) % 360}
 const reverseAngle = (a) => {return (a + 180)%360}
 
 
+/* =========================================================
+   Editor diagnostics
+
+   - Keeps a small persistent ring buffer for bug reports.
+   - Captures console log/warn/error without suppressing DevTools.
+   - Never throws when storage is unavailable.
+========================================================= */
+class EditorLogger {
+  constructor(){
+    this.storageKey =
+      "adofai-editor-debug-log-v1";
+
+    this.maxEntries = 300;
+    this.entries = [];
+    this.listeners = new Set();
+
+    this.persistenceEnabled = true;
+    this.consoleCaptureInstalled = false;
+
+    this.originalConsole = {
+      log: console.log.bind(console),
+      warn: console.warn.bind(console),
+      error: console.error.bind(console)
+    };
+
+    this.load();
+  }
+
+  formatValue(value){
+    if(value instanceof Error){
+      return value.stack ||
+        `${value.name}: ${value.message}`;
+    }
+
+    if(typeof value === "string"){
+      return value;
+    }
+
+    if(
+      value === null ||
+      value === undefined ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ){
+      return String(value);
+    }
+
+    try{
+      const seen = new WeakSet();
+
+      const text = JSON.stringify(
+        value,
+        (key, item) => {
+          if(
+            item &&
+            typeof item === "object"
+          ){
+            if(seen.has(item)){
+              return "[Circular]";
+            }
+            seen.add(item);
+          }
+          return item;
+        }
+      );
+
+      if(typeof text === "string"){
+        return text.length > 3000
+          ? text.slice(0, 3000) + "…"
+          : text;
+      }
+    }
+    catch{}
+
+    try{
+      return String(value);
+    }
+    catch{
+      return "[Unprintable value]";
+    }
+  }
+
+  load(){
+    try{
+      const text =
+        localStorage.getItem(
+          this.storageKey
+        );
+
+      if(!text){
+        return;
+      }
+
+      const parsed = JSON.parse(text);
+
+      if(Array.isArray(parsed)){
+        this.entries =
+          parsed.slice(
+            -this.maxEntries
+          );
+      }
+    }
+    catch{}
+  }
+
+  persist(){
+    if(!this.persistenceEnabled){
+      return;
+    }
+
+    try{
+      localStorage.setItem(
+        this.storageKey,
+        JSON.stringify(
+          this.entries
+        )
+      );
+    }
+    catch{}
+  }
+
+  emit(){
+    for(const listener of this.listeners){
+      try{
+        listener(this.entries);
+      }
+      catch{}
+    }
+  }
+
+  push(level, args, source = "editor"){
+    const entry = {
+      time: new Date().toISOString(),
+      level,
+      source,
+      message: args
+        .map(value =>
+          this.formatValue(value)
+        )
+        .join(" ")
+    };
+
+    this.entries.push(entry);
+
+    if(
+      this.entries.length >
+      this.maxEntries
+    ){
+      this.entries.splice(
+        0,
+        this.entries.length -
+        this.maxEntries
+      );
+    }
+
+    this.persist();
+    this.emit();
+
+    return entry;
+  }
+
+  info(...args){
+    this.originalConsole.log(
+      "[ADOFAI Editor]",
+      ...args
+    );
+    return this.push(
+      "INFO",
+      args
+    );
+  }
+
+  warn(...args){
+    this.originalConsole.warn(
+      "[ADOFAI Editor]",
+      ...args
+    );
+    return this.push(
+      "WARN",
+      args
+    );
+  }
+
+  error(...args){
+    this.originalConsole.error(
+      "[ADOFAI Editor]",
+      ...args
+    );
+    return this.push(
+      "ERROR",
+      args
+    );
+  }
+
+  installConsoleCapture(){
+    if(this.consoleCaptureInstalled){
+      return;
+    }
+
+    const map = {
+      log: "INFO",
+      warn: "WARN",
+      error: "ERROR"
+    };
+
+    for(const method of Object.keys(map)){
+      console[method] = (...args) => {
+        this.originalConsole[method](
+          ...args
+        );
+
+        this.push(
+          map[method],
+          args,
+          "console"
+        );
+      };
+    }
+
+    this.consoleCaptureInstalled = true;
+  }
+
+  clear({ persist = true } = {}){
+    this.entries.length = 0;
+
+    if(persist){
+      try{
+        localStorage.removeItem(
+          this.storageKey
+        );
+      }
+      catch{}
+    }
+
+    this.emit();
+  }
+
+  setPersistenceEnabled(value){
+    this.persistenceEnabled =
+      Boolean(value);
+  }
+
+  subscribe(listener){
+    this.listeners.add(listener);
+    return () =>
+      this.listeners.delete(listener);
+  }
+
+  toText(){
+    const header = [
+      "ADOFAI Web Editor Debug Log",
+      `Exported: ${new Date().toISOString()}`,
+      `URL: ${location.href}`,
+      `User Agent: ${navigator.userAgent}`,
+      ""
+    ];
+
+    const body =
+      this.entries.map(entry =>
+        `[${entry.time}] [${entry.level}] [${entry.source}] ${entry.message}`
+      );
+
+    return [
+      ...header,
+      ...body
+    ].join("\n");
+  }
+}
+
+const EDITOR_LOGGER =
+  new EditorLogger();
 
 
 const EVENT_MARKER_ICONS = {
@@ -343,39 +615,69 @@ function createEventMarkerInfo(
 
 
       /*
-        원본 swirl 이미지는 90° 방향을
-        기준 방향으로 사용한다.
+        Twirl 이미지 회전 규칙.
 
-        Three.js의 +Z 회전은 반시계 방향이므로
-        목표 절대각 A에 맞추려면 A - 90°.
+        BLUE:
+          기존 규칙을 유지한다.
+          원본 이미지는 90° 방향을 기준으로 하므로
+          nextAbsoluteAngle - 90°를 사용한다.
 
-        예:
-          next 90° -> 0° 회전
-          next 0°  -> -90° 회전 (= 시계 90°)
+          반시계 공전 상태에서는 기존 규칙대로
+          추가 180° 회전을 적용한다.
+
+        RED:
+          실제 ADOFAI 표시 규칙에 맞춰
+          "다음 타일의 절대각 / 2" 만큼
+          반시계 방향으로 회전한다.
+
+          Three.js의 +Z 회전은 반시계 방향이므로
+          값을 그대로 양수로 넣는다.
+
+          예:
+            nextAbsoluteAngle = 135°
+            -> red rotation = +67.5°
       */
-      const baseRotationDeg =
+      let rotationDeg =
+        0;
+
+
+      if(
+        !isBlue
+        &&
         Number.isFinite(
           nextAbsoluteAngle
         )
-          ? normalizeAngle(
-              nextAbsoluteAngle - 90
-            )
-          : 0;
+      ){
 
+        rotationDeg =
+          normalizeAngle(
+            nextAbsoluteAngle /
+            2
+          );
+      }
+      else{
 
-      /*
-        반시계방향 공전용 Twirl은 현재 결과에서
-        추가로 180° 회전한다.
-      */
-      const rotationDeg =
-        normalizeAngle(
-          baseRotationDeg +
-          (
-            twirlState
-              ? 180
-              : 0
+        const baseRotationDeg =
+          Number.isFinite(
+            nextAbsoluteAngle
           )
-        );
+            ? normalizeAngle(
+                nextAbsoluteAngle -
+                90
+              )
+            : 0;
+
+
+        rotationDeg =
+          normalizeAngle(
+            baseRotationDeg +
+            (
+              twirlState
+                ? 180
+                : 0
+            )
+          );
+      }
 
 
       setMarker(
@@ -2247,7 +2549,18 @@ class RuntimeScene{
 
     const texture =
       this.eventTextureLoader
-        .load(src);
+        .load(
+          src,
+          undefined,
+          undefined,
+          error => {
+            console.warn(
+              "Event marker texture load failed:",
+              src,
+              error
+            );
+          }
+        );
 
 
     texture.colorSpace =
@@ -3892,7 +4205,15 @@ class TileEditorUI {
   
         this.callback
           .onAddAngle?.(
-            this.dialAngle
+            this.dialAngle,
+            {
+              /*
+                Advanced FREE는 선택 타일 기준 상대각도.
+                SNAP은 기존처럼 절대각도.
+              */
+              relative:
+                !this.snapEnabled
+            }
           );
       }
     );
@@ -5632,15 +5953,19 @@ integer = false,
       
       
       /*
-        SNAP에서는 15° 단위,
-        FREE에서는 소수 둘째 자리까지 유지한다.
+        다이얼 조작:
+          SNAP = 15° 단위
+          FREE = 1° 단위
+
+        소수 자유각은 상단 숫자 입력칸에서
+        직접 입력할 수 있다.
       */
       if(!this.snapEnabled){
 
         angle =
           Math.round(
-            angle * 100
-          ) / 100;
+            angle
+          );
       }
 
 
@@ -8990,6 +9315,13 @@ class CompiledProject{
     this.floors = null;
     
     this.bpms = [];
+
+    /*
+      Effective orbit/timing angle for each floor after Twirl/MID
+      resolution. 180° = 1 beat.
+    */
+    this.relativeAngles = [];
+
     this.beats = [];
     this.floorStarts_us = [];
     this.floorDurations_us = [];
@@ -9646,10 +9978,6 @@ class Compiler{
         isTwirled =
           !isTwirled;
       }
-
-
-      option.isTwirled =
-        isTwirled;
 
 
       option.isTwirled =
@@ -10417,19 +10745,15 @@ class Compiler{
   
 
     /*
-    
-    console.log(floors)
-    console.log(bpms);
-    console.log(beats);
-    console.log(floorStarts_us);
-    console.log(floorDurations_us);
-    console.log(playerCameraPositions)
-
+      Do not log full compiler arrays in production. Real-world levels
+      can contain thousands of floors/events, and DevTools retaining
+      those arrays on every rebuild causes a large memory/performance hit.
     */
     
     
     compiled.floors = floors;
     compiled.bpms = bpms;
+    compiled.relativeAngles = angles;
     compiled.beats = beats;
     compiled.floorStarts_us =
       floorStarts_us;
@@ -10593,7 +10917,459 @@ class EditorApp{
     this.autosaveInterval_ms =
       15000;
 
+    /*
+      Clear Cache suppresses background writes until the user makes
+      another edit. This prevents pagehide/15s autosave from instantly
+      recreating the data that was just deleted.
+    */
+    this.autosaveSuppressed = false;
+
+    this.logger = EDITOR_LOGGER;
+    this.diagnosticsInitialized = false;
+    this.logUnsubscribe = null;
+
     this.levelStarted = false;
+
+    this.initDiagnostics();
+  }
+
+  /* =========================================================
+     Diagnostics / user-facing notifications
+  ========================================================= */
+
+  initDiagnostics(){
+    if(this.diagnosticsInitialized){
+      return;
+    }
+
+    this.logger.installConsoleCapture();
+
+    window.addEventListener(
+      "error",
+      event => {
+        const error =
+          event.error ??
+          new Error(
+            event.message ||
+            "Unknown window error"
+          );
+
+        this.reportError(
+          error,
+          "Unhandled error"
+        );
+      }
+    );
+
+    window.addEventListener(
+      "unhandledrejection",
+      event => {
+        const reason =
+          event.reason instanceof Error
+            ? event.reason
+            : new Error(
+                this.logger.formatValue(
+                  event.reason
+                )
+              );
+
+        this.reportError(
+          reason,
+          "Unhandled promise rejection"
+        );
+      }
+    );
+
+    this.diagnosticsInitialized = true;
+
+    this.logger.info(
+      "Editor session started",
+      {
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        dpr: window.devicePixelRatio || 1
+      }
+    );
+  }
+
+  showToast(
+    message,
+    type = "info",
+    duration_ms = 3200
+  ){
+    const container =
+      document.getElementById(
+        "editor-toast-container"
+      );
+
+    if(!container){
+      return false;
+    }
+
+    const toast =
+      document.createElement(
+        "div"
+      );
+
+    toast.className =
+      `editor-toast ${type}`;
+
+    toast.textContent =
+      String(message ?? "");
+
+    container.appendChild(toast);
+
+    const remove = () => {
+      toast.classList.add(
+        "leaving"
+      );
+
+      window.setTimeout(
+        () => toast.remove(),
+        220
+      );
+    };
+
+    window.setTimeout(
+      remove,
+      Math.max(1000, duration_ms)
+    );
+
+    return true;
+  }
+
+  readEditorPreference(
+    key,
+    fallback = null
+  ){
+    try{
+      const value =
+        localStorage.getItem(key);
+
+      return value === null
+        ? fallback
+        : value;
+    }
+    catch(error){
+      this.logger.warn(
+        "Could not read editor preference",
+        key,
+        error
+      );
+      return fallback;
+    }
+  }
+
+  writeEditorPreference(
+    key,
+    value
+  ){
+    try{
+      localStorage.setItem(
+        key,
+        String(value)
+      );
+      return true;
+    }
+    catch(error){
+      this.logger.warn(
+        "Could not save editor preference",
+        key,
+        error
+      );
+      return false;
+    }
+  }
+
+  reportError(
+    error,
+    context = "Editor error",
+    { toast = true } = {}
+  ){
+    const normalized =
+      error instanceof Error
+        ? error
+        : new Error(
+            String(error ?? "Unknown error")
+          );
+
+    this.logger.error(
+      context,
+      normalized
+    );
+
+    if(toast){
+      this.showToast(
+        `${context}. Open Debug Logs for details.`,
+        "error",
+        5000
+      );
+    }
+
+    return normalized;
+  }
+
+  refreshDebugLogView(){
+    const output =
+      document.getElementById(
+        "editor-log-output"
+      );
+
+    if(!output){
+      return;
+    }
+
+    output.textContent =
+      this.logger.toText();
+
+    output.scrollTop =
+      output.scrollHeight;
+  }
+
+  openDebugLogs(){
+    const overlay =
+      document.getElementById(
+        "editor-log-overlay"
+      );
+
+    if(!overlay){
+      return false;
+    }
+
+    this.refreshDebugLogView();
+    overlay.hidden = false;
+    return true;
+  }
+
+  closeDebugLogs(){
+    const overlay =
+      document.getElementById(
+        "editor-log-overlay"
+      );
+
+    if(overlay){
+      overlay.hidden = true;
+    }
+  }
+
+  async copyDebugLogs(){
+    const text =
+      this.logger.toText();
+
+    try{
+      if(
+        navigator.clipboard &&
+        window.isSecureContext
+      ){
+        await navigator.clipboard
+          .writeText(text);
+      }
+      else{
+        const textarea =
+          document.createElement(
+            "textarea"
+          );
+
+        textarea.value = text;
+        textarea.style.position =
+          "fixed";
+        textarea.style.opacity =
+          "0";
+
+        document.body.appendChild(
+          textarea
+        );
+
+        textarea.select();
+        document.execCommand(
+          "copy"
+        );
+        textarea.remove();
+      }
+
+      this.showToast(
+        "Debug logs copied.",
+        "success"
+      );
+
+      return true;
+    }
+    catch(error){
+      this.reportError(
+        error,
+        "Could not copy debug logs"
+      );
+      return false;
+    }
+  }
+
+  formatPlaybackTime(seconds){
+    const value =
+      Number(seconds);
+
+    if(!Number.isFinite(value)){
+      return "--:--.---";
+    }
+
+    const safe =
+      Math.max(0, value);
+
+    const minutes =
+      Math.floor(safe / 60);
+
+    const secs =
+      safe - minutes * 60;
+
+    return (
+      String(minutes).padStart(2, "0") +
+      ":" +
+      secs.toFixed(3).padStart(6, "0")
+    );
+  }
+
+  async deleteAutosaveDatabase(){
+    if(!window.indexedDB){
+      return true;
+    }
+
+    return await new Promise(
+      (resolve, reject) => {
+        const request =
+          indexedDB.deleteDatabase(
+            "adofai-web-editor"
+          );
+
+        request.onsuccess =
+          () => resolve(true);
+
+        request.onerror =
+          () => reject(
+            request.error ??
+            new Error(
+              "IndexedDB delete failed."
+            )
+          );
+
+        request.onblocked =
+          () => reject(
+            new Error(
+              "IndexedDB delete was blocked."
+            )
+          );
+      }
+    );
+  }
+
+  async clearAllEditorCache(){
+    /* Stop timers from recreating the just-deleted autosave. */
+    this.autosaveSuppressed = true;
+
+    if(this.autosaveTimer !== null){
+      clearTimeout(
+        this.autosaveTimer
+      );
+      this.autosaveTimer = null;
+    }
+
+    try{
+      const localKeys = [];
+
+      for(let i = 0; i < localStorage.length; i++){
+        const key = localStorage.key(i);
+        if(
+          key &&
+          key.startsWith(
+            "adofai-editor-"
+          )
+        ){
+          localKeys.push(key);
+        }
+      }
+
+      for(const key of localKeys){
+        localStorage.removeItem(key);
+      }
+
+      const sessionKeys = [];
+
+      for(let i = 0; i < sessionStorage.length; i++){
+        const key = sessionStorage.key(i);
+        if(
+          key &&
+          key.startsWith(
+            "adofai-editor-"
+          )
+        ){
+          sessionKeys.push(key);
+        }
+      }
+
+      for(const key of sessionKeys){
+        sessionStorage.removeItem(key);
+      }
+
+      await this.deleteAutosaveDatabase();
+
+      if("caches" in window){
+        const cacheNames =
+          await caches.keys();
+
+        for(const name of cacheNames){
+          if(/adofai/i.test(name)){
+            await caches.delete(name);
+          }
+        }
+      }
+
+      this.autosaveSongCacheKey = null;
+
+      /*
+        Clear old saved logs as part of cache deletion. Keep new logs
+        in memory only until the user makes another real edit.
+      */
+      this.logger.clear({
+        persist: false
+      });
+      this.logger.setPersistenceEnabled(
+        false
+      );
+
+      const gridInput =
+        document.getElementById(
+          "editor-setting-grid"
+        );
+
+      const infoInput =
+        document.getElementById(
+          "editor-setting-info"
+        );
+
+      if(gridInput){
+        gridInput.checked = true;
+      }
+
+      if(infoInput){
+        infoInput.checked = true;
+      }
+
+      this.runtime.setGridVisible(true);
+      this.setEditorInfoVisible(true);
+      this.refreshDebugLogView();
+
+      this.showToast(
+        "All editor cache has been deleted.",
+        "success",
+        4200
+      );
+
+      return true;
+    }
+    catch(error){
+      this.reportError(
+        error,
+        "Could not clear all editor cache"
+      );
+      return false;
+    }
   }
 
   /* =========================================================
@@ -10666,6 +11442,10 @@ class EditorApp{
 
   saveAutosaveNow(){
 
+    if(this.autosaveSuppressed){
+      return false;
+    }
+
     if(!this.doc){
       return false;
     }
@@ -10714,7 +11494,10 @@ class EditorApp{
     delay_ms = this.autosaveDelay_ms
   ){
 
-    if(!this.autosaveInitialized){
+    if(
+      this.autosaveSuppressed ||
+      !this.autosaveInitialized
+    ){
       return;
     }
 
@@ -11055,6 +11838,11 @@ class EditorApp{
   
   async loadProject(path){ //일단 level.adofai만 가져오는걸로
 
+    this.logger.info(
+      "Loading initial project",
+      path
+    );
+
     this.setLevelLoading(
       true,
       "loading..."
@@ -11142,10 +11930,14 @@ class EditorApp{
     
     this.editorUI.init({
 
-      onAddAngle: angle => {
-    
+      onAddAngle: (
+        angle,
+        options = {}
+      ) => {
+
         this.addFloorAfterSelected(
-          angle
+          angle,
+          options
         );
       },
     
@@ -11365,6 +12157,16 @@ class EditorApp{
 
     this.refreshProjectSettingsUI();
 
+    this.logger.info(
+      "Initial project ready",
+      {
+        restoredFromAutosave,
+        tiles: this.doc?.ids?.length ?? 0,
+        events: this.doc?.actions?.length ?? 0,
+        songLoaded
+      }
+    );
+
 
     /*
       Do not open Level Settings automatically on the first page load.
@@ -11393,36 +12195,16 @@ class EditorApp{
       return;
     }
 
-    const storageKey =
-      "adofai-editor-welcome-accepted-v1";
-
-    let alreadyAccepted = false;
-
-    try{
-      alreadyAccepted =
-        localStorage.getItem(storageKey) ===
-        "true";
-    }
-    catch{
-      alreadyAccepted = false;
-    }
-
-    overlay.hidden =
-      alreadyAccepted;
+    /*
+      The legal / sharing notice is intentionally shown on every
+      page load. It is session UI, not a remembered preference.
+    */
+    overlay.hidden = false;
 
     closeButton.addEventListener(
       "click",
       () => {
-
         overlay.hidden = true;
-
-        try{
-          localStorage.setItem(
-            storageKey,
-            "true"
-          );
-        }
-        catch{}
       }
     );
   }
@@ -11473,6 +12255,41 @@ class EditorApp{
         "editor-setting-info"
       );
 
+    const openLogsButton =
+      document.getElementById(
+        "editor-open-logs-button"
+      );
+
+    const clearCacheButton =
+      document.getElementById(
+        "editor-clear-cache-button"
+      );
+
+    const logOverlay =
+      document.getElementById(
+        "editor-log-overlay"
+      );
+
+    const logSheet =
+      document.getElementById(
+        "editor-log-sheet"
+      );
+
+    const logCloseButton =
+      document.getElementById(
+        "editor-log-close"
+      );
+
+    const logCopyButton =
+      document.getElementById(
+        "editor-log-copy"
+      );
+
+    const logClearButton =
+      document.getElementById(
+        "editor-log-clear"
+      );
+
     this.editorInfoElement =
       document.getElementById(
         "editor-info"
@@ -11485,6 +12302,13 @@ class EditorApp{
       !closeButton ||
       !gridInput ||
       !infoInput ||
+      !openLogsButton ||
+      !clearCacheButton ||
+      !logOverlay ||
+      !logSheet ||
+      !logCloseButton ||
+      !logCopyButton ||
+      !logClearButton ||
       !this.editorInfoElement
     ){
       throw new Error(
@@ -11502,8 +12326,9 @@ class EditorApp{
 
 
     const savedGrid =
-      localStorage.getItem(
-        "adofai-editor-grid"
+      this.readEditorPreference(
+        "adofai-editor-grid",
+        null
       );
 
     const showGrid =
@@ -11517,8 +12342,9 @@ class EditorApp{
     );
 
     const savedInfo =
-      localStorage.getItem(
-        "adofai-editor-info"
+      this.readEditorPreference(
+        "adofai-editor-info",
+        null
       );
 
     const showInfo =
@@ -11564,10 +12390,16 @@ class EditorApp{
     window.addEventListener(
       "keydown",
       e => {
-        if(
-          e.key === "Escape" &&
-          !overlay.hidden
-        ){
+        if(e.key !== "Escape"){
+          return;
+        }
+
+        if(!logOverlay.hidden){
+          this.closeDebugLogs();
+          return;
+        }
+
+        if(!overlay.hidden){
           overlay.hidden = true;
         }
       }
@@ -11584,9 +12416,9 @@ class EditorApp{
           visible
         );
 
-        localStorage.setItem(
+        this.writeEditorPreference(
           "adofai-editor-grid",
-          String(visible)
+          visible
         );
       }
     );
@@ -11602,12 +12434,79 @@ class EditorApp{
           visible
         );
 
-        localStorage.setItem(
+        this.writeEditorPreference(
           "adofai-editor-info",
-          String(visible)
+          visible
         );
       }
     );
+
+    openLogsButton.addEventListener(
+      "click",
+      () => {
+        this.openDebugLogs();
+      }
+    );
+
+    clearCacheButton.addEventListener(
+      "click",
+      async () => {
+        await this.clearAllEditorCache();
+      }
+    );
+
+    logCloseButton.addEventListener(
+      "click",
+      () => {
+        this.closeDebugLogs();
+      }
+    );
+
+    logOverlay.addEventListener(
+      "pointerdown",
+      e => {
+        if(e.target === logOverlay){
+          this.closeDebugLogs();
+        }
+      }
+    );
+
+    logSheet.addEventListener(
+      "pointerdown",
+      e => {
+        e.stopPropagation();
+      }
+    );
+
+    logCopyButton.addEventListener(
+      "click",
+      async () => {
+        await this.copyDebugLogs();
+      }
+    );
+
+    logClearButton.addEventListener(
+      "click",
+      () => {
+        this.logger.clear();
+        this.refreshDebugLogView();
+        this.showToast(
+          "Debug logs cleared.",
+          "success"
+        );
+      }
+    );
+
+    this.logUnsubscribe =
+      this.logger.subscribe(
+        () => {
+          if(!logOverlay.hidden){
+            this.refreshDebugLogView();
+          }
+        }
+      );
+
+    this.refreshDebugLogView();
 
     this.editorSettingsInitialized =
       true;
@@ -12354,6 +13253,12 @@ class EditorApp{
 
     this.scheduleAutosave();
 
+    this.logger.info(
+      "Level setting changed",
+      key,
+      value
+    );
+
     return true;
   }
 
@@ -12471,6 +13376,13 @@ class EditorApp{
 
     if(loaded){
 
+      if(this.autosaveSuppressed){
+        this.autosaveSuppressed = false;
+        this.logger.setPersistenceEnabled(
+          true
+        );
+      }
+
       this.doc.settings.songFilename =
         file.name;
 
@@ -12518,6 +13430,20 @@ class EditorApp{
 
     if(loaded){
       this.scheduleAutosave();
+      this.logger.info(
+        "Song selected",
+        {
+          name: file.name,
+          size: file.size,
+          type: file.type || "unknown"
+        }
+      );
+    }
+    else{
+      this.showToast(
+        `Failed to read song: ${file.name}`,
+        "error"
+      );
     }
 
     return loaded;
@@ -12602,6 +13528,15 @@ class EditorApp{
 
     this.scheduleAutosave();
 
+    this.logger.info(
+      "Project replaced",
+      {
+        source: source?.name ?? source?.type ?? "unknown",
+        tiles: this.doc?.ids?.length ?? 0,
+        events: this.doc?.actions?.length ?? 0
+      }
+    );
+
     return true;
   }
 
@@ -12679,17 +13614,22 @@ class EditorApp{
       this.refreshProjectSettingsUI();
       this.openProjectSettings();
 
+      this.logger.info(
+        "Local level loaded",
+        {
+          name: file.name,
+          tiles: this.doc?.ids?.length ?? 0,
+          events: this.doc?.actions?.length ?? 0
+        }
+      );
+
       return true;
     }
     catch(error){
 
-      console.error(
-        "level file load failed:",
-        error
-      );
-
-      alert(
-        "Failed to load the level file."
+      this.reportError(
+        error,
+        "Failed to load the level file"
       );
 
       return false;
@@ -12805,19 +13745,18 @@ class EditorApp{
         this.openProjectSettings();
       }
 
+      this.logger.info(
+        "New level loaded",
+        { songLoaded }
+      );
 
       return true;
     }
     catch(error){
 
-      console.error(
-        "default level load failed:",
-        error
-      );
-
-
-      alert(
-        "Failed to load the default level.adofai file."
+      this.reportError(
+        error,
+        "Failed to load the default level.adofai file"
       );
 
 
@@ -12974,8 +13913,20 @@ class EditorApp{
       Windows / Android 등에서
       파일명으로 사용할 수 없는 문자를 치환.
     */
+    const rawBaseName =
+      `${artist} - ${song}`;
+
+    const parsedTitle =
+      this.parseLevelTitleMarkup(
+        rawBaseName
+      );
+
     let baseName =
-      `${artist} - ${song}`
+      (
+        parsedTitle.valid
+          ? parsedTitle.plainText
+          : rawBaseName
+      )
       .replace(
         /[<>:"/\\|?*\u0000-\u001F]/g,
         "_"
@@ -13009,8 +13960,9 @@ class EditorApp{
 
     if(!json){
 
-      alert(
-        "There is no level to download."
+      this.showToast(
+        "There is no level to download.",
+        "warning"
       );
 
       return false;
@@ -13102,6 +14054,16 @@ class EditorApp{
       1000
     );
 
+    this.logger.info(
+      "Level download requested",
+      this.getDownloadLevelFilename()
+    );
+
+    this.showToast(
+      "Level download started.",
+      "success",
+      2200
+    );
 
     return true;
   }
@@ -13161,7 +14123,15 @@ class EditorApp{
       전부 갱신
     */
     this.rebuild();
-  
+
+    this.logger.info(
+      "Event updated",
+      {
+        eventType: action?.eventType ?? "Unknown",
+        floorId: action?.floorId ?? null,
+        patch
+      }
+    );
   
     return true;
   }
@@ -13206,7 +14176,14 @@ class EditorApp{
       전부 다시 계산.
     */
     this.rebuild();
-  
+
+    this.logger.info(
+      "Event deleted",
+      {
+        eventType: action?.eventType ?? "Unknown",
+        floorId: action?.floorId ?? null
+      }
+    );
   
     return true;
   }
@@ -13376,6 +14353,16 @@ class EditorApp{
       this.state.mode !== "edit"
     ){
       return false;
+    }
+
+    if(this.autosaveSuppressed){
+      this.autosaveSuppressed = false;
+      this.logger.setPersistenceEnabled(
+        true
+      );
+      this.logger.info(
+        "Cache writes resumed after a new edit."
+      );
     }
 
     const snapshot =
@@ -13615,6 +14602,14 @@ class EditorApp{
     this.updateHistoryButtons();
     this.scheduleAutosave(0);
 
+    this.logger.info(
+      "Undo",
+      {
+        undo: this.undoStack.length,
+        redo: this.redoStack.length
+      }
+    );
+
     return true;
   }
 
@@ -13660,6 +14655,14 @@ class EditorApp{
 
     this.updateHistoryButtons();
     this.scheduleAutosave(0);
+
+    this.logger.info(
+      "Redo",
+      {
+        undo: this.undoStack.length,
+        redo: this.redoStack.length
+      }
+    );
 
     return true;
   }
@@ -13966,6 +14969,14 @@ class EditorApp{
     }
     
     this.updateEditorUI();
+
+    this.logger.info(
+      "Level compiled",
+      {
+        tiles: compiled.floors?.length ?? 0,
+        events: this.doc?.actions?.length ?? 0
+      }
+    );
 
     /*
       Most actual level edits end in rebuild(). Debounce the write
@@ -14398,7 +15409,14 @@ class EditorApp{
       rebuild 후에도 그대로 살아 있음.
     */
     this.rebuild();
-  
+
+    this.logger.info(
+      "Outgoing angle changed",
+      {
+        floorIndex: index,
+        nextAngle
+      }
+    );
   
     return true;
   }
@@ -14451,8 +15469,12 @@ class EditorApp{
       999
     );
   
-  
     this.rebuild();
+
+    this.logger.info(
+      "Outgoing angle changed to MID",
+      { floorIndex: index }
+    );
   
     return true;
   }
@@ -14531,8 +15553,12 @@ class EditorApp{
       fullspinAngle
     );
   
-  
     this.rebuild();
+
+    this.logger.info(
+      "Outgoing angle changed to 360°",
+      { floorIndex: index }
+    );
   
     return true;
   }
@@ -14702,53 +15728,172 @@ class EditorApp{
     */
   }
   
-  addFloorAfterSelected(angle = 0){
+  addFloorAfterSelected(
+    angle = 0,
+    {
+      relative = false
+    } = {}
+  ){
 
     if(
       this.state.mode !== "edit"
     ){
       return false;
     }
-  
-  
+
+
     if(
       this.state.selectedFloorIds
         .size !== 1
     ){
       return false;
     }
-  
-  
+
+
     const selectedId =
       this.state.activeFloorId;
-  
-  
+
+
     if(!selectedId){
       return false;
     }
-  
-  
+
+
     const index =
       this.doc.indexOfId(
         selectedId
       );
-  
-  
+
+
     if(index < 0){
       return false;
     }
-  
-  
+
+
     /*
       999는 Midspin이므로
       정규화시키면 안 된다.
     */
-    const rawAngle =
-      angle === 999
-        ? 999
-        : normalizeAngle(angle);
-  
-  
+    let rawAngle;
+
+
+    if(angle === 999){
+
+      rawAngle =
+        999;
+    }
+    else{
+
+      const requestedAngle =
+        Number(
+          angle
+        );
+
+
+      if(
+        !Number.isFinite(
+          requestedAngle
+        )
+      ){
+        return false;
+      }
+
+
+      if(relative){
+
+        /*
+          ADOFAI Advanced FREE는 절대각 입력이 아니라
+          "현재 선택 타일의 절대각 + 자유각도" 방식이다.
+
+          예:
+            0° + FREE 10° -> 10°
+            10° + FREE 10° -> 20°
+            20° + FREE 10° -> 30°
+
+          MID(999) 뒤에서도 동작해야 하므로
+          doc.angles[index] 대신 Compiler가 이미 해석한
+          현재 타일의 절대방향을 우선 사용한다.
+
+          Compiler:
+            floor.startAngle = reverseAngle(nowAngle)
+
+          따라서:
+            nowAngle = reverseAngle(floor.startAngle)
+        */
+        const selectedFloor =
+          this.compiled
+            ?.floors?.[
+              index
+            ];
+
+
+        let baseAngle =
+          Number(
+            selectedFloor
+              ?.startAngle
+          );
+
+
+        if(
+          Number.isFinite(
+            baseAngle
+          )
+        ){
+
+          baseAngle =
+            reverseAngle(
+              baseAngle
+            );
+        }
+        else{
+
+          const fallbackAngle =
+            Number(
+              this.doc
+                ?.angles?.[
+                  index
+                ]
+            );
+
+
+          if(
+            !Number.isFinite(
+              fallbackAngle
+            )
+            ||
+            fallbackAngle === 999
+          ){
+            return false;
+          }
+
+
+          baseAngle =
+            normalizeAngle(
+              fallbackAngle
+            );
+        }
+
+
+        rawAngle =
+          normalizeAngle(
+            baseAngle +
+            requestedAngle
+          );
+      }
+      else{
+
+        /*
+          일반 방향 버튼과 Advanced SNAP은
+          기존과 동일하게 절대각도 입력.
+        */
+        rawAngle =
+          normalizeAngle(
+            requestedAngle
+          );
+      }
+    }
+
+
     this.recordHistoryBeforeEdit();
 
 
@@ -14781,7 +15926,16 @@ class EditorApp{
   
   
     this.rebuild();
-  
+
+    this.logger.info(
+      "Tile added",
+      {
+        afterIndex: index,
+        floorId: newId,
+        angle: rawAngle,
+        relative
+      }
+    );
   
     return true;
   }
@@ -14853,8 +16007,8 @@ class EditorApp{
         2. 없다면 이전 타일
     */
     const nextSelectedId =
-      this.doc.ids[index - 1] ??
       this.doc.ids[index + 1] ??
+      this.doc.ids[index - 1] ??
       null;
   
   
@@ -14917,7 +16071,14 @@ class EditorApp{
       타일 전체 재구축
     */
     this.rebuild();
-  
+
+    this.logger.info(
+      "Tile deleted",
+      {
+        floorIndex: index,
+        floorId: selectedId
+      }
+    );
   
     return true;
   }
@@ -15015,6 +16176,11 @@ class EditorApp{
     this.state.selectionAnchorId = null;
   
     this.rebuild();
+
+    this.logger.info(
+      "Tiles deleted",
+      { count: removableIds.length }
+    );
   
     return true;
   }
@@ -15543,6 +16709,15 @@ class EditorApp{
       };
   
   
+    this.logger.info(
+      "Playback started",
+      {
+        targetIndex: this.playTargetIndex,
+        target_us: this.playTarget_us,
+        pitch: this.doc?.settings?.pitch ?? 100
+      }
+    );
+
     return true;
   }
   
@@ -15610,7 +16785,11 @@ class EditorApp{
         false
       );
     }
-  
+
+    this.logger.info(
+      "Playback stopped",
+      { index }
+    );
   
     return true;
   }
@@ -16190,6 +17369,32 @@ class EditorApp{
     this.editorInfoElement =
       element;
 
+    const finite = value => {
+      const number = Number(value);
+      return Number.isFinite(number)
+        ? number
+        : null;
+    };
+
+    const angleText = value => {
+      const number = finite(value);
+      return number === null
+        ? "—"
+        : `${Number(number.toFixed(4))}°`;
+    };
+
+    const numberText = (
+      value,
+      digits = 4
+    ) => {
+      const number = finite(value);
+      return number === null
+        ? "—"
+        : Number(
+            number.toFixed(digits)
+          ).toString();
+    };
+
     const frame =
       this.renderEngine?.frameCount ?? 0;
 
@@ -16258,10 +17463,6 @@ class EditorApp{
           `Selected: #${activeIndex} (${selectedCount})  Tile: (${Number(floor.x).toFixed(2)}, ${Number(floor.y).toFixed(2)})`
         );
 
-        /*
-          Compiler stores the orbit state AFTER applying a Twirl on
-          this floor. false = clockwise, true = counterclockwise.
-        */
         const isTwirled =
           Boolean(
             floor.option?.isTwirled
@@ -16270,6 +17471,180 @@ class EditorApp{
         lines.push(
           `isTwirled: ${isTwirled}  Orbit: ${isTwirled ? "Counterclockwise (CCW)" : "Clockwise (CW)"}`
         );
+
+        /*
+          Absolute direction is reconstructed from Floor.startAngle.
+          Compiler stores startAngle as reverseAngle(nowAngle), so
+          reversing once more yields the actual resolved ADOFAI angle.
+          This also works after a 999/MID run where doc.angles itself is
+          deliberately still 999.
+        */
+        const currentAbsolute =
+          normalizeAngle(
+            reverseAngle(
+              Number(floor.startAngle)
+            )
+          );
+
+        const previousFloor =
+          activeIndex > 0
+            ? this.compiled?.floors?.[
+                activeIndex - 1
+              ]
+            : null;
+
+        const nextFloor =
+          activeIndex + 1 < tileCount
+            ? this.compiled?.floors?.[
+                activeIndex + 1
+              ]
+            : null;
+
+        const previousAbsolute =
+          previousFloor
+            ? normalizeAngle(
+                reverseAngle(
+                  Number(
+                    previousFloor.startAngle
+                  )
+                )
+              )
+            : null;
+
+        const nextAbsolute =
+          nextFloor
+            ? normalizeAngle(
+                reverseAngle(
+                  Number(
+                    nextFloor.startAngle
+                  )
+                )
+              )
+            : finite(
+                floor.endAngle
+              );
+
+        const rawAngle =
+          this.doc?.angles?.[
+            activeIndex
+          ];
+
+        const relativeAngle =
+          finite(
+            this.compiled
+              ?.relativeAngles?.[
+                activeIndex
+              ]
+          );
+
+        const totalBeat =
+          finite(
+            this.compiled?.beats?.[
+              activeIndex
+            ]
+          );
+
+        const baseBeat =
+          relativeAngle !== null
+            ? relativeAngle / 180
+            : null;
+
+        const pauseBeat =
+          (
+            totalBeat !== null &&
+            baseBeat !== null
+          )
+            ? Math.max(
+                0,
+                totalBeat - baseBeat
+              )
+            : null;
+
+        const bpm =
+          finite(
+            this.compiled?.bpms?.[
+              activeIndex
+            ]
+          );
+
+        const relativeBpm =
+          (
+            bpm !== null &&
+            baseBeat !== null &&
+            baseBeat > 0
+          )
+            ? bpm / baseBeat
+            : null;
+
+        lines.push(
+          `Absolute: ${angleText(currentAbsolute)}${rawAngle === 999 ? "  Raw: MID(999)" : ""}`
+        );
+
+        lines.push(
+          `Angles: ${angleText(previousAbsolute)} → ${angleText(currentAbsolute)} → ${angleText(nextAbsolute)}`
+        );
+
+        lines.push(
+          `Tile Arms: ${angleText(floor.startAngle)} → ${angleText(floor.endAngle)}`
+        );
+
+        lines.push(
+          `Timing Angle: ${angleText(relativeAngle)}  Base Beat: ${numberText(baseBeat, 6)}`
+        );
+
+        if(
+          totalBeat !== null
+        ){
+          if(
+            pauseBeat !== null &&
+            pauseBeat > 0.000001
+          ){
+            lines.push(
+              `Actual Beat: ${numberText(totalBeat, 6)}  (${numberText(baseBeat, 6)} angle + ${numberText(pauseBeat, 6)} pause)`
+            );
+          }
+          else{
+            lines.push(
+              `Actual Beat: ${numberText(totalBeat, 6)}`
+            );
+          }
+        }
+
+        lines.push(
+          `BPM: ${numberText(bpm, 3)}  Relative BPM: ${relativeBpm === null ? "—" : numberText(relativeBpm, 3)}`
+        );
+
+        const floorStart_us =
+          finite(
+            this.compiled?.floorStarts_us?.[
+              activeIndex
+            ]
+          );
+
+        const floorDuration_us =
+          finite(
+            this.compiled?.floorDurations_us?.[
+              activeIndex
+            ]
+          );
+
+        if(
+          floorStart_us !== null &&
+          floorDuration_us !== null
+        ){
+          const startSec =
+            floorStart_us / 1000000;
+
+          const endSec =
+            (
+              floorStart_us +
+              floorDuration_us
+            ) / 1000000;
+
+          lines.push(
+            `Timeline: ${startSec.toFixed(4)}s → ${endSec.toFixed(4)}s  (${(floorDuration_us / 1000).toFixed(2)}ms)`
+          );
+        }
       }
       else{
         lines.push(
@@ -16283,21 +17658,6 @@ class EditorApp{
       );
     }
 
-    let bpm = null;
-
-    if(activeIndex >= 0){
-      const value =
-        Number(
-          this.compiled?.bpms?.[
-            activeIndex
-          ]
-        );
-
-      if(Number.isFinite(value)){
-        bpm = value;
-      }
-    }
-
     const pitch =
       Number(
         this.doc?.settings?.pitch ??
@@ -16307,35 +17667,63 @@ class EditorApp{
     let statusLine =
       `Mode: ${mode}`;
 
-    if(bpm !== null){
-      statusLine +=
-        `  BPM: ${bpm.toFixed(2).replace(/\.00$/, "")}`;
-    }
-
     if(Number.isFinite(pitch)){
       statusLine +=
         `  Pitch: ${pitch}%`;
     }
 
+    lines.push(statusLine);
+
     if(
       this.state?.mode === "play" &&
       this.clock
     ){
-      const timeSec =
+      const levelTimeSec =
         Number(
           this.clock.getTime_us()
         ) /
         1000000;
 
-      if(Number.isFinite(timeSec)){
-        statusLine +=
-          `  Time: ${timeSec.toFixed(3)}s`;
+      const songTimeSec =
+        levelTimeSec -
+        this.editorGlobalOffset_ms /
+        1000;
+
+      const songDurationSec =
+        finite(
+          this.song?.buffer?.duration
+        );
+
+      if(songDurationSec !== null){
+        lines.push(
+          `Playback: ${this.formatPlaybackTime(songTimeSec)} / ${this.formatPlaybackTime(songDurationSec)}`
+        );
+      }
+      else{
+        const lastIndex =
+          (this.compiled?.floors?.length ?? 0) - 1;
+
+        const levelEnd_us =
+          lastIndex >= 0
+            ? Number(
+                this.compiled.floorStarts_us[
+                  lastIndex
+                ]
+              ) +
+              Number(
+                this.compiled.floorDurations_us[
+                  lastIndex
+                ] ?? 0
+              )
+            : NaN;
+
+        lines.push(
+          Number.isFinite(levelEnd_us)
+            ? `Level Time: ${this.formatPlaybackTime(levelTimeSec)} / ${this.formatPlaybackTime(levelEnd_us / 1000000)}`
+            : `Level Time: ${this.formatPlaybackTime(levelTimeSec)}`
+        );
       }
     }
-
-    lines.push(
-      statusLine
-    );
 
     element.textContent =
       lines.join("\n");
@@ -16419,10 +17807,37 @@ class EditorApp{
     */
     this.rebuild();
 
+    this.logger.info(
+      "Event added",
+      {
+        eventType,
+        floorId
+      }
+    );
 
     return action;
   }
 }
 
+/*
+  Optional admin/debug handle for testers using DevTools.
+  Example:
+    editorDebug.toText()
+    editorDebug.entries
+*/
+window.editorDebug =
+  EDITOR_LOGGER;
+
 window.app = new EditorApp();
-app.loadProject("./level.adofai");
+
+app.loadProject("./level.adofai")
+  .catch(error => {
+    app.setLevelLoading(
+      false
+    );
+
+    app.reportError(
+      error,
+      "Editor startup failed"
+    );
+  });
