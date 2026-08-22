@@ -759,6 +759,13 @@ const EVENT_TAB_DEFS = {
     allowMultiple:
       true,
 
+    /*
+      이벤트를 생성한 직후 해당 이벤트 탭을 자동으로 열지 여부.
+      SetSpeed는 생성 즉시 세부 값을 편집하는 경우가 많으므로 연다.
+    */
+    openTabOnCreate:
+      true,
+
     defaultData: {
       speedType:
         "Bpm",
@@ -794,6 +801,13 @@ const EVENT_TAB_DEFS = {
     allowMultiple:
       false,
 
+    /*
+      Twirl은 옵션이 없는 즉시 적용 이벤트이므로
+      생성 후 타일 편집 화면을 그대로 유지한다.
+    */
+    openTabOnCreate:
+      false,
+
     defaultData: {},
 
     order:
@@ -816,6 +830,9 @@ const EVENT_TAB_DEFS = {
 
     allowMultiple:
       false,
+
+    openTabOnCreate:
+      true,
 
     defaultData: {
       duration:
@@ -848,6 +865,9 @@ const EVENT_TAB_DEFS = {
 
     allowMultiple:
       false,
+
+    openTabOnCreate:
+      true,
 
     defaultData: {
       gameSound:
@@ -6450,16 +6470,17 @@ integer = false,
 
 
           /*
-            이벤트 추가 직후
-            해당 이벤트 탭을 자동으로 연다.
-          */
+            이벤트 종류별로 생성 후 탭 이동 여부를 다르게 한다.
 
+            예:
+              SetSpeed / Pause / SetHitsound
+                -> 생성 후 해당 탭 열기
+
+              Twirl
+                -> 현재 탭 유지
+          */
           const previousTab =
             this.activeTabKey;
-
-
-          this.activeTabKey =
-            item.key;
 
 
           const added =
@@ -6470,15 +6491,32 @@ integer = false,
 
 
           /*
-            추가 실패 시
-            이전 탭으로 복원
+            추가 실패 시 현재 탭을 그대로 유지한다.
           */
-
           if(!added){
 
             this.activeTabKey =
               previousTab;
 
+            this.render();
+
+            return;
+          }
+
+
+          if(
+            item.openTabOnCreate !==
+            false
+          ){
+
+            this.activeTabKey =
+              item.key;
+
+            /*
+              addEventToSelected() 내부 rebuild는
+              이전 activeTabKey 상태에서 이미 끝났으므로,
+              여기서 새 탭을 한 번 더 렌더한다.
+            */
             this.render();
           }
         }
@@ -15273,6 +15311,14 @@ class EditorApp{
             order:
               def.order,
 
+            /*
+              EVENT_TAB_DEFS가 생성 후 탭 이동 동작까지 결정한다.
+              속성이 없는 미래 이벤트는 기존 동작과의 호환을 위해 true.
+            */
+            openTabOnCreate:
+              def.openTabOnCreate !==
+              false,
+
             canAdd:
               this.state.mode ===
                 "edit"
@@ -15728,6 +15774,74 @@ class EditorApp{
     */
   }
   
+  /* =========================================================
+     Advanced FREE angle base
+
+     FREE는 절대각 입력이 아니라 현재 선택 타일의
+     실제 절대각에 입력값을 더하는 상대각 방식이다.
+
+     Compiler가 MID(999)를 이미 절대방향으로 해석했으므로
+     compiled floor를 우선 사용한다.
+  ========================================================= */
+  getResolvedAbsoluteAngleAt(
+    index
+  ){
+
+    const floor =
+      this.compiled
+        ?.floors?.[index];
+
+
+    const compiledStartAngle =
+      Number(
+        floor?.startAngle
+      );
+
+
+    if(
+      Number.isFinite(
+        compiledStartAngle
+      )
+    ){
+
+      /*
+        Compiler에서
+          floor.startAngle = reverseAngle(nowAngle)
+
+        이므로 다시 reverse하면 현재 타일의
+        해석된 절대각(nowAngle)을 얻는다.
+      */
+      return normalizeAngle(
+        reverseAngle(
+          compiledStartAngle
+        )
+      );
+    }
+
+
+    const rawAngle =
+      Number(
+        this.doc
+          ?.angles?.[index]
+      );
+
+
+    if(
+      Number.isFinite(rawAngle)
+      &&
+      rawAngle !== 999
+    ){
+
+      return normalizeAngle(
+        rawAngle
+      );
+    }
+
+
+    return null;
+  }
+
+
   addFloorAfterSelected(
     angle = 0,
     {
@@ -15820,60 +15934,30 @@ class EditorApp{
           따라서:
             nowAngle = reverseAngle(floor.startAngle)
         */
-        const selectedFloor =
-          this.compiled
-            ?.floors?.[
-              index
-            ];
-
-
-        let baseAngle =
-          Number(
-            selectedFloor
-              ?.startAngle
+        const baseAngle =
+          this.getResolvedAbsoluteAngleAt(
+            index
           );
 
 
         if(
-          Number.isFinite(
+          !Number.isFinite(
             baseAngle
           )
         ){
-
-          baseAngle =
-            reverseAngle(
-              baseAngle
-            );
-        }
-        else{
-
-          const fallbackAngle =
-            Number(
-              this.doc
-                ?.angles?.[
-                  index
-                ]
-            );
-
-
-          if(
-            !Number.isFinite(
-              fallbackAngle
-            )
-            ||
-            fallbackAngle === 999
-          ){
-            return false;
-          }
-
-
-          baseAngle =
-            normalizeAngle(
-              fallbackAngle
-            );
+          return false;
         }
 
 
+        /*
+          예:
+            선택 타일 90° + FREE 10° = 100°
+            새 100° 타일 + FREE 10° = 110°
+
+          따라서 반복 추가하면
+            90 -> 100 -> 110 -> 120 ...
+          로 누적된다.
+        */
         rawAngle =
           normalizeAngle(
             baseAngle +
