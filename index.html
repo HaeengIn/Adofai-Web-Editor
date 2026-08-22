@@ -57,6 +57,40 @@
       </div>
 
       <div
+        id="clipboard-toolbar"
+        aria-label="Tile clipboard"
+      >
+        <button
+          id="copy-tiles-button"
+          class="clipboard-tool-button"
+          type="button"
+          aria-label="Copy selected tiles"
+          title="Copy selected tiles"
+          disabled
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="8" width="10" height="10" rx="1.5"></rect>
+            <rect x="5" y="5" width="10" height="10" rx="1.5"></rect>
+          </svg>
+        </button>
+
+        <button
+          id="paste-tiles-button"
+          class="clipboard-tool-button"
+          type="button"
+          aria-label="Paste tiles after selected tile"
+          title="Paste tiles after selected tile"
+          disabled
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 5.5h6v3H9z"></path>
+            <path d="M7 7h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path>
+            <path d="M9 12h6M9 15h6"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div
         id="history-toolbar"
         aria-label="Edit history"
       >

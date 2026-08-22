@@ -3887,6 +3887,8 @@ class TileEditorUI {
       onUpdateEvent: null,
       onAddEvent: null,
       onDeleteEvent: null,
+      onCopyEvent: null,
+      onPasteEvent: null,
     };
     
     this.snapEnabled = true;
@@ -4502,94 +4504,113 @@ class TileEditorUI {
   
   createEventCard(
     title,
-    onDelete = null
+    onDelete = null,
+    onCopy = null
   ){
-  
+
     const card =
       document.createElement(
         "div"
       );
-  
-  
+
     card.className =
       "event-card";
-  
-  
+
     const header =
       document.createElement(
         "div"
       );
-  
-  
+
     header.className =
       "event-card-header";
-  
-  
+
     const heading =
       document.createElement(
         "div"
       );
-  
-  
+
     heading.className =
       "event-card-title";
-  
+
     heading.textContent =
       title;
-  
-  
+
     header.appendChild(
       heading
     );
-  
-  
-    if(onDelete){
-  
-      const deleteButton =
+
+    if(onCopy || onDelete){
+      const actions =
         document.createElement(
-          "button"
+          "div"
         );
-  
-  
-      deleteButton.type =
-        "button";
-  
-      deleteButton.className =
-        "event-card-delete";
-  
-      deleteButton.textContent =
-        "×";
-  
-  
-      deleteButton.setAttribute(
-        "aria-label",
-        `Delete ${title}`
-      );
-  
-  
-      deleteButton.addEventListener(
-        "click",
-        () => {
-  
-          onDelete();
-        }
-      );
-  
-  
+
+      actions.className =
+        "event-card-actions";
+
+      if(onCopy){
+        const copyButton =
+          document.createElement(
+            "button"
+          );
+
+        copyButton.type =
+          "button";
+        copyButton.className =
+          "event-card-copy";
+        copyButton.textContent =
+          "Copy";
+        copyButton.setAttribute(
+          "aria-label",
+          `Copy ${title}`
+        );
+        copyButton.addEventListener(
+          "click",
+          () => onCopy()
+        );
+        actions.appendChild(
+          copyButton
+        );
+      }
+
+      if(onDelete){
+        const deleteButton =
+          document.createElement(
+            "button"
+          );
+
+        deleteButton.type =
+          "button";
+        deleteButton.className =
+          "event-card-delete";
+        deleteButton.textContent =
+          "×";
+        deleteButton.setAttribute(
+          "aria-label",
+          `Delete ${title}`
+        );
+        deleteButton.addEventListener(
+          "click",
+          () => onDelete()
+        );
+        actions.appendChild(
+          deleteButton
+        );
+      }
+
       header.appendChild(
-        deleteButton
+        actions
       );
     }
-  
-  
+
     card.appendChild(
       header
     );
-  
-  
+
     return card;
   }
-  
+
+
   renderSpeedEventScreen(
     group
   ){
@@ -4603,21 +4624,18 @@ class TileEditorUI {
   
         const card =
           this.createEventCard(
-        
             group.actions.length > 1
               ? `Set Speed ${index + 1}`
               : "Set Speed",
-        
             () => {
-        
-              this.callback
-                .onDeleteEvent?.(
-                  action
-                );
+              this.callback.onDeleteEvent?.(action);
+            },
+            () => {
+              this.callback.onCopyEvent?.(action);
             }
           );
-  
-  
+
+
         const rawSpeedType =
           String(
             action.speedType ??
@@ -4844,17 +4862,15 @@ class TileEditorUI {
       const card =
         this.createEventCard(
           "Twirl",
-  
           () => {
-  
-            this.callback
-              .onDeleteEvent?.(
-                action
-              );
+            this.callback.onDeleteEvent?.(action);
+          },
+          () => {
+            this.callback.onCopyEvent?.(action);
           }
         );
-  
-  
+
+
       this.eventScreenBody
         .appendChild(
           card
@@ -5325,21 +5341,18 @@ integer = false,
   
         const card =
           this.createEventCard(
-        
             group.actions.length > 1
               ? `Pause ${index + 1}`
               : "Pause",
-        
             () => {
-        
-              this.callback
-                .onDeleteEvent?.(
-                  action
-                );
+              this.callback.onDeleteEvent?.(action);
+            },
+            () => {
+              this.callback.onCopyEvent?.(action);
             }
           );
-  
-  
+
+
         const duration =
           Number.isFinite(
             Number(
@@ -5531,12 +5544,11 @@ integer = false,
             group.actions.length > 1
               ? `Set Hitsound ${index + 1}`
               : "Set Hitsound",
-
             () => {
-              this.callback
-                .onDeleteEvent?.(
-                  action
-                );
+              this.callback.onDeleteEvent?.(action);
+            },
+            () => {
+              this.callback.onCopyEvent?.(action);
             }
           );
 
@@ -6381,6 +6393,82 @@ integer = false,
         button
       );
     }
+
+    const pasteEventButton =
+      document.createElement(
+        "button"
+      );
+
+    pasteEventButton.type =
+      "button";
+    pasteEventButton.className =
+      "editor-tab event-paste-tab";
+    pasteEventButton.dataset.tab =
+      "paste-event";
+    pasteEventButton.disabled =
+      !this.data?.canPasteEvent;
+
+    const copiedEventType =
+      String(
+        this.data?.eventClipboardType ?? ""
+      );
+
+    pasteEventButton.setAttribute(
+      "aria-label",
+      copiedEventType
+        ? `Paste ${copiedEventType}`
+        : "Paste copied event"
+    );
+    pasteEventButton.title =
+      copiedEventType
+        ? `Paste ${copiedEventType}`
+        : "Paste Event";
+
+    const pasteIcon =
+      document.createElement(
+        "span"
+      );
+    pasteIcon.className =
+      "editor-tab-icon event-paste-icon";
+    pasteIcon.textContent =
+      "⎘";
+    pasteEventButton.appendChild(
+      pasteIcon
+    );
+
+    pasteEventButton.addEventListener(
+      "click",
+      () => {
+        if(pasteEventButton.disabled){
+          return;
+        }
+
+        const pasted =
+          this.callback.onPasteEvent?.();
+
+        if(!pasted){
+          return;
+        }
+
+        const def =
+          getEventDefinition(
+            pasted.eventType
+          );
+
+        if(def && def.openTabOnCreate !== false){
+          this.activeTabKey =
+            def.key;
+        }
+
+        this.isAdvanced =
+          false;
+        this.render();
+      }
+    );
+
+    this.tabsElement.appendChild(
+      pasteEventButton
+    );
   }
 
   renderEventPalette(){
@@ -10866,6 +10954,16 @@ class EditorApp{
     this.historyRestoring = false;
     this.historyInitialized = false;
     
+    /* =========================
+       Internal Clipboards
+    ========================= */
+
+    this.copyTilesButton = null;
+    this.pasteTilesButton = null;
+    this.tileClipboard = null;
+    this.eventClipboard = null;
+    this.clipboardInitialized = false;
+
     this.editorUI = new TileEditorUI();
     
     this.resizeObserver = null;
@@ -11964,6 +12062,8 @@ class EditorApp{
 
     this.initHistoryControls();
     this.resetHistory();
+
+    this.initClipboardControls();
     
     
     this.editorUI.init({
@@ -12028,6 +12128,18 @@ class EditorApp{
           return this.deleteEventAction(
             action
           );
+        },
+
+      onCopyEvent:
+        action => {
+          return this.copyEventAction(
+            action
+          );
+        },
+
+      onPasteEvent:
+        () => {
+          return this.pasteEventToSelected();
         },
     
     });
@@ -14725,6 +14837,301 @@ class EditorApp{
   }
 
 
+  /* =========================================================
+     Tile / Event Clipboard
+  ========================================================= */
+
+  initClipboardControls(){
+    if(this.clipboardInitialized){
+      this.updateClipboardButtons();
+      return;
+    }
+
+    this.copyTilesButton =
+      document.getElementById(
+        "copy-tiles-button"
+      );
+    this.pasteTilesButton =
+      document.getElementById(
+        "paste-tiles-button"
+      );
+
+    if(!this.copyTilesButton || !this.pasteTilesButton){
+      throw new Error(
+        "tile clipboard controls not found"
+      );
+    }
+
+    this.copyTilesButton.addEventListener(
+      "click",
+      () => this.copySelectedTiles()
+    );
+    this.pasteTilesButton.addEventListener(
+      "click",
+      () => this.pasteTilesAfterSelected()
+    );
+
+    this.clipboardInitialized = true;
+    this.updateClipboardButtons();
+  }
+
+  updateClipboardButtons(){
+    const editable =
+      this.state?.mode === "edit";
+    const selectedCount =
+      this.state?.selectedFloorIds?.size ?? 0;
+
+    if(this.copyTilesButton){
+      this.copyTilesButton.disabled =
+        !editable || selectedCount <= 0;
+    }
+
+    if(this.pasteTilesButton){
+      this.pasteTilesButton.disabled =
+        !editable ||
+        selectedCount !== 1 ||
+        !Array.isArray(this.tileClipboard?.tiles) ||
+        this.tileClipboard.tiles.length === 0;
+    }
+  }
+
+  copySelectedTiles(){
+    if(this.state.mode !== "edit"){
+      return false;
+    }
+
+    const selected =
+      [...this.state.selectedFloorIds]
+      .map(id => ({
+        id,
+        index: this.doc.indexOfId(id)
+      }))
+      .filter(item => item.index >= 0)
+      .sort((a, b) => a.index - b.index);
+
+    if(selected.length === 0){
+      return false;
+    }
+
+    const tiles = selected.map(item => ({
+      angle: structuredClone(
+        this.doc.angles[item.index]
+      ),
+      actions:
+        this.doc.getActionsByFloorId(item.id)
+        .map(action => {
+          const cloned = structuredClone(action);
+          delete cloned.floorId;
+          return cloned;
+        })
+    }));
+
+    this.tileClipboard = {
+      tiles,
+      copiedAt: Date.now()
+    };
+
+    this.updateClipboardButtons();
+    this.showToast(
+      `${tiles.length} tile${tiles.length === 1 ? "" : "s"} copied.`,
+      "success",
+      2200
+    );
+    this.logger.info(
+      "Tiles copied",
+      {
+        count: tiles.length,
+        sourceIndices: selected.map(item => item.index)
+      }
+    );
+
+    return true;
+  }
+
+  pasteTilesAfterSelected(){
+    if(
+      this.state.mode !== "edit" ||
+      this.state.selectedFloorIds.size !== 1
+    ){
+      return false;
+    }
+
+    const copiedTiles =
+      this.tileClipboard?.tiles;
+
+    if(!Array.isArray(copiedTiles) || copiedTiles.length === 0){
+      return false;
+    }
+
+    const targetId =
+      this.state.activeFloorId;
+    const targetIndex =
+      this.doc.indexOfId(targetId);
+
+    if(!targetId || targetIndex < 0){
+      return false;
+    }
+
+    this.recordHistoryBeforeEdit();
+
+    let afterId = targetId;
+    const insertedIds = [];
+
+    for(const tile of copiedTiles){
+      const newId =
+        this.doc.insertAfter(
+          afterId,
+          structuredClone(tile.angle)
+        );
+
+      insertedIds.push(newId);
+
+      for(const copiedAction of tile.actions ?? []){
+        const action = structuredClone(copiedAction);
+        action.floorId = newId;
+        // Preserve all events, including unsupported ones.
+        this.doc.actions.push(action);
+      }
+
+      afterId = newId;
+    }
+
+    if(insertedIds.length === 0){
+      return false;
+    }
+
+    // Select the last pasted tile so repeated Paste appends naturally.
+    const lastInsertedId =
+      insertedIds[insertedIds.length - 1];
+
+    this.state.selectedFloorIds.clear();
+    this.state.selectedFloorIds.add(lastInsertedId);
+    this.state.activeFloorId = lastInsertedId;
+    this.state.selectionAnchorId = lastInsertedId;
+
+    this.rebuild();
+
+    this.showToast(
+      `${insertedIds.length} tile${insertedIds.length === 1 ? "" : "s"} pasted.`,
+      "success",
+      2400
+    );
+    this.logger.info(
+      "Tiles pasted",
+      {
+        afterIndex: targetIndex,
+        count: insertedIds.length
+      }
+    );
+
+    return true;
+  }
+
+  copyEventAction(action){
+    if(
+      this.state.mode !== "edit" ||
+      !action ||
+      !this.doc.actions.includes(action)
+    ){
+      return false;
+    }
+
+    const cloned =
+      structuredClone(action);
+    delete cloned.floorId;
+
+    this.eventClipboard = {
+      action: cloned,
+      copiedAt: Date.now()
+    };
+
+    this.updateEditorUI();
+
+    const eventType =
+      String(cloned.eventType ?? "Event");
+
+    this.showToast(
+      `${eventType} copied.`,
+      "success",
+      2200
+    );
+    this.logger.info(
+      "Event copied",
+      { eventType }
+    );
+
+    return true;
+  }
+
+  canPasteEventToSelected(){
+    if(
+      this.state.mode !== "edit" ||
+      this.state.selectedFloorIds.size !== 1
+    ){
+      return false;
+    }
+
+    const copiedAction =
+      this.eventClipboard?.action;
+    const floorId =
+      this.state.activeFloorId;
+    const eventType =
+      copiedAction?.eventType;
+
+    if(!floorId || !eventType){
+      return false;
+    }
+
+    return this.doc.canAddAction(
+      floorId,
+      eventType
+    );
+  }
+
+  pasteEventToSelected(){
+    if(!this.canPasteEventToSelected()){
+      return null;
+    }
+
+    const floorId =
+      this.state.activeFloorId;
+    const copied =
+      structuredClone(this.eventClipboard.action);
+    const eventType =
+      copied.eventType;
+
+    delete copied.eventType;
+    delete copied.floorId;
+
+    this.recordHistoryBeforeEdit();
+
+    const action =
+      this.doc.addAction(
+        floorId,
+        eventType,
+        copied
+      );
+
+    if(!action){
+      return null;
+    }
+
+    this.rebuild();
+
+    this.showToast(
+      `${eventType} pasted.`,
+      "success",
+      2200
+    );
+    this.logger.info(
+      "Event pasted",
+      { eventType, floorId }
+    );
+
+    return action;
+  }
+
+
   initFloorNavigation(){
 
     this.prevFloorButton =
@@ -15357,6 +15764,12 @@ class EditorApp{
 
       eventPaletteItems,
 
+      canPasteEvent:
+        this.canPasteEventToSelected(),
+
+      eventClipboardType:
+        this.eventClipboard?.action?.eventType ?? null,
+
       hitsoundOptions:
         this.hitSound
           ?.getAvailableHitsoundOptions?.()
@@ -15381,6 +15794,7 @@ class EditorApp{
     
     this.updateFloorNavigationButtons();
     this.updateHistoryButtons();
+    this.updateClipboardButtons();
   }
   
   setSelectedOutgoingAngle(
@@ -16083,15 +16497,12 @@ class EditorApp{
   
   
     /*
-      삭제하기 전에
-      다음에 선택할 타일을 기억한다.
-  
-      우선순위:
-        1. 다음 타일
-        2. 없다면 이전 타일
+      삭제 후에는 항상 바로 이전 타일을 선택한다.
+
+      index > 0만 삭제할 수 있으므로
+      index - 1은 항상 유효한 이전 타일이다.
     */
     const nextSelectedId =
-      this.doc.ids[index + 1] ??
       this.doc.ids[index - 1] ??
       null;
   
