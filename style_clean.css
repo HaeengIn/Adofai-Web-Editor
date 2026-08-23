@@ -8145,3 +8145,1000 @@ img.editor-tab-icon {
     font-size: var(--font-lg, 25px);
   }
 }
+
+/* =========================================================
+   Advanced + button size
+========================================================= */
+
+#advanced-add-button {
+  width: clamp(44px, 11vw, 56px);
+  height: clamp(44px, 11vw, 56px);
+
+  min-width: clamp(44px, 11vw, 56px);
+  min-height: clamp(44px, 11vw, 56px);
+
+  font-size: clamp(28px, 7vw, 34px);
+}
+/* =========================================================
+   LANDSCAPE PHONE WORKSPACE V1
+
+   Portrait keeps the existing bottom-sheet editor.
+   On a short landscape viewport the same DOM reflows into a
+   camera-style side workspace:
+
+     map / canvas  |  editor controls
+
+   Nothing is duplicated. The map ResizeObserver in main.js
+   automatically updates Three.js when this CSS changes its size.
+========================================================= */
+
+@media
+  (orientation: landscape)
+  and (max-height: 650px)
+  and (max-width: 1100px)
+{
+  /* -----------------------------------------------------
+     Workspace split
+  ----------------------------------------------------- */
+
+  #editor {
+    --landscape-panel-width:
+      clamp(
+        310px,
+        41vw,
+        380px
+      );
+
+    --event-palette-height: 44px;
+    --nav-height: 48px;
+
+    flex-direction: row;
+  }
+
+  #editor.ui-multi {
+    --landscape-panel-width:
+      clamp(
+        240px,
+        32vw,
+        310px
+      );
+  }
+
+  #editor.ui-empty,
+  #editor.ui-play {
+    --landscape-panel-width: 0px;
+  }
+
+  #map-viewport {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    width: auto;
+    height: 100%;
+  }
+
+  #editor-panel {
+    flex:
+      0 0
+      var(--landscape-panel-width) !important;
+
+    width:
+      var(--landscape-panel-width);
+
+    height: 100%;
+    max-height: none;
+
+    border-top: none;
+    border-left:
+      1px solid
+      var(--border-panel);
+  }
+
+  #editor.ui-empty #editor-panel,
+  #editor.ui-play #editor-panel {
+    display: none;
+  }
+
+
+  /* -----------------------------------------------------
+     Map overlay controls
+  ----------------------------------------------------- */
+
+  #level-toolbar {
+    top:
+      calc(
+        8px +
+        env(safe-area-inset-top)
+      );
+
+    left:
+      calc(
+        8px +
+        env(safe-area-inset-left)
+      );
+
+    right:
+      calc(
+        8px +
+        env(safe-area-inset-right)
+      );
+
+    height: 40px;
+  }
+
+  #level-toolbar-actions {
+    gap: 6px;
+  }
+
+  #project-settings-button,
+  #editor-settings-button,
+  .clipboard-tool-button,
+  .history-button {
+    width: 40px;
+    height: 40px;
+
+    border-radius: 11px;
+  }
+
+  #project-settings-button,
+  #editor-settings-button {
+    font-size: 20px;
+  }
+
+  #clipboard-toolbar {
+    top:
+      calc(
+        8px +
+        env(safe-area-inset-top)
+      );
+
+    left:
+      calc(
+        56px +
+        env(safe-area-inset-left)
+      );
+
+    gap: 6px;
+  }
+
+  .clipboard-tool-button {
+    padding: 8px;
+  }
+
+  #history-toolbar {
+    top:
+      calc(
+        8px +
+        env(safe-area-inset-top)
+      );
+
+    right:
+      calc(
+        8px +
+        env(safe-area-inset-right)
+      );
+
+    gap: 6px;
+  }
+
+  .history-button {
+    font-size: 23px;
+  }
+
+  #level-title {
+    max-width: 48vw;
+
+    padding: 5px 9px;
+
+    font-size:
+      clamp(
+        12px,
+        2.2vw,
+        16px
+      );
+  }
+
+  #editor-info {
+    top:
+      calc(
+        56px +
+        env(safe-area-inset-top)
+      );
+
+    right:
+      calc(
+        10px +
+        env(safe-area-inset-right)
+      );
+
+    max-width: min(52vw, 430px);
+
+    font-size:
+      clamp(
+        7px,
+        1.3vw,
+        9px
+      );
+
+    line-height: 1.4;
+  }
+
+
+  /* -----------------------------------------------------
+     Playback/navigation pill
+
+     It remains horizontal, but is centered over the visible
+     map area instead of over the whole screen + side editor.
+  ----------------------------------------------------- */
+
+  #bottom-nav,
+  #editor.ui-single #bottom-nav,
+  #editor.ui-advanced #bottom-nav,
+  #editor.ui-multi #bottom-nav {
+    left:
+      calc(
+        (
+          100% -
+          var(--landscape-panel-width)
+        ) / 2
+      );
+
+    bottom:
+      calc(
+        10px +
+        env(safe-area-inset-bottom)
+      );
+
+    width:
+      clamp(
+        228px,
+        31vw,
+        292px
+      );
+
+    height: var(--nav-height);
+
+    padding: 4px 6px;
+  }
+
+  .modifier-button,
+  .floor-nav-button {
+    height: 40px;
+  }
+
+  .modifier-button {
+    font-size:
+      clamp(
+        10px,
+        1.5vw,
+        13px
+      );
+  }
+
+  .floor-nav-button {
+    font-size:
+      clamp(
+        24px,
+        3vw,
+        30px
+      );
+  }
+
+  #play-button {
+    width: 40px;
+    height: 40px;
+
+    border-radius: 12px;
+
+    font-size: 19px;
+  }
+
+
+  /* -----------------------------------------------------
+     Tabs + palette are now the top and bottom bars of the
+     right-side editor rail.
+  ----------------------------------------------------- */
+
+  #editor-tabs {
+    flex:
+      0 0
+      44px;
+
+    height: 44px;
+
+    gap: 5px;
+
+    padding:
+      5px
+      8px
+      0;
+  }
+
+  .editor-tab {
+    flex: 0 0 46px;
+
+    height: 37px;
+
+    border-radius:
+      10px
+      10px
+      0
+      0;
+  }
+
+  .editor-tab.active {
+    height: 39px;
+  }
+
+  img.editor-tab-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  #event-palette {
+    flex:
+      0 0
+      var(--event-palette-height);
+
+    min-height:
+      var(--event-palette-height);
+  }
+
+  #event-palette-list {
+    justify-content: flex-start;
+
+    gap: 7px;
+
+    padding:
+      3px
+      8px;
+  }
+
+  .event-palette-button {
+    flex: 0 0 36px;
+
+    width: 36px;
+    height: 36px;
+
+    min-width: 36px;
+    min-height: 36px;
+
+    border-radius: 9px;
+  }
+
+  .event-palette-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+
+  /* -----------------------------------------------------
+     Single tile editor
+  ----------------------------------------------------- */
+
+  #angle-panel {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  #single-angle-editor {
+    --landscape-side-width:
+      clamp(
+        82px,
+        11vw,
+        96px
+      );
+
+    grid-template-columns:
+      var(--landscape-side-width)
+      minmax(0, 1fr)
+      var(--landscape-side-width);
+
+    width: 100%;
+    height: 100%;
+
+    align-items: start;
+
+    padding:
+      10px
+      8px
+      8px;
+  }
+
+  #special-angle-column,
+  #delete-angle-column {
+    min-width: 0;
+
+    gap: 8px;
+
+    padding: 0;
+  }
+
+  #special-angle-column {
+    padding-right: 6px;
+  }
+
+  #delete-angle-column {
+    padding-left: 6px;
+  }
+
+  .editor-control-button,
+  #delete-floor-button {
+    min-height: 44px;
+    height: 44px;
+
+    padding: 0 5px;
+
+    border-radius: 10px;
+
+    font-size:
+      clamp(
+        10px,
+        1.55vw,
+        13px
+      );
+  }
+
+  #quick-angle-area {
+    min-width: 0;
+    min-height: 0;
+
+    padding-top: 1px;
+
+    align-items: center;
+    overflow: visible;
+  }
+
+  .angle-panel-title {
+    flex-basis: 20px;
+
+    margin-bottom: 4px;
+
+    font-size:
+      clamp(
+        9px,
+        1.45vw,
+        12px
+      );
+  }
+
+  #quick-angle-ring {
+    width:
+      min(
+        18vw,
+        38dvh,
+        158px
+      );
+
+    min-width: 128px;
+
+    margin-top: 2px;
+  }
+
+  .angle-button {
+    width: 38px;
+    height: 38px;
+
+    border-radius: 10px;
+
+    font-size: 20px;
+  }
+
+  .angle-sub-button {
+    width: 23px;
+    height: 23px;
+
+    min-width: 23px;
+    min-height: 23px;
+
+    font-size: 8px;
+  }
+
+  #angle-current {
+    width: 50px;
+    height: 50px;
+
+    font-size: 13px;
+  }
+
+
+  /* -----------------------------------------------------
+     Advanced editor
+  ----------------------------------------------------- */
+
+  #advanced-angle-editor {
+    --advanced-side-width:
+      clamp(
+        82px,
+        11vw,
+        96px
+      );
+
+    --advanced-input-width: 104px;
+
+    grid-template-columns:
+      var(--advanced-side-width)
+      minmax(0, 1fr)
+      var(--advanced-side-width);
+
+    grid-template-rows:
+      44px
+      max-content
+      minmax(0, 1fr) !important;
+
+    column-gap: 7px;
+    row-gap: 6px;
+
+    width: 100%;
+    height: 100%;
+
+    padding:
+      6px
+      8px
+      8px;
+  }
+
+  #advanced-header {
+    grid-template-columns:
+      var(--advanced-side-width)
+      minmax(0, 1fr)
+      var(--advanced-side-width);
+
+    gap: 7px;
+
+    height: 44px;
+    padding: 0;
+  }
+
+  #advanced-header > span:nth-child(2) {
+    position: static;
+
+    grid-column: 2;
+
+    max-width: 100%;
+
+    transform: none;
+
+    font-size:
+      clamp(
+        14px,
+        2vw,
+        18px
+      );
+  }
+
+  #advanced-back-button,
+  #advanced-delete-floor-button {
+    height: 40px;
+
+    align-self: center;
+
+    border-radius: 10px;
+  }
+
+  #advanced-back-button {
+    width: 46px;
+
+    font-size: 25px;
+  }
+
+  #advanced-delete-floor-button {
+    width: 100%;
+
+    padding: 0 4px;
+
+    font-size:
+      clamp(
+        10px,
+        1.5vw,
+        12px
+      );
+  }
+
+  #advanced-angle-info {
+    grid-column: 2;
+    grid-row: 2;
+
+    gap: 6px;
+
+    padding: 0;
+  }
+
+  #advanced-angle-input-wrap {
+    height: 38px;
+    min-height: 38px;
+  }
+
+  #advanced-angle-value {
+    width: var(--advanced-input-width);
+    height: 38px;
+
+    padding: 0 8px;
+
+    font-size: 20px;
+  }
+
+  #advanced-angle-input-wrap > span {
+    left:
+      calc(
+        50% +
+        var(--advanced-input-width) / 2 +
+        6px
+      );
+
+    font-size: 19px;
+  }
+
+  #snap-toggle-button {
+    min-width: 104px;
+    height: 32px;
+
+    border-radius: 11px;
+
+    font-size: 11px;
+  }
+
+  #advanced-special-angle-column {
+    grid-column: 1;
+    grid-row: 2 / 4;
+
+    width: 100%;
+
+    gap: 8px;
+
+    margin: 0;
+    padding: 2px 6px 0 0;
+  }
+
+  #advanced-special-angle-column
+  .editor-control-button {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  #angle-dial-wrap {
+    grid-column: 2;
+    grid-row: 3;
+
+    --landscape-dial-size:
+      min(
+        18vw,
+        38dvh,
+        154px
+      );
+
+    width:
+      var(--landscape-dial-size) !important;
+
+    height:
+      var(--landscape-dial-size) !important;
+
+    min-width:
+      var(--landscape-dial-size) !important;
+
+    min-height:
+      var(--landscape-dial-size) !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    align-self: start;
+    justify-self: center;
+
+    margin: 1px 0 0 !important;
+  }
+
+  .dial-label {
+    font-size: 11px;
+  }
+
+  #advanced-add-button {
+    width: 50px;
+    height: 50px;
+
+    min-width: 50px;
+    min-height: 50px;
+
+    font-size: 32px;
+  }
+
+
+  /* -----------------------------------------------------
+     Multi selection
+  ----------------------------------------------------- */
+
+  #multi-editor {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 16px;
+
+    padding: 18px;
+
+    text-align: center;
+  }
+
+  #multi-selection-count {
+    font-size: 14px;
+  }
+
+  #delete-selected-button {
+    min-width: 132px;
+    height: 44px;
+
+    border-radius: 10px;
+
+    font-size: 13px;
+  }
+
+
+  /* -----------------------------------------------------
+     Event editor
+  ----------------------------------------------------- */
+
+  #event-screen-header {
+    flex-basis: 54px;
+
+    gap: 9px;
+
+    padding: 7px 10px;
+  }
+
+  #event-screen-icon {
+    flex-basis: 34px;
+
+    width: 34px;
+    height: 34px;
+  }
+
+  #event-screen-title {
+    font-size: 14px;
+  }
+
+  #event-screen-subtitle {
+    font-size: 10px;
+  }
+
+  #event-screen-body {
+    padding: 7px 9px 10px;
+  }
+
+  .event-card {
+    margin-bottom: 8px;
+
+    padding: 8px 9px;
+  }
+
+  .event-card-title {
+    font-size: 12px;
+  }
+
+  .event-form-row {
+    min-height: 46px;
+
+    gap: 8px;
+  }
+
+  .event-form-label {
+    font-size: 10px;
+  }
+
+  .event-form-input,
+  .event-form-select {
+    flex-basis: min(43%, 150px);
+
+    width: min(43%, 150px);
+    max-width: 150px;
+
+    height: 34px;
+  }
+
+  .event-segmented {
+    flex: 0 1 60%;
+
+    width: min(60%, 210px);
+    max-width: 210px;
+
+    height: 38px;
+  }
+
+  .event-segment-button {
+    flex: 1 1 50%;
+
+    min-width: 0;
+
+    padding: 0 6px;
+
+    font-size: 10px;
+  }
+
+
+  /* -----------------------------------------------------
+     Dialogs: use the scarce vertical space more efficiently.
+  ----------------------------------------------------- */
+
+  .project-settings-overlay,
+  .editor-welcome-overlay {
+    padding:
+      calc(
+        7px +
+        env(safe-area-inset-top)
+      )
+      calc(
+        10px +
+        env(safe-area-inset-right)
+      )
+      calc(
+        7px +
+        env(safe-area-inset-bottom)
+      )
+      calc(
+        10px +
+        env(safe-area-inset-left)
+      );
+  }
+
+  .project-settings-sheet {
+    width: min(620px, 88vw);
+    max-height: calc(100dvh - 14px);
+  }
+
+  .editor-welcome-sheet {
+    width: min(720px, 92vw);
+    max-height: calc(100dvh - 14px);
+  }
+
+  .editor-welcome-scroll {
+    padding: 14px 18px 6px;
+  }
+
+  .editor-welcome-scroll h2 {
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+
+  .editor-welcome-scroll p {
+    margin-bottom: 9px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .editor-welcome-continue {
+    flex-basis: 40px;
+    margin: 7px 18px 10px;
+  }
+}
+
+
+/* =========================================================
+   EXTRA-SHORT LANDSCAPE PHONES
+   Example: browser chrome leaves only ~320px CSS height.
+========================================================= */
+
+@media
+  (orientation: landscape)
+  and (max-height: 360px)
+  and (max-width: 1100px)
+{
+  #editor {
+    --landscape-panel-width:
+      clamp(
+        300px,
+        42vw,
+        350px
+      );
+
+    --event-palette-height: 40px;
+    --nav-height: 44px;
+  }
+
+  #editor-tabs {
+    flex-basis: 40px;
+    height: 40px;
+  }
+
+  .editor-tab {
+    height: 34px;
+  }
+
+  .editor-tab.active {
+    height: 36px;
+  }
+
+  #single-angle-editor {
+    --landscape-side-width: 78px;
+
+    padding:
+      6px
+      6px
+      5px;
+  }
+
+  .editor-control-button,
+  #delete-floor-button {
+    min-height: 39px;
+    height: 39px;
+  }
+
+  #quick-angle-ring {
+    width: min(17vw, 36dvh, 132px);
+    min-width: 116px;
+  }
+
+  .angle-button {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+
+  .angle-sub-button {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    font-size: 7px;
+  }
+
+  #angle-current {
+    width: 46px;
+    height: 46px;
+  }
+
+  #advanced-angle-editor {
+    --advanced-side-width: 78px;
+
+    grid-template-rows:
+      40px
+      max-content
+      minmax(0, 1fr) !important;
+
+    row-gap: 4px;
+    padding: 4px 6px 5px;
+  }
+
+  #advanced-angle-input-wrap,
+  #advanced-angle-value {
+    height: 34px;
+    min-height: 34px;
+  }
+
+  #snap-toggle-button {
+    height: 28px;
+  }
+
+  #advanced-special-angle-column
+  .editor-control-button {
+    min-height: 39px;
+    height: 39px;
+  }
+
+  #angle-dial-wrap {
+    --landscape-dial-size:
+      min(
+        16vw,
+        34dvh,
+        120px
+      );
+  }
+
+  #advanced-add-button {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    font-size: 30px;
+  }
+
+  #bottom-nav,
+  #editor.ui-single #bottom-nav,
+  #editor.ui-advanced #bottom-nav,
+  #editor.ui-multi #bottom-nav {
+    width: clamp(214px, 30vw, 270px);
+    bottom:
+      calc(
+        7px +
+        env(safe-area-inset-bottom)
+      );
+  }
+}

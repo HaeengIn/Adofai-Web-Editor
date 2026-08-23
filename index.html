@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=Edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <title>Adofai Web Editor</title>
   
@@ -857,6 +857,28 @@
               checked
             >
           </label>
+        </section>
+
+        <section class="settings-section">
+          <h3>Playback</h3>
+
+          <label class="settings-field">
+            <span>Editor Offset</span>
+            <div class="settings-number-unit">
+              <input
+                id="editor-setting-offset"
+                type="number"
+                inputmode="decimal"
+                step="any"
+                value="0"
+              >
+              <span>ms</span>
+            </div>
+          </label>
+
+          <p class="settings-local-note">
+            Editor-only visual timing compensation. Positive values delay the level visuals; negative values advance them. Music and hitsounds stay locked together.
+          </p>
         </section>
 
         <section class="settings-section">

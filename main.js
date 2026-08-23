@@ -10988,12 +10988,27 @@ class EditorApp{
     this.hitSound = new HitSoundSystem();
     
     this.song = new SongSystem();
-    this.editorGlobalOffset_ms = 0;
+
     /*
-      화면 렌더 보정값.
-      +값 = 화면을 늦춤.
+      Editor-only playback compensation.
+
+      Positive value = delay level visuals.
+      Negative value = advance level visuals.
+
+      IMPORTANT:
+      This value must NOT move only the song or only the hitsounds.
+      Song + hitsounds stay on the same level clock; only the visual
+      evaluator is shifted. This avoids the old bug where an editor
+      offset could make the music drift away from hitsounds.
     */
     this.editorVisualOffset_ms = 0;
+
+    /*
+      Deprecated compatibility field. Older code used this as a
+      song-only offset. Keep it at zero so old callers cannot
+      accidentally separate music from the hitsound timeline.
+    */
+    this.editorGlobalOffset_ms = 0;
     
     this.playbackFloorIndex = null;
     
@@ -11479,6 +11494,11 @@ class EditorApp{
           "editor-setting-info"
         );
 
+      const offsetInput =
+        document.getElementById(
+          "editor-setting-offset"
+        );
+
       if(gridInput){
         gridInput.checked = true;
       }
@@ -11486,6 +11506,18 @@ class EditorApp{
       if(infoInput){
         infoInput.checked = true;
       }
+
+      if(offsetInput){
+        offsetInput.value = "0";
+      }
+
+      this.setEditorOffset(
+        0,
+        {
+          persist: false,
+          log: false
+        }
+      );
 
       this.runtime.setGridVisible(true);
       this.setEditorInfoVisible(true);
@@ -12405,6 +12437,11 @@ class EditorApp{
         "editor-setting-info"
       );
 
+    const offsetInput =
+      document.getElementById(
+        "editor-setting-offset"
+      );
+
     const openLogsButton =
       document.getElementById(
         "editor-open-logs-button"
@@ -12452,6 +12489,7 @@ class EditorApp{
       !closeButton ||
       !gridInput ||
       !infoInput ||
+      !offsetInput ||
       !openLogsButton ||
       !clearCacheButton ||
       !logOverlay ||
@@ -12506,6 +12544,30 @@ class EditorApp{
     this.setEditorInfoVisible(
       showInfo
     );
+
+    const savedOffset =
+      Number(
+        this.readEditorPreference(
+          "adofai-editor-offset-ms",
+          "0"
+        )
+      );
+
+    const editorOffset =
+      Number.isFinite(savedOffset)
+        ? savedOffset
+        : 0;
+
+    this.setEditorOffset(
+      editorOffset,
+      {
+        persist: false,
+        log: false
+      }
+    );
+
+    offsetInput.value =
+      String(editorOffset);
 
     button.addEventListener(
       "click",
@@ -12588,6 +12650,40 @@ class EditorApp{
           "adofai-editor-info",
           visible
         );
+      }
+    );
+
+    const commitEditorOffset =
+      () => {
+
+        const value =
+          Number(offsetInput.value);
+
+        if(!Number.isFinite(value)){
+          offsetInput.value =
+            String(this.editorVisualOffset_ms);
+          return;
+        }
+
+        this.setEditorOffset(value);
+
+        offsetInput.value =
+          String(this.editorVisualOffset_ms);
+      };
+
+    offsetInput.addEventListener(
+      "change",
+      commitEditorOffset
+    );
+
+    offsetInput.addEventListener(
+      "keydown",
+      e => {
+        if(e.key === "Enter"){
+          e.preventDefault();
+          commitEditorOffset();
+          offsetInput.blur();
+        }
       }
     );
 
@@ -15011,6 +15107,14 @@ class EditorApp{
 
     this.rebuild();
 
+    /*
+      Pasting creates tiles too; follow the last pasted tile because it
+      is also the new active selection and the next insertion point.
+    */
+    this.focusFloorById(
+      lastInsertedId
+    );
+
     this.showToast(
       `${insertedIds.length} tile${insertedIds.length === 1 ? "" : "s"} pasted.`,
       "success",
@@ -16189,6 +16293,43 @@ class EditorApp{
   }
   
   /* =========================================================
+     Camera follow for newly-created tiles
+
+     Rebuild first so the new floor mesh has its final position,
+     then focus the map camera on that mesh. Repeated additions
+     restart this short easing from the current camera position, so
+     the viewport continuously follows level construction.
+  ========================================================= */
+  focusFloorById(
+    floorId,
+    durationSec = 0.22
+  ){
+
+    if(!floorId){
+      return false;
+    }
+
+    const group =
+      this.runtime
+        ?.meshByFloorId
+        ?.get(floorId);
+
+    if(!group){
+      return false;
+    }
+
+    this.cameraSystem.requestFocusTo(
+      group.position.x,
+      group.position.y,
+      durationSec,
+      "outexpo"
+    );
+
+    return true;
+  }
+
+
+  /* =========================================================
      Advanced FREE angle base
 
      FREE는 절대각 입력이 아니라 현재 선택 타일의
@@ -16424,6 +16565,14 @@ class EditorApp{
   
   
     this.rebuild();
+
+    /*
+      Newly created tile becomes the active selection, so keep the
+      map camera following the construction point as tiles are added.
+    */
+    this.focusFloorById(
+      newId
+    );
 
     this.logger.info(
       "Tile added",
@@ -17001,10 +17150,16 @@ class EditorApp{
       floorStarts_us에 포함되어 있으므로
       다시 더하지 않는다.
     */
+    /*
+      Editor Offset is intentionally NOT applied to the song.
+      Music and hitsounds must remain on the same level clock.
+      The editor-only compensation is applied only when evaluating
+      visualTime_us below.
+    */
     this.song.playFromLevelTime(
       preRollStart_us,
       ctxStartTime,
-      this.editorGlobalOffset_ms * 1000
+      0
     );
   
   
@@ -17333,19 +17488,61 @@ class EditorApp{
     this.updateEditorUI();
   }
   
-  setEditorGlobalOffset(ms){
+  setEditorOffset(
+    ms,
+    {
+      persist = true,
+      log = true
+    } = {}
+  ){
 
     const value =
       Number(ms);
-  
+
     if(!Number.isFinite(value)){
       return false;
     }
-  
-    this.editorGlobalOffset_ms =
+
+    /*
+      A single editor offset must never desynchronize audio channels.
+      Apply it only to the visual evaluator.
+    */
+    this.editorVisualOffset_ms =
       value;
-  
+
+    this.editorGlobalOffset_ms =
+      0;
+
+    if(persist){
+      this.writeEditorPreference(
+        "adofai-editor-offset-ms",
+        value
+      );
+    }
+
+    if(log){
+      this.logger.info(
+        "Editor offset changed",
+        {
+          ms: value,
+          meaning:
+            value >= 0
+              ? "visuals delayed"
+              : "visuals advanced"
+        }
+      );
+    }
+
     return true;
+  }
+
+  /*
+    Backward-compatible alias. Older builds exposed a global offset
+    that shifted only the song. Redirect it to the safe visual-only
+    editor offset instead.
+  */
+  setEditorGlobalOffset(ms){
+    return this.setEditorOffset(ms);
   }
 
   setLevelLoading(
@@ -18167,6 +18364,19 @@ class EditorApp{
         `  Pitch: ${pitch}%`;
     }
 
+    const editorOffset =
+      Number(this.editorVisualOffset_ms);
+
+    if(Number.isFinite(editorOffset)){
+      const sign =
+        editorOffset > 0
+          ? "+"
+          : "";
+
+      statusLine +=
+        `  Editor Offset: ${sign}${editorOffset}ms`;
+    }
+
     lines.push(statusLine);
 
     if(
@@ -18179,10 +18389,12 @@ class EditorApp{
         ) /
         1000000;
 
+      /*
+        Song and hitsounds share the unshifted level clock.
+        Editor Offset affects visuals only.
+      */
       const songTimeSec =
-        levelTimeSec -
-        this.editorGlobalOffset_ms /
-        1000;
+        levelTimeSec;
 
       const songDurationSec =
         finite(
