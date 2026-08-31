@@ -12801,9 +12801,19 @@ class EditorApp{
         "song-file-input"
       );
 
+    const folderInput =
+      document.getElementById(
+        "level-folder-input"
+      );
+
     const loadLevelButton =
       document.getElementById(
         "load-level-file-button"
+      );
+
+    const loadFolderButton =
+      document.getElementById(
+        "load-level-folder-button"
       );
 
     const newLevelButton =
@@ -12828,6 +12838,7 @@ class EditorApp{
       !sheet ||
       !closeButton ||
       !levelInput ||
+      !folderInput ||
       !songInput
     ){
       throw new Error(
@@ -12900,6 +12911,14 @@ class EditorApp{
     );
 
 
+    loadFolderButton?.addEventListener(
+      "click",
+      () => {
+        folderInput.click();
+      }
+    );
+
+
     newLevelButton?.addEventListener(
       "click",
       async () => {
@@ -12944,6 +12963,43 @@ class EditorApp{
             item =>
               /\.adofai$/i.test(item.name)
           ) ?? files[0];
+
+        await this.loadProjectFromFile(
+          file,
+          files
+        );
+      }
+    );
+
+
+    folderInput.addEventListener(
+      "change",
+      async () => {
+
+        const files =
+          Array.from(
+            folderInput.files ?? []
+          );
+
+        folderInput.value = "";
+
+        if(!files.length){
+          return;
+        }
+
+        const file =
+          this.findLocalLevelFile(
+            files
+          );
+
+        if(!file){
+          this.showToast(
+            "레벨 파일을 찾을 수 없습니다.",
+            "error",
+            5000
+          );
+          return;
+        }
 
         await this.loadProjectFromFile(
           file,
@@ -13597,6 +13653,32 @@ class EditorApp{
 
 
     return loaded;
+  }
+
+
+  findLocalLevelFile(
+    files
+  ){
+
+    if(!Array.isArray(files)){
+      return null;
+    }
+
+
+    return files.find(
+      file =>
+        /(^|\/)level\.adofai$/i.test(
+          String(
+            file.webkitRelativePath ??
+            file.name ??
+            ""
+          )
+          .replace(/\\/g, "/")
+        )
+    ) ?? files.find(
+      file =>
+        /\.adofai$/i.test(file.name)
+    ) ?? null;
   }
 
 
