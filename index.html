@@ -814,9 +814,8 @@
         </section>
 
         <p class="settings-local-note">
-          When a local .adofai file is selected directly, browser security
-          prevents automatic access to audio files in the same folder.
-          Please choose the song file manually in that case.
+          Local .adofai files can auto-load music when the .adofai file
+          and the songFilename audio file are selected together.
         </p>
       </div>
     </section>
@@ -1096,10 +1095,60 @@
   ></div>
 
 
+  <div
+    id="level-load-help-overlay"
+    class="project-settings-overlay"
+    hidden
+  >
+    <section
+      id="level-load-help-sheet"
+      class="project-settings-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="level-load-help-title"
+    >
+      <header class="project-settings-header">
+        <h2 id="level-load-help-title">Load Level</h2>
+      </header>
+
+      <div class="project-settings-scroll">
+        <p class="settings-local-note">
+          브라우저 보안 정책상 .adofai 파일 하나만 선택하면 같은 폴더의 음원 파일을 자동으로 읽을 수 없습니다.
+          Load Level에서 .adofai 파일과 songFilename에 적힌 음원 파일을 동시에 선택하면 음원 파일을 따로 불러오지 않아도 됩니다.
+        </p>
+
+        <p class="settings-local-note">
+          Because of browser security, selecting only one .adofai file does not let this editor read sibling audio files automatically.
+          If you select the .adofai file and the audio file named by songFilename together in Load Level, the song will load without choosing it separately.
+        </p>
+
+        <label class="editor-setting-toggle">
+          <input
+            id="level-load-help-never"
+            type="checkbox"
+          >
+          <span>다시 표시하지 않음 / Do not show again</span>
+        </label>
+
+        <div class="settings-action-row">
+          <button
+            id="level-load-help-ok"
+            class="settings-secondary-button"
+            type="button"
+          >
+            확인 / OK
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+
   <input
     id="level-file-input"
     type="file"
-    accept=".adofai,application/json,text/plain"
+    multiple
+    accept=".adofai,application/json,text/plain,audio/*,.ogg,.mp3,.wav"
     hidden
   >
 
