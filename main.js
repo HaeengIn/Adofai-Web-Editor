@@ -5,344 +5,28 @@ import {
   mergeGeometries
 } from "three/addons/utils/BufferGeometryUtils.js";
 
+import {
+  degToRad,
+  radToDeg,
+  normalizeAngle,
+  reverseAngle
+} from "./src/utils/math.js";
+import { EditorLogger } from "./src/utils/editor-logger.js";
+import {
+  EVENT_MARKER_ICONS,
+  EVENT_TAB_DEFS,
+  getEventDefinition,
+  createEventTabGroups
+} from "./src/config/event-config.js";
+import { CameraSystem } from "./src/modules/camera-system.js";
+import { RuntimeScene } from "./src/modules/runtime-scene.js";
+import { ModifierKeyController, PlayButtonController, TileEditorUI } from "./src/modules/ui.js";
+import { Clock, SongSystem, HitSoundSystem, Evaluator } from "./src/modules/audio.js";
+import { Document, DocumentBuilder, Compiler } from "./src/modules/document.js";
+import { InputController } from "./src/modules/input-controller.js";
+import { Picker } from "./src/modules/picker.js";
 
-const degToRad = (deg) => {return deg * 2*Math.PI / 360}
-const radToDeg = (rad) => {return rad * 360 / (2 * Math.PI)}
-const normalizeAngle = (a) => {return ((a % 360) + 360) % 360}
-const reverseAngle = (a) => {return (a + 180)%360}
-
-
-/* =========================================================
-   Editor diagnostics
-
-   - Keeps a small persistent ring buffer for bug reports.
-   - Captures console log/warn/error without suppressing DevTools.
-   - Never throws when storage is unavailable.
-========================================================= */
-class EditorLogger {
-  constructor(){
-    this.storageKey =
-      "adofai-editor-debug-log-v1";
-
-    this.maxEntries = 300;
-    this.entries = [];
-    this.listeners = new Set();
-
-    this.persistenceEnabled = true;
-    this.consoleCaptureInstalled = false;
-
-    this.originalConsole = {
-      log: console.log.bind(console),
-      warn: console.warn.bind(console),
-      error: console.error.bind(console)
-    };
-
-    this.load();
-  }
-
-  formatValue(value){
-    if(value instanceof Error){
-      return value.stack ||
-        `${value.name}: ${value.message}`;
-    }
-
-    if(typeof value === "string"){
-      return value;
-    }
-
-    if(
-      value === null ||
-      value === undefined ||
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      typeof value === "bigint"
-    ){
-      return String(value);
-    }
-
-    try{
-      const seen = new WeakSet();
-
-      const text = JSON.stringify(
-        value,
-        (key, item) => {
-          if(
-            item &&
-            typeof item === "object"
-          ){
-            if(seen.has(item)){
-              return "[Circular]";
-            }
-            seen.add(item);
-          }
-          return item;
-        }
-      );
-
-      if(typeof text === "string"){
-        return text.length > 3000
-          ? text.slice(0, 3000) + "…"
-          : text;
-      }
-    }
-    catch{}
-
-    try{
-      return String(value);
-    }
-    catch{
-      return "[Unprintable value]";
-    }
-  }
-
-  load(){
-    try{
-      const text =
-        localStorage.getItem(
-          this.storageKey
-        );
-
-      if(!text){
-        return;
-      }
-
-      const parsed = JSON.parse(text);
-
-      if(Array.isArray(parsed)){
-        this.entries =
-          parsed.slice(
-            -this.maxEntries
-          );
-      }
-    }
-    catch{}
-  }
-
-  persist(){
-    if(!this.persistenceEnabled){
-      return;
-    }
-
-    try{
-      localStorage.setItem(
-        this.storageKey,
-        JSON.stringify(
-          this.entries
-        )
-      );
-    }
-    catch{}
-  }
-
-  emit(){
-    for(const listener of this.listeners){
-      try{
-        listener(this.entries);
-      }
-      catch{}
-    }
-  }
-
-  push(level, args, source = "editor"){
-    const entry = {
-      time: new Date().toISOString(),
-      level,
-      source,
-      message: args
-        .map(value =>
-          this.formatValue(value)
-        )
-        .join(" ")
-    };
-
-    this.entries.push(entry);
-
-    if(
-      this.entries.length >
-      this.maxEntries
-    ){
-      this.entries.splice(
-        0,
-        this.entries.length -
-        this.maxEntries
-      );
-    }
-
-    this.persist();
-    this.emit();
-
-    return entry;
-  }
-
-  info(...args){
-    this.originalConsole.log(
-      "[ADOFAI Editor]",
-      ...args
-    );
-    return this.push(
-      "INFO",
-      args
-    );
-  }
-
-  warn(...args){
-    this.originalConsole.warn(
-      "[ADOFAI Editor]",
-      ...args
-    );
-    return this.push(
-      "WARN",
-      args
-    );
-  }
-
-  error(...args){
-    this.originalConsole.error(
-      "[ADOFAI Editor]",
-      ...args
-    );
-    return this.push(
-      "ERROR",
-      args
-    );
-  }
-
-  installConsoleCapture(){
-    if(this.consoleCaptureInstalled){
-      return;
-    }
-
-    const map = {
-      log: "INFO",
-      warn: "WARN",
-      error: "ERROR"
-    };
-
-    for(const method of Object.keys(map)){
-      console[method] = (...args) => {
-        this.originalConsole[method](
-          ...args
-        );
-
-        this.push(
-          map[method],
-          args,
-          "console"
-        );
-      };
-    }
-
-    this.consoleCaptureInstalled = true;
-  }
-
-  clear({ persist = true } = {}){
-    this.entries.length = 0;
-
-    if(persist){
-      try{
-        localStorage.removeItem(
-          this.storageKey
-        );
-      }
-      catch{}
-    }
-
-    this.emit();
-  }
-
-  setPersistenceEnabled(value){
-    this.persistenceEnabled =
-      Boolean(value);
-  }
-
-  subscribe(listener){
-    this.listeners.add(listener);
-    return () =>
-      this.listeners.delete(listener);
-  }
-
-  toText(){
-    const header = [
-      "ADOFAI Web Editor Debug Log",
-      `Exported: ${new Date().toISOString()}`,
-      `URL: ${location.href}`,
-      `User Agent: ${navigator.userAgent}`,
-      ""
-    ];
-
-    const body =
-      this.entries.map(entry =>
-        `[${entry.time}] [${entry.level}] [${entry.source}] ${entry.message}`
-      );
-
-    return [
-      ...header,
-      ...body
-    ].join("\n");
-  }
-}
-
-const EDITOR_LOGGER =
-  new EditorLogger();
-
-
-const EVENT_MARKER_ICONS = {
-
-  /*
-    1 < BPM 배율 <= 2.05
-  */
-  rabbit:
-    "./icons/Rabbit.png",
-
-  /*
-    BPM 배율 > 2.05
-  */
-  rabbitFast:
-    "./icons/Double_Rabbit.png",
-
-
-  /*
-    0.45 < BPM 배율 < 1
-  */
-  snail:
-    "./icons/Snail.png",
-
-  /*
-    BPM 배율 <= 0.45
-  */
-  snailSlow:
-    "./icons/Double_Snail.png",
-
-  /*
-    BPM 변화량이 사실상 동일한 경우.
-    편집 중에만 표시되고 재생 중에는 숨긴다.
-  */
-  equal:
-    "./icons/equal.png",
-
-
-  /*
-    Twirl 색상.
-
-    blue = Twirl 적용 후 현재 타일 -> 다음 타일의
-           유효 각도가 180° 이상
-
-    red  = 180° 미만
-  */
-  twirlBlue:
-    "./icons/swirl_blue.png",
-
-  twirlRed:
-    "./icons/swirl_red.png",
-
-
-    /*
-      Pause 및 기타 모든 이벤트
-    */
-    star:
-      "./icons/tile_vfx.png"
-  };
-
+const EDITOR_LOGGER = new EditorLogger();
 
 
 function createEventMarkerInfo(
@@ -741,263 +425,6 @@ function createEventMarkerInfo(
   return marker;
 }
 
-const EVENT_TAB_DEFS = {
-
-  SetSpeed: {
-    key:
-      "speed",
-
-    title:
-      "Set Speed",
-
-    iconSrc:
-      "./icons/SetSpeed.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      true,
-
-    /*
-      이벤트를 생성한 직후 해당 이벤트 탭을 자동으로 열지 여부.
-      SetSpeed는 생성 즉시 세부 값을 편집하는 경우가 많으므로 연다.
-    */
-    openTabOnCreate:
-      true,
-
-    defaultData: {
-      speedType:
-        "Bpm",
-
-      beatsPerMinute:
-        100,
-
-      bpmMultiplier:
-        1,
-
-      angleOffset:
-        0
-    },
-
-    order:
-      10
-  },
-
-
-  Twirl: {
-    key:
-      "twirl",
-
-    title:
-      "Twirl",
-
-    iconSrc:
-      "./icons/Twirl.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      false,
-
-    /*
-      Twirl은 옵션이 없는 즉시 적용 이벤트이므로
-      생성 후 타일 편집 화면을 그대로 유지한다.
-    */
-    openTabOnCreate:
-      false,
-
-    defaultData: {},
-
-    order:
-      20
-  },
-
-
-  Pause: {
-    key:
-      "pause",
-
-    title:
-      "Pause",
-
-    iconSrc:
-      "./icons/Pause.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      false,
-
-    openTabOnCreate:
-      true,
-
-    defaultData: {
-      duration:
-        1,
-
-      countdownTicks:
-        0,
-
-      angleCorrectionDir:
-        "None"
-    },
-
-    order:
-      30
-  },
-
-
-  SetHitsound: {
-    key:
-      "hitsound",
-
-    title:
-      "Set Hitsound",
-
-    iconSrc:
-      "./icons/SetGameSound.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      false,
-
-    openTabOnCreate:
-      true,
-
-    defaultData: {
-      gameSound:
-        "Hitsound",
-
-      hitsound:
-        "Kick",
-
-      hitsoundVolume:
-        100
-    },
-
-    order:
-      40
-  }
-
-};
-
-function getEventDefinition(
-  eventType
-){
-
-  return (
-    EVENT_TAB_DEFS[
-      eventType
-    ]
-    ??
-    null
-  );
-}
-
-
-function createEventTabGroups(
-  actions
-){
-  const groups =
-    new Map();
-
-
-  for(const action of actions){
-
-    const def =
-      EVENT_TAB_DEFS[
-        action.eventType
-      ];
-
-
-    /*
-      아직 전용 UI가 없는 이벤트
-    */
-    if(!def){
-
-      const key =
-        "unsupported";
-    
-    
-      if(!groups.has(key)){
-    
-        groups.set(
-          key,
-          {
-            key:
-              "unsupported",
-    
-            title:
-              "Unsupported Events",
-    
-            iconSrc:
-              "./icons/tile_vfx.png",
-    
-            order:
-              1000,
-    
-            editable:
-              false,
-    
-            actions:
-              []
-          }
-        );
-      }
-    
-    
-      groups
-        .get(key)
-        .actions
-        .push(action);
-    
-    
-      continue;
-    
-    }
-
-
-    /*
-      이미 같은 종류의 탭이 있으면
-      그 안에 이벤트만 추가
-    */
-    if(!groups.has(def.key)){
-
-      groups.set(
-        def.key,
-        {
-          ...def,
-
-          actions: []
-        }
-      );
-    }
-
-
-    groups
-      .get(def.key)
-      .actions
-      .push(action);
-  }
-
-
-  return [
-    ...groups.values()
-  ].sort(
-    (a, b) =>
-      a.order - b.order
-  );
-}
-
-
-
-
-
 /*
   한 타일의 여러 action 중
   최종적으로 화면에 보여줄 이벤트 마커를 결정한다.
@@ -1127,7 +554,8 @@ class Floor{
 }
 
 //카메라를 전문적으로 다루기 위한 카메라 클래그
-class CameraSystem{
+// CameraSystem moved to src/modules/camera-system.js
+
   constructor(three){
     this.THREE = three;
 
@@ -1393,7 +821,8 @@ class CameraSystem{
 } //condition ? true : false
 
 //Three.js 내용 관리
-class RuntimeScene{
+// RuntimeScene moved to src/modules/runtime-scene.js
+
   constructor(three){
     this.Three = three;
     this.scene = null;
@@ -3638,7 +3067,8 @@ this.attachedFloorGroups
   }
 }
 
-class ModifierKeyController {
+// ModifierKeyController moved to src/modules/ui.js
+
   constructor(){
     this.ctrl = false;
     this.shift = false;
@@ -3782,7 +3212,8 @@ class ModifierKeyController {
   }
 }
 
-class PlayButtonController {
+// PlayButtonController moved to src/modules/ui.js
+
   constructor(){
     this.button = null;
     this.isPlaying = false;
@@ -3831,7 +3262,8 @@ class PlayButtonController {
   }
 }
 
-class TileEditorUI {
+// TileEditorUI moved to src/modules/ui.js
+
   constructor(){
 
     this.root = null;
@@ -6795,7 +6227,8 @@ integer = false,
 }
 
 //입력 관리 클래스
-class InputController{
+// InputController moved to src/modules/input-controller.js
+
   constructor(runtime, cameraSystem){
     this.runtime = runtime;
     this.cameraSystem = cameraSystem
@@ -6918,7 +6351,8 @@ class InputController{
 }
 
 //레이캐스팅을 이용한 뽑기 전용 클래스
-class Picker{
+// Picker moved to src/modules/picker.js
+
   constructor(runtime, cameraSystem){
     this.runtime = runtime;
     this.cameraSystem = cameraSystem;
@@ -7036,7 +6470,8 @@ class Picker{
 }
 
 //Playback을 위한 계산 클래스
-class Evaluator{
+// Evaluator moved to src/modules/audio.js
+
   constructor(){
     this.compiled = null;
     this.startTime_us = null,
@@ -7323,7 +6758,8 @@ class Evaluator{
   }
 }
 
-class HitSoundSystem {
+// HitSoundSystem moved to src/modules/audio.js
+
   constructor(){
     this.ctx =
       null;
@@ -8967,7 +8403,8 @@ class HitSoundSystem {
   }
 }
 
-class SongSystem {
+// SongSystem moved to src/modules/audio.js
+
   constructor(){
     this.ctx = null;
 
@@ -9217,7 +8654,8 @@ class SongSystem {
   }
 }
 
-class Clock{
+// Clock moved to src/modules/audio.js
+
   constructor(){
     this.time_us = 0;
 
@@ -9343,7 +8781,8 @@ class Clock{
 }
 
 //에디터의 상태 정보를 담은 클래스
-class EditorState{
+// EditorState moved to its domain module
+
   constructor(){
 
     // 현재 선택된 모든 타일
@@ -9360,7 +8799,8 @@ class EditorState{
 }
 
 //Three.js 렌더 관리
-class RenderEngine{
+// RenderEngine moved to its domain module
+
   constructor(runtime, cameraSystem,clock){
     this.runtime = runtime; //런타임 클래스 저장
     this.cameraSystem = cameraSystem;
@@ -9436,7 +8876,8 @@ class RenderEngine{
 }
 
 //컴파일돤 프로젝트를 클래스 형태로 저장
-class CompiledProject{
+// CompiledProject moved to its domain module
+
   constructor(){
     this.floors = null;
     
@@ -9512,7 +8953,8 @@ class CompiledProject{
 }
 
 //직접적으로 에디터에 사용가능하고 수정 삭제따위에 용이한 문서 클래스
-class Document {
+// Document moved to src/modules/document.js
+
   constructor(){
     this.ids = [];    // ["f_0","f_1",...]
     this.angles = []; // [0, 30, 999, ...]  (원본 그대로 보관)
@@ -9728,7 +9170,8 @@ class Document {
   }
 }
 
-class DocumentBuilder{
+// DocumentBuilder moved to src/modules/document.js
+
   constructor(){
     
   }
@@ -9805,7 +9248,8 @@ class DocumentBuilder{
 
 
 //json 전처리
-class Compiler{ 
+// Compiler moved to src/modules/document.js
+
   constructor(){
     
   }
