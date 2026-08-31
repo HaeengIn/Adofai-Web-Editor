@@ -814,9 +814,9 @@
         </section>
 
         <p class="settings-local-note">
-          When a local .adofai file is selected directly, browser security
-          prevents automatic access to audio files in the same folder.
-          Please choose the song file manually in that case.
+          When selecting a local .adofai file, select the song file together
+          in the same file picker so the editor can automatically load
+          the songFilename file from that selection.
         </p>
       </div>
     </section>
@@ -1099,7 +1099,8 @@
   <input
     id="level-file-input"
     type="file"
-    accept=".adofai,application/json,text/plain"
+    multiple
+    accept=".adofai,application/json,text/plain,audio/*,.ogg,.mp3,.wav"
     hidden
   >
 

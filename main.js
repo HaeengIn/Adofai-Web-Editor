@@ -12928,17 +12928,26 @@ class EditorApp{
       "change",
       async () => {
 
-        const file =
-          levelInput.files?.[0];
+        const files =
+          Array.from(
+            levelInput.files ?? []
+          );
 
         levelInput.value = "";
 
-        if(!file){
+        if(!files.length){
           return;
         }
 
+        const file =
+          files.find(
+            item =>
+              /\.adofai$/i.test(item.name)
+          ) ?? files[0];
+
         await this.loadProjectFromFile(
-          file
+          file,
+          files
         );
       }
     );
@@ -13591,8 +13600,138 @@ class EditorApp{
   }
 
 
+  findLocalSongFile(
+    files,
+    songFilename
+  ){
+
+    const expectedName =
+      String(
+        songFilename ?? ""
+      ).trim();
+
+
+    if(
+      !expectedName ||
+      !Array.isArray(files)
+    ){
+      return null;
+    }
+
+
+    const normalizedExpected =
+      expectedName.replace(/\\/g, "/");
+
+    const expectedBaseName =
+      normalizedExpected
+        .split("/")
+        .pop();
+
+
+    return files.find(
+      file => {
+
+        const relativePath =
+          String(
+            file.webkitRelativePath ?? ""
+          )
+          .replace(/\\/g, "/");
+
+        return (
+          relativePath &&
+          relativePath.endsWith(
+            normalizedExpected
+          )
+        ) || (
+          file.name === expectedBaseName
+        );
+      }
+    ) ?? null;
+  }
+
+
+  async loadSongFromLocalFiles(
+    files,
+    { showMissingToast = true } = {}
+  ){
+
+    const expectedSong =
+      String(
+        this.doc?.settings
+          ?.songFilename ??
+        ""
+      ).trim();
+
+
+    if(!expectedSong){
+
+      await this.song.init(
+        this.hitSound.ctx,
+        null
+      );
+
+      this.songLoadState = {
+        loaded: false,
+        message:
+          "No song is assigned to this level. Please choose a song file."
+      };
+
+      return false;
+    }
+
+
+    const songFile =
+      this.findLocalSongFile(
+        files,
+        expectedSong
+      );
+
+
+    if(!songFile){
+
+      await this.song.init(
+        this.hitSound.ctx,
+        null
+      );
+
+      const message =
+        "음원 파일을 찾을 수 없습니다.";
+
+      this.songLoadState = {
+        loaded: false,
+        message:
+          `${message} (${expectedSong})`
+      };
+
+      if(showMissingToast){
+        this.showToast(
+          message,
+          "error",
+          5000
+        );
+      }
+
+      return false;
+    }
+
+
+    return await this.selectSongFile(
+      songFile,
+      {
+        updateSongFilename: false,
+        statusMessage:
+          `Song loaded automatically: ${songFile.name}`
+      }
+    );
+  }
+
+
   async selectSongFile(
-    file
+    file,
+    {
+      updateSongFilename = true,
+      statusMessage = null
+    } = {}
   ){
 
     if(!file || !this.hitSound.ctx){
@@ -13629,10 +13768,12 @@ class EditorApp{
         );
       }
 
-      this.doc.settings.songFilename =
-        file.name;
+      if(updateSongFilename){
+        this.doc.settings.songFilename =
+          file.name;
 
-      this.syncSettingsToProject();
+        this.syncSettingsToProject();
+      }
 
       /*
         File objects cannot be reopened from their original local
@@ -13663,6 +13804,7 @@ class EditorApp{
         ? {
             loaded: true,
             message:
+              statusMessage ??
               `Song selected: ${file.name}`
           }
         : {
@@ -13788,7 +13930,8 @@ class EditorApp{
 
 
   async loadProjectFromFile(
-    file
+    file,
+    files = [file]
   ){
 
     if(!file){
@@ -13826,39 +13969,17 @@ class EditorApp{
       );
 
 
-      /*
-        중요:
-        <input type=file>로 받은 File 객체에는
-        같은 폴더의 다른 파일에 접근할 권한이 없다.
-
-        songFilename이 있어도 자동 탐색할 수 없으므로
-        곡 선택을 요청한다.
-      */
-      await this.song.init(
-        this.hitSound.ctx,
-        null
-      );
-
-
-      const expectedSong =
-        String(
-          this.doc.settings
-            ?.songFilename ??
-          ""
-        ).trim();
-
-
-      this.songLoadState = {
-        loaded: false,
-        message:
-          expectedSong
-            ? `This level uses ${expectedSong}. Browser security prevents automatic access to files in the same local folder, so please choose the song manually.`
-            : "No song is assigned to this level. Please choose a song file."
-      };
+      const songLoaded =
+        await this.loadSongFromLocalFiles(
+          files
+        );
 
 
       this.refreshProjectSettingsUI();
-      this.openProjectSettings();
+
+      if(!songLoaded){
+        this.openProjectSettings();
+      }
 
       this.logger.info(
         "Local level loaded",
