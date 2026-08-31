@@ -13258,6 +13258,11 @@ class EditorApp{
         "level-load-help-overlay"
       );
 
+    const cancelButton =
+      document.getElementById(
+        "level-load-help-cancel"
+      );
+
     const okButton =
       document.getElementById(
         "level-load-help-ok"
@@ -13275,6 +13280,7 @@ class EditorApp{
 
     if(
       !overlay ||
+      !cancelButton ||
       !okButton ||
       !neverInput ||
       !levelInput
@@ -13284,6 +13290,13 @@ class EditorApp{
 
 
     overlay.hidden = true;
+
+    cancelButton.addEventListener(
+      "click",
+      () => {
+        overlay.hidden = true;
+      }
+    );
 
     okButton.addEventListener(
       "click",
