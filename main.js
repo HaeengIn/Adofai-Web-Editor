@@ -12378,22 +12378,102 @@ class EditorApp{
         "editor-welcome-continue"
       );
 
-    if(!overlay || !closeButton){
+    const neverInput =
+      document.getElementById(
+        "editor-welcome-never"
+      );
+
+    if(!overlay || !closeButton || !neverInput){
       return;
     }
 
-    /*
-      The legal / sharing notice is intentionally shown on every
-      page load. It is session UI, not a remembered preference.
-    */
-    overlay.hidden = false;
+    const preferenceKey =
+      "adofai-editor-hide-welcome-v1";
 
-    closeButton.addEventListener(
-      "click",
-      () => {
-        overlay.hidden = true;
+    const syncCheckboxState = () => {
+      const hidden =
+        this.readEditorPreference(
+          preferenceKey,
+          "0"
+        ) === "1";
+
+      neverInput.checked = hidden;
+    };
+
+    const savePreference = () => {
+      this.writeEditorPreference(
+        preferenceKey,
+        neverInput.checked ? "1" : "0"
+      );
+    };
+
+    const closeWelcomeNotice = () => {
+      savePreference();
+      overlay.hidden = true;
+    };
+
+    overlay.addEventListener(
+      "pointerdown",
+      e => {
+        if(e.target === overlay){
+          closeWelcomeNotice();
+        }
       }
     );
+
+    closeButton.onclick = () => {
+      closeWelcomeNotice();
+    };
+
+    syncCheckboxState();
+
+    if(this.readEditorPreference(preferenceKey, "0") === "1"){
+      overlay.hidden = true;
+      return;
+    }
+
+    overlay.hidden = false;
+  }
+
+  openWelcomeNotice(){
+    const overlay =
+      document.getElementById(
+        "editor-welcome-overlay"
+      );
+
+    const continueButton =
+      document.getElementById(
+        "editor-welcome-continue"
+      );
+
+    const neverInput =
+      document.getElementById(
+        "editor-welcome-never"
+      );
+
+    if(!overlay || !continueButton || !neverInput){
+      return false;
+    }
+
+    const preferenceKey =
+      "adofai-editor-hide-welcome-v1";
+
+    neverInput.checked =
+      this.readEditorPreference(
+        preferenceKey,
+        "0"
+      ) === "1";
+
+    continueButton.onclick = () => {
+      this.writeEditorPreference(
+        preferenceKey,
+        neverInput.checked ? "1" : "0"
+      );
+      overlay.hidden = true;
+    };
+
+    overlay.hidden = false;
+    return true;
   }
 
 
@@ -12447,6 +12527,11 @@ class EditorApp{
         "editor-setting-offset"
       );
 
+    const openWelcomeButton =
+      document.getElementById(
+        "editor-open-welcome-button"
+      );
+
     const openLogsButton =
       document.getElementById(
         "editor-open-logs-button"
@@ -12495,6 +12580,7 @@ class EditorApp{
       !gridInput ||
       !infoInput ||
       !offsetInput ||
+      !openWelcomeButton ||
       !openLogsButton ||
       !clearCacheButton ||
       !logOverlay ||
@@ -12689,6 +12775,13 @@ class EditorApp{
           commitEditorOffset();
           offsetInput.blur();
         }
+      }
+    );
+
+    openWelcomeButton.addEventListener(
+      "click",
+      () => {
+        this.openWelcomeNotice();
       }
     );
 
