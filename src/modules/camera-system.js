@@ -1,16 +1,21 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+import { ease } from "../utils/easing.js";
+
 export class CameraSystem {
   constructor(three = THREE) {
     this.THREE = three;
+
     this.camera = null;
     this.controls = null;
 
     this.baseViewWidth = 19.2;
     this.baseViewHeight = 10.8;
+
     this.pos = new this.THREE.Vector3(0, 0, 100);
     this.tgt = new this.THREE.Vector3(0, 0, 0);
+
     this._panPixels = { dx: 0, dy: 0 };
 
     this._focus = {
@@ -132,15 +137,18 @@ export class CameraSystem {
 
   update(domElement) {
     if (this._focus.enabled) {
-      const elapsed = (performance.now() - this._focus.startMs) / 1000;
-      const t = this._focus.durationSec > 0 ? Math.min(elapsed / this._focus.durationSec, 1) : 1;
-      const eased = t < 1 ? t * t : 1;
-
-      this.pos.lerpVectors(this._focus.fromPos, this._focus.toPos, eased);
-      this.tgt.lerpVectors(this._focus.fromTgt, this._focus.toTgt, eased);
+      const now = performance.now();
+      const durMs = this._focus.durationSec * 1000;
+      const t = durMs <= 0 ? 1 : (now - this._focus.startMs) / durMs;
 
       if (t >= 1) {
+        this.pos.copy(this._focus.toPos);
+        this.tgt.copy(this._focus.toTgt);
         this._focus.enabled = false;
+      } else {
+        const a = ease(t, this._focus.ease);
+        this.pos.lerpVectors(this._focus.fromPos, this._focus.toPos, a);
+        this.tgt.lerpVectors(this._focus.fromTgt, this._focus.toTgt, a);
       }
     }
 
