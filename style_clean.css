@@ -1,3 +1,12 @@
+/* Import Godo Maum Font */
+@font-face {
+  font-family: "GodoMaum";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/godoMaum.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* =========================================================
    Theme / Reset
 ========================================================= */
@@ -2350,14 +2359,37 @@ img.editor-tab-icon {
   color:
     #eee;
 
+  font-family:
+    "GodoMaum",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif;
+
   font-size:
-    12px;
+    40px;
 
   font-weight:
-    650;
+    400;
 
   text-align:
     center;
+}
+
+@media (max-width: 768px) {
+  #level-title {
+    font-size: 20px !important;
+  }
+}
+
+#level-title,
+#level-title * {
+  font-family:
+    "GodoMaum",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif;
 }
 
 
