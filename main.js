@@ -1,348 +1,34 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import JSON5 from "https://cdn.jsdelivr.net/npm/json5@2/dist/index.mjs";
+import { EditorLogger } from "./src/utils/editor-logger.js";
+import { ease } from "./src/utils/easing.js";
 import {
-  mergeGeometries
-} from "three/addons/utils/BufferGeometryUtils.js";
+  EVENT_MARKER_ICONS,
+  EVENT_TAB_DEFS,
+  getEventDefinition,
+  createEventTabGroups
+} from "./src/config/event-config.js";
+import {
+  degToRad,
+  radToDeg,
+  normalizeAngle,
+  reverseAngle
+} from "./src/utils/math.js";
+import {
+  Floor,
+  EditorState,
+  RenderEngine,
+  CompiledProject
+} from "./src/modules/editor-state.js";
+import {
+  ModifierKeyController,
+  PlayButtonController
+} from "./src/modules/controls.js";
+import { CameraSystem } from "./src/modules/camera-system.js";
+import { RuntimeScene } from "./src/modules/runtime-scene.js";
+import { EditorSettingsController } from "./src/modules/editor-settings.js";
 
-
-const degToRad = (deg) => {return deg * 2*Math.PI / 360}
-const radToDeg = (rad) => {return rad * 360 / (2 * Math.PI)}
-const normalizeAngle = (a) => {return ((a % 360) + 360) % 360}
-const reverseAngle = (a) => {return (a + 180)%360}
-
-
-/* =========================================================
-   Editor diagnostics
-
-   - Keeps a small persistent ring buffer for bug reports.
-   - Captures console log/warn/error without suppressing DevTools.
-   - Never throws when storage is unavailable.
-========================================================= */
-class EditorLogger {
-  constructor(){
-    this.storageKey =
-      "adofai-editor-debug-log-v1";
-
-    this.maxEntries = 300;
-    this.entries = [];
-    this.listeners = new Set();
-
-    this.persistenceEnabled = true;
-    this.consoleCaptureInstalled = false;
-
-    this.originalConsole = {
-      log: console.log.bind(console),
-      warn: console.warn.bind(console),
-      error: console.error.bind(console)
-    };
-
-    this.load();
-  }
-
-  formatValue(value){
-    if(value instanceof Error){
-      return value.stack ||
-        `${value.name}: ${value.message}`;
-    }
-
-    if(typeof value === "string"){
-      return value;
-    }
-
-    if(
-      value === null ||
-      value === undefined ||
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      typeof value === "bigint"
-    ){
-      return String(value);
-    }
-
-    try{
-      const seen = new WeakSet();
-
-      const text = JSON.stringify(
-        value,
-        (key, item) => {
-          if(
-            item &&
-            typeof item === "object"
-          ){
-            if(seen.has(item)){
-              return "[Circular]";
-            }
-            seen.add(item);
-          }
-          return item;
-        }
-      );
-
-      if(typeof text === "string"){
-        return text.length > 3000
-          ? text.slice(0, 3000) + "…"
-          : text;
-      }
-    }
-    catch{}
-
-    try{
-      return String(value);
-    }
-    catch{
-      return "[Unprintable value]";
-    }
-  }
-
-  load(){
-    try{
-      const text =
-        localStorage.getItem(
-          this.storageKey
-        );
-
-      if(!text){
-        return;
-      }
-
-      const parsed = JSON.parse(text);
-
-      if(Array.isArray(parsed)){
-        this.entries =
-          parsed.slice(
-            -this.maxEntries
-          );
-      }
-    }
-    catch{}
-  }
-
-  persist(){
-    if(!this.persistenceEnabled){
-      return;
-    }
-
-    try{
-      localStorage.setItem(
-        this.storageKey,
-        JSON.stringify(
-          this.entries
-        )
-      );
-    }
-    catch{}
-  }
-
-  emit(){
-    for(const listener of this.listeners){
-      try{
-        listener(this.entries);
-      }
-      catch{}
-    }
-  }
-
-  push(level, args, source = "editor"){
-    const entry = {
-      time: new Date().toISOString(),
-      level,
-      source,
-      message: args
-        .map(value =>
-          this.formatValue(value)
-        )
-        .join(" ")
-    };
-
-    this.entries.push(entry);
-
-    if(
-      this.entries.length >
-      this.maxEntries
-    ){
-      this.entries.splice(
-        0,
-        this.entries.length -
-        this.maxEntries
-      );
-    }
-
-    this.persist();
-    this.emit();
-
-    return entry;
-  }
-
-  info(...args){
-    this.originalConsole.log(
-      "[ADOFAI Editor]",
-      ...args
-    );
-    return this.push(
-      "INFO",
-      args
-    );
-  }
-
-  warn(...args){
-    this.originalConsole.warn(
-      "[ADOFAI Editor]",
-      ...args
-    );
-    return this.push(
-      "WARN",
-      args
-    );
-  }
-
-  error(...args){
-    this.originalConsole.error(
-      "[ADOFAI Editor]",
-      ...args
-    );
-    return this.push(
-      "ERROR",
-      args
-    );
-  }
-
-  installConsoleCapture(){
-    if(this.consoleCaptureInstalled){
-      return;
-    }
-
-    const map = {
-      log: "INFO",
-      warn: "WARN",
-      error: "ERROR"
-    };
-
-    for(const method of Object.keys(map)){
-      console[method] = (...args) => {
-        this.originalConsole[method](
-          ...args
-        );
-
-        this.push(
-          map[method],
-          args,
-          "console"
-        );
-      };
-    }
-
-    this.consoleCaptureInstalled = true;
-  }
-
-  clear({ persist = true } = {}){
-    this.entries.length = 0;
-
-    if(persist){
-      try{
-        localStorage.removeItem(
-          this.storageKey
-        );
-      }
-      catch{}
-    }
-
-    this.emit();
-  }
-
-  setPersistenceEnabled(value){
-    this.persistenceEnabled =
-      Boolean(value);
-  }
-
-  subscribe(listener){
-    this.listeners.add(listener);
-    return () =>
-      this.listeners.delete(listener);
-  }
-
-  toText(){
-    const header = [
-      "ADOFAI Web Editor Debug Log",
-      `Exported: ${new Date().toISOString()}`,
-      `URL: ${location.href}`,
-      `User Agent: ${navigator.userAgent}`,
-      ""
-    ];
-
-    const body =
-      this.entries.map(entry =>
-        `[${entry.time}] [${entry.level}] [${entry.source}] ${entry.message}`
-      );
-
-    return [
-      ...header,
-      ...body
-    ].join("\n");
-  }
-}
-
-const EDITOR_LOGGER =
-  new EditorLogger();
-
-
-const EVENT_MARKER_ICONS = {
-
-  /*
-    1 < BPM 배율 <= 2.05
-  */
-  rabbit:
-    "./icons/Rabbit.png",
-
-  /*
-    BPM 배율 > 2.05
-  */
-  rabbitFast:
-    "./icons/Double_Rabbit.png",
-
-
-  /*
-    0.45 < BPM 배율 < 1
-  */
-  snail:
-    "./icons/Snail.png",
-
-  /*
-    BPM 배율 <= 0.45
-  */
-  snailSlow:
-    "./icons/Double_Snail.png",
-
-  /*
-    BPM 변화량이 사실상 동일한 경우.
-    편집 중에만 표시되고 재생 중에는 숨긴다.
-  */
-  equal:
-    "./icons/equal.png",
-
-
-  /*
-    Twirl 색상.
-
-    blue = Twirl 적용 후 현재 타일 -> 다음 타일의
-           유효 각도가 180° 이상
-
-    red  = 180° 미만
-  */
-  twirlBlue:
-    "./icons/swirl_blue.png",
-
-  twirlRed:
-    "./icons/swirl_red.png",
-
-
-    /*
-      Pause 및 기타 모든 이벤트
-    */
-    star:
-      "./icons/tile_vfx.png"
-  };
-
+const EDITOR_LOGGER = new EditorLogger();
 
 
 function createEventMarkerInfo(
@@ -741,263 +427,6 @@ function createEventMarkerInfo(
   return marker;
 }
 
-const EVENT_TAB_DEFS = {
-
-  SetSpeed: {
-    key:
-      "speed",
-
-    title:
-      "Set Speed",
-
-    iconSrc:
-      "./icons/SetSpeed.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      true,
-
-    /*
-      이벤트를 생성한 직후 해당 이벤트 탭을 자동으로 열지 여부.
-      SetSpeed는 생성 즉시 세부 값을 편집하는 경우가 많으므로 연다.
-    */
-    openTabOnCreate:
-      true,
-
-    defaultData: {
-      speedType:
-        "Bpm",
-
-      beatsPerMinute:
-        100,
-
-      bpmMultiplier:
-        1,
-
-      angleOffset:
-        0
-    },
-
-    order:
-      10
-  },
-
-
-  Twirl: {
-    key:
-      "twirl",
-
-    title:
-      "Twirl",
-
-    iconSrc:
-      "./icons/Twirl.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      false,
-
-    /*
-      Twirl은 옵션이 없는 즉시 적용 이벤트이므로
-      생성 후 타일 편집 화면을 그대로 유지한다.
-    */
-    openTabOnCreate:
-      false,
-
-    defaultData: {},
-
-    order:
-      20
-  },
-
-
-  Pause: {
-    key:
-      "pause",
-
-    title:
-      "Pause",
-
-    iconSrc:
-      "./icons/Pause.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      false,
-
-    openTabOnCreate:
-      true,
-
-    defaultData: {
-      duration:
-        1,
-
-      countdownTicks:
-        0,
-
-      angleCorrectionDir:
-        "None"
-    },
-
-    order:
-      30
-  },
-
-
-  SetHitsound: {
-    key:
-      "hitsound",
-
-    title:
-      "Set Hitsound",
-
-    iconSrc:
-      "./icons/SetGameSound.png",
-
-    editable:
-      true,
-
-    allowMultiple:
-      false,
-
-    openTabOnCreate:
-      true,
-
-    defaultData: {
-      gameSound:
-        "Hitsound",
-
-      hitsound:
-        "Kick",
-
-      hitsoundVolume:
-        100
-    },
-
-    order:
-      40
-  }
-
-};
-
-function getEventDefinition(
-  eventType
-){
-
-  return (
-    EVENT_TAB_DEFS[
-      eventType
-    ]
-    ??
-    null
-  );
-}
-
-
-function createEventTabGroups(
-  actions
-){
-  const groups =
-    new Map();
-
-
-  for(const action of actions){
-
-    const def =
-      EVENT_TAB_DEFS[
-        action.eventType
-      ];
-
-
-    /*
-      아직 전용 UI가 없는 이벤트
-    */
-    if(!def){
-
-      const key =
-        "unsupported";
-    
-    
-      if(!groups.has(key)){
-    
-        groups.set(
-          key,
-          {
-            key:
-              "unsupported",
-    
-            title:
-              "Unsupported Events",
-    
-            iconSrc:
-              "./icons/tile_vfx.png",
-    
-            order:
-              1000,
-    
-            editable:
-              false,
-    
-            actions:
-              []
-          }
-        );
-      }
-    
-    
-      groups
-        .get(key)
-        .actions
-        .push(action);
-    
-    
-      continue;
-    
-    }
-
-
-    /*
-      이미 같은 종류의 탭이 있으면
-      그 안에 이벤트만 추가
-    */
-    if(!groups.has(def.key)){
-
-      groups.set(
-        def.key,
-        {
-          ...def,
-
-          actions: []
-        }
-      );
-    }
-
-
-    groups
-      .get(def.key)
-      .actions
-      .push(action);
-  }
-
-
-  return [
-    ...groups.values()
-  ].sort(
-    (a, b) =>
-      a.order - b.order
-  );
-}
-
-
-
-
-
 /*
   한 타일의 여러 action 중
   최종적으로 화면에 보여줄 이벤트 마커를 결정한다.
@@ -1006,2830 +435,6 @@ function createEventTabGroups(
   actions 배열에서 뒤의 이벤트가 앞의 이벤트를 덮는다.
 */
 
-
-function ease(t, ease = 'linear'){
-  t = Math.min(1, Math.max(0, t));
-  const e = ease.toLowerCase()
-  switch(e) {
-    case 'linear': //선형
-      return t;
-      
-    case 'inquad': //2차함수
-      return t**2;
-    
-    case 'outquad':
-      return -1*(1-t)**2+1;
-      
-    case 'inoutquad':
-      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    
-    case 'inqubic': //3차함수
-      return t*t*t;
-    
-    case 'outqubic':
-      return 1-(1-t)**3;
-    
-    case 'inoutcubic':
-      return t < 0.5 ? 4 * t * t * t : 1 - 4 * Math.pow(1 - t, 3);
-    
-    case 'inexpo':
-      return t === 0 ? 0 : Math.pow(2, 10 * (t - 1));
-    
-    case 'outexpo':
-      return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      
-    case 'inoutexpo':
-      if (t === 0) return 0;
-      if (t === 1) return 1;
-      return t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2;
-    
-    case 'inback': {
-      const c1 = 1.70158;
-      const c3 = c1 + 1;
-      return c3 * t * t * t - c1 * t * t;
-    }
-    
-    case 'outback': {
-      const c1 = 1.70158;
-      const c3 = c1 + 1;
-      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-    }
-    
-    case 'inoutback': {
-      const c1 = 1.70158;
-      const c2 = c1 * 1.525;
-      return t < 0.5
-        ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
-        : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
-    }
-    
-    case 'outbounce': {
-      const n1 = 7.5625;
-      const d1 = 2.75;
-    
-      if (t < 1 / d1) {
-        return n1 * t * t;
-      } else if (t < 2 / d1) {
-        t -= 1.5 / d1;
-        return n1 * t * t + 0.75;
-      } else if (t < 2.5 / d1) {
-        t -= 2.25 / d1;
-        return n1 * t * t + 0.9375;
-      } else {
-        t -= 2.625 / d1;
-        return n1 * t * t + 0.984375;
-      }
-    }
-    
-    case 'inbounce':
-      return 1 - ease(1 - t, 'outbounce');
-    
-    case 'inoutbounce':
-      return t < 0.5
-        ? (1 - ease(1 - 2 * t, 'outbounce')) / 2
-        : (1 + ease(2 * t - 1, 'outbounce')) / 2;
-    
-    case 'outelastic': {
-      const c4 = (2 * Math.PI) / 3;
-      return t === 0
-        ? 0
-        : t === 1
-        ? 1
-        : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
-    }
-    
-    case 'inelastic': {
-      const c4 = (2 * Math.PI) / 3;
-      return t === 0
-        ? 0
-        : t === 1
-        ? 1
-        : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
-    }
-    
-    
-    
-    default:
-      return t;
-  }
-}
-
-
-class Floor{
-  constructor(id, x,y, startAngle, endAngle, option = {isTwirled : false, isFullspin : false, isMidspin : false}){
-    this.id = id ///f_3, f_7...
-    this.startAngle = startAngle;
-    this.endAngle = endAngle;
-    this.x = x;
-    this.y = y;
-    this.option = option
-  }
-}
-
-//카메라를 전문적으로 다루기 위한 카메라 클래그
-class CameraSystem{
-  constructor(three){
-    this.THREE = three;
-
-    this.camera = null;
-    this.controls = null;
-
-    // 기존 1920×1080에서 보이던 월드 범위.
-    // 화면 비율이 바뀌어도 최소한 이 범위는 유지한다.
-    this.baseViewWidth = 19.2;
-    this.baseViewHeight = 10.8;
-
-    // 내부 상태(진짜 카메라 상태)
-    this.pos = new this.THREE.Vector3(0, 0, 100);
-    
-    this.tgt = new this.THREE.Vector3(0, 0, 0);
-
-    // 이번 프레임 입력 누적(드래그 등)
-    this._panPixels = { dx: 0, dy: 0 };
-
-    // focus 상태
-    this._focus = {
-      enabled: false,
-      fromPos: new this.THREE.Vector3(),
-      toPos: new this.THREE.Vector3(),
-      fromTgt: new this.THREE.Vector3(),
-      toTgt: new this.THREE.Vector3(),
-      startMs: 0,
-      durationSec: 1,
-      ease: "outquad",
-    };
-
-    this.viewportWidth = 1;
-    this.viewportHeight = 1;
-  }
-  
-  //카메라 초기셋팅
-  init(domElement){
-    const THREE = this.THREE;
-  
-    const halfW =
-      this.baseViewWidth / 2;
-  
-    const halfH =
-      this.baseViewHeight / 2;
-  
-    this.camera =
-      new THREE.OrthographicCamera(
-        -halfW,
-         halfW,
-         halfH,
-        -halfH,
-         0.1,
-         2000
-      );
-  
-    this.camera.position.copy(
-      this.pos
-    );
-  
-    this.camera.lookAt(
-      this.tgt
-    );
-  
-    this.controls =
-      new OrbitControls(
-        this.camera,
-        domElement
-      );
-  
-    this.controls.enableRotate = false;
-    this.controls.enablePan = false;
-  
-    this.controls.enableZoom = true;
-    this.controls.zoomSpeed = 0.8;
-  
-    this.controls.screenSpacePanning = true;
-  
-    this.controls.target.copy(
-      this.tgt
-    );
-  
-    this.controls.update();
-  }
-
-  // 외부 API: 드래그(픽셀)를 요청만 누적
-  requestPanByPixels(dx, dy){
-    // 드래그가 들어오면 자동 포커스 취소
-    if(this._focus.enabled) this.cancelFocus();
-    
-    this._panPixels.dx += dx;
-    this._panPixels.dy += dy;
-  }
-  
-  // 월드 단위로 바로 팬(좌표계 기준)
-  requestPanByWorld(worldDx, worldDy){
-    if(this._focus.enabled) this.cancelFocus();
-    
-    this.pos.x += worldDx;
-    this.pos.y += worldDy;
-  
-    this.tgt.x += worldDx;
-    this.tgt.y += worldDy;
-  }
-
-  // 외부 API: 포커스 이동, 각 포커스에 대한 정보들을 설정하는 함수
-  requestFocusTo(toX, toY, durationSec = 0.6, easeName = "outexpo"){
-    const now = performance.now();
-
-    this._focus.enabled = true;
-    this._focus.startMs = now;
-    this._focus.durationSec = Math.max(0, durationSec);
-    this._focus.ease = easeName;
-
-    this._focus.fromPos.copy(this.pos);
-    this._focus.fromTgt.copy(this.tgt);
-
-    this._focus.toPos.set(toX, toY, this.pos.z);
-    this._focus.toTgt.set(toX, toY, 0);
-  }
-  
-  //포커스 취소
-  cancelFocus(){
-    this._focus.enabled = false;
-  }
-
-  // 내부: 픽셀 -> 월드 변환 후 pos/tgt에 적용
-  _applyPanPixels(domElement){
-    const dx = this._panPixels.dx;
-    const dy = this._panPixels.dy;
-    if(dx === 0 && dy === 0) return;
-
-    this._panPixels.dx = 0;
-    this._panPixels.dy = 0;
-
-    const cssW =
-      this.viewportWidth;
-
-    const cssH =
-      this.viewportHeight;
-    if(cssW <= 0 || cssH <= 0) return;
-
-    const cam = this.camera;
-
-    const viewW = (cam.right - cam.left) / cam.zoom;
-    const viewH = (cam.top - cam.bottom) / cam.zoom;
-
-    const worldDx = -dx * (viewW / cssW);
-    const worldDy =  dy * (viewH / cssH);
-
-    this.pos.x += worldDx;
-    this.pos.y += worldDy;
-
-    this.tgt.x += worldDx;
-    this.tgt.y += worldDy;
-  }
-  
-  applyCameraFrame(cameraFrame){
-    this.pos.x = this.tgt.x = cameraFrame.x;
-    this.pos.y = this.tgt.y = cameraFrame.y;
-    
-    
-  }
-  
-  setZoomPercent(percent){
-    const p = Math.max(1, percent);
-  
-    this.camera.zoom = p / 100;
-    this.camera.updateProjectionMatrix();
-  
-    this.controls.update();
-  }
-  
-  getZoomPercent(){
-    return this.camera.zoom * 100;
-  }
-  
-  //최종 값들을 업데이트하는 함수
-  update(domElement){
-    //focus
-    if(this._focus.enabled){
-      const now = performance.now();
-      const durMs = this._focus.durationSec*1000
-      const t = durMs <= 0 ? 1 : (now - this._focus.startMs) / durMs;
-
-      if(t >= 1){
-        this.pos.copy(this._focus.toPos);
-        this.tgt.copy(this._focus.toTgt);
-        this._focus.enabled = false;
-      } else {
-        const a = ease(t, this._focus.ease);
-        //three.js에 있는 lerpVectors
-        this.pos.lerpVectors(this._focus.fromPos, this._focus.toPos, a);
-        this.tgt.lerpVectors(this._focus.fromTgt, this._focus.toTgt, a);
-      }
-    }
-
-    //드래그 pan 적용
-    this._applyPanPixels(domElement);
-
-    //실제 카메라 반영
-    this.camera.position.copy(this.pos);
-    this.controls.target.copy(this.tgt);
-    this.controls.update();
-  }
-  
-  resize(width, height){
-
-    this.viewportWidth =
-      width;
-
-    this.viewportHeight =
-      height;
-
-    if(
-      !this.camera ||
-      width <= 0 ||
-      height <= 0
-    ){
-      return;
-    }
-  
-    const aspect =
-      width / height;
-  
-    const baseAspect =
-      this.baseViewWidth /
-      this.baseViewHeight;
-  
-    let viewWidth;
-    let viewHeight;
-  
-    if(aspect >= baseAspect){
-  
-      viewHeight =
-        this.baseViewHeight;
-  
-      viewWidth =
-        viewHeight * aspect;
-    }
-    else{
-  
-      viewWidth =
-        this.baseViewWidth;
-  
-      viewHeight =
-        viewWidth / aspect;
-    }
-  
-    this.camera.left =
-      -viewWidth / 2;
-  
-    this.camera.right =
-      viewWidth / 2;
-  
-    this.camera.top =
-      viewHeight / 2;
-  
-    this.camera.bottom =
-      -viewHeight / 2;
-  
-    this.camera.updateProjectionMatrix();
-  }
-} //condition ? true : false
-
-//Three.js 내용 관리
-class RuntimeScene{
-  constructor(three){
-    this.Three = three;
-    this.scene = null;
-    this.renderer = null;
-  
-    this.defaultWidth = 150;
-    this.defaultHeight = 85;
-    this.defaultOutlineOffset = 10;
-    this.defaultBorder = 23;
-  
-    this.isGrid = true;
-
-    /*
-      Editor-only view helpers.
-      Keep references so Editor Settings can toggle them
-      without rebuilding the Three.js scene.
-    */
-    this.gridHelper = null;
-    this.axesHelper = null;
-  
-    this.floorMeshes = [];
-    this.meshByFloorId = new Map();
-    this.floorIdByMesh = new Map();
-    
-    this.viewportWidth = 0;
-    this.viewportHeight = 0;
-    
-    this.eventTextureLoader =
-      new this.Three.TextureLoader();
-    
-    this.eventTextureCache =
-      new Map();
-    
-    this.eventMarkerSize =
-      0.5;
-    
-    this.circleSegments =
-      16;
-    
-    this.renderFloorCount =
-      0;
-    
-    
-    /* =========================
-       Shared Floor Resources
-    ========================= */
-    
-    /*
-      동일한 타일 모양은
-      Geometry를 공유한다.
-    */
-    this.floorGeometryCache =
-      new Map();
-    
-    
-    /*
-      타일 material도 공유.
-    
-      선택 여부는 inner material을
-      교체하는 방식으로 처리.
-    */
-    this.sharedOuterMaterial =
-      new this.Three.MeshBasicMaterial({
-    
-        color:
-          0xffffff,
-    
-        depthTest:
-          false,
-    
-        depthWrite:
-          false
-      });
-    
-    
-    this.sharedInnerMaterial =
-      new this.Three.MeshBasicMaterial({
-    
-        color:
-          0x0a0a0a,
-    
-        depthTest:
-          false,
-    
-        depthWrite:
-          false
-      });
-    
-    
-    this.sharedSelectedInnerMaterial =
-      new this.Three.MeshBasicMaterial({
-    
-        color:
-          0x00ff00,
-    
-        depthTest:
-          false,
-    
-        depthWrite:
-          false
-      });
-    
-    
-    /* =========================
-       Shared Event Resources
-    ========================= */
-    
-    this.sharedEventMarkerGeometry =
-      new this.Three.PlaneGeometry(
-        this.eventMarkerSize,
-        this.eventMarkerSize
-      );
-    
-    
-    this.eventMarkerMaterialCache =
-      new Map();
-    
-    
-    this.playbackVisualMode =
-      false;
-
-    this.visibleFloorMeshes =
-      [];
-
-
-    this.visibilityMargin =
-      2;
-
-
-    this.visibilityRefreshDistance =
-      0.3;
-
-
-    this.floorVisibilityState = {
-
-      x:
-        Infinity,
-
-      y:
-        Infinity,
-
-      zoom:
-        -1,
-
-      viewWidth:
-        -1,
-
-      viewHeight:
-        -1
-    };
-    
-    this.floorChunkSize =
-      8;
-    
-    
-    this.floorChunks =
-      new Map();
-    
-    
-    this.attachedFloorGroups =
-      new Set();
-  }
-
-  init(){
-
-    const THREE =
-      this.Three;
-  
-  
-    this.scene =
-      new THREE.Scene();
-  
-  
-    const canvas =
-      document.getElementById(
-        "canvas"
-      );
-  
-  
-    if(!canvas){
-  
-      throw new Error(
-        "canvas not found"
-      );
-    }
-  
-  
-    this.renderer =
-      new THREE.WebGLRenderer({
-  
-        canvas,
-  
-        antialias:
-          true,
-  
-        powerPreference:
-          "high-performance"
-      });
-  
-  
-    this.renderer.setPixelRatio(
-  
-      Math.min(
-  
-        window.devicePixelRatio ||
-        1,
-  
-        2
-      )
-    );
-  
-  
-    /* =====================================================
-       Grid
-    ===================================================== */
-  
-    /*
-      타일보다 훨씬 어두운 색으로 설정.
-    */
-    this.gridHelper =
-      new THREE.GridHelper(
-  
-        5000,
-        5000,
-  
-        /*
-          중심축
-        */
-        0x303030,
-  
-        /*
-          일반 grid
-        */
-        0x202020
-      );
-  
-  
-    /*
-      GridHelper는 기본적으로 XZ 평면이므로
-      타일과 같은 XY 평면으로 회전.
-    */
-    this.gridHelper.rotation.x =
-      Math.PI / 2;
-  
-  
-    /*
-      타일은 z = 0.
-  
-      카메라는 +Z 방향에서 보고 있으므로
-      grid를 음수 Z로 보내면
-      실제 공간에서도 타일 뒤가 된다.
-    */
-    this.gridHelper.position.z =
-      -1;
-  
-  
-    /*
-      Three.js 렌더 순서에서도
-      가장 먼저 그려지도록 한다.
-    */
-    this.gridHelper.renderOrder =
-      -10000;
-  
-  
-    /* =====================================================
-       Grid Material
-    ===================================================== */
-  
-    if(
-      this.gridHelper.material
-    ){
-    
-      const materials =
-        Array.isArray(
-          this.gridHelper.material
-        )
-          ? this.gridHelper.material
-          : [
-              this.gridHelper.material
-            ];
-    
-    
-      for(
-        const material
-        of materials
-      ){
-    
-        /*
-          중요:
-          Grid를 Transparent render list에서 빼낸다.
-    
-          타일들은 transparent:true이므로
-          Grid가 먼저 렌더링되고
-          타일이 그 위를 덮게 된다.
-        */
-        material.transparent =
-          false;
-    
-    
-        /*
-          transparent:false에서는
-          opacity로 흐리게 만드는 방식은 사용하지 않는다.
-        */
-        material.opacity =
-          1;
-    
-    
-        /*
-          순수한 배경 가이드이므로
-          depth buffer에는 참여하지 않는다.
-        */
-        material.depthTest =
-          false;
-    
-        material.depthWrite =
-          false;
-    
-    
-        material.needsUpdate =
-          true;
-      }
-    }
-  
-  
-    /* =====================================================
-       Axes
-    ===================================================== */
-  
-    this.axesHelper =
-      new THREE.AxesHelper(
-        10
-      );
-  
-  
-    /*
-      Grid와 마찬가지로
-      타일 뒤쪽에 둔다.
-  
-      Grid보다 아주 조금 앞.
-    */
-    this.axesHelper.position.z =
-      -0.9;
-  
-  
-    this.axesHelper.renderOrder =
-      -9999;
-  
-  
-    /* =====================================================
-       Axes Material
-    ===================================================== */
-  
-    if(
-      this.axesHelper.material
-    ){
-    
-      const materials =
-        Array.isArray(
-          this.axesHelper.material
-        )
-          ? this.axesHelper.material
-          : [
-              this.axesHelper.material
-            ];
-    
-    
-      for(
-        const material
-        of materials
-      ){
-    
-        material.transparent =
-          false;
-    
-        material.opacity =
-          1;
-    
-        material.depthTest =
-          false;
-    
-        material.depthWrite =
-          false;
-    
-        material.needsUpdate =
-          true;
-      }
-    }
-  
-  
-    /* =====================================================
-       Add Helpers
-    ===================================================== */
-  
-    this.scene.add(
-      this.gridHelper
-    );
-  
-  
-    this.scene.add(
-      this.axesHelper
-    );
-  
-  
-    this.setGridVisible(
-      this.isGrid
-    );
-  }
-
-  setGridVisible(visible){
-
-    this.isGrid =
-      Boolean(visible);
-
-    if(this.gridHelper){
-      this.gridHelper.visible =
-        this.isGrid;
-    }
-
-    if(this.axesHelper){
-      this.axesHelper.visible =
-        this.isGrid;
-    }
-
-    return this.isGrid;
-  }
-  
-  rebuildFloorSpatialIndex(){
-
-    this.floorChunks.clear();
-  
-  
-    const size =
-      this.floorChunkSize;
-  
-  
-    for(
-      const group
-      of this.floorMeshes
-    ){
-  
-      const cx =
-        Math.floor(
-          group.position.x /
-          size
-        );
-  
-  
-      const cy =
-        Math.floor(
-          group.position.y /
-          size
-        );
-  
-  
-      const key =
-        `${cx},${cy}`;
-  
-  
-      let chunk =
-        this.floorChunks.get(
-          key
-        );
-  
-  
-      if(!chunk){
-  
-        chunk =
-          [];
-  
-  
-        this.floorChunks.set(
-          key,
-          chunk
-        );
-      }
-  
-  
-      chunk.push(
-        group
-      );
-    }
-  }
-
-  // 카메라를 인자로 받는다
-  render(
-    camera
-  ){
-
-    this.updateFloorVisibility(
-      camera
-    );
-
-
-    this.renderer.render(
-      this.scene,
-      camera
-    );
-  }
-  
-  resize(width, height){
-
-    if(!this.renderer){
-      return;
-    }
-  
-  
-    const w =
-      Math.max(
-        1,
-        Math.round(width)
-      );
-  
-    const h =
-      Math.max(
-        1,
-        Math.round(height)
-      );
-  
-  
-    /*
-      같은 크기라면 WebGL buffer
-      다시 만들지 않음
-    */
-    if(
-      w === this.viewportWidth &&
-      h === this.viewportHeight
-    ){
-      return;
-    }
-  
-  
-    this.viewportWidth = w;
-    this.viewportHeight = h;
-  
-  
-    this.renderer.setSize(
-      w,
-      h,
-      false
-    );
-  }
-/*
-  updateCanvasScale() {
-    const canvas = this.renderer.domElement;
-  
-    const scaleX = window.innerWidth / 1920;
-    const scaleY = window.innerHeight / 1080;
-  
-    const scale = Math.min(scaleX, scaleY);
-  
-    canvas.style.transform = `scale(${scale})`;
-  }
-  */
-  
-    mergeGeometryParts(
-    geometries
-  ){
-  
-    /*
-      mergeGeometries는
-  
-      indexed / non-indexed geometry가
-      섞여 있으면 실패할 수 있다.
-  
-      그래서 전부 non-indexed로 통일.
-    */
-  
-    const parts = [];
-  
-  
-    for(
-      const geometry
-      of geometries
-    ){
-  
-      if(geometry.index){
-  
-        const converted =
-          geometry.toNonIndexed();
-  
-  
-        geometry.dispose();
-  
-  
-        parts.push(
-          converted
-        );
-      }
-      else{
-  
-        parts.push(
-          geometry
-        );
-      }
-    }
-  
-  
-    /*
-      하나뿐이면 merge할 필요 없음.
-    */
-    if(parts.length === 1){
-  
-      const geometry =
-        parts[0];
-  
-  
-      geometry.computeBoundingSphere();
-  
-  
-      return geometry;
-    }
-  
-  
-    const merged =
-      mergeGeometries(
-        parts,
-        false
-      );
-  
-  
-    for(
-      const geometry
-      of parts
-    ){
-  
-      geometry.dispose();
-    }
-  
-  
-    if(!merged){
-  
-      throw new Error(
-        "Floor geometry merge failed."
-      );
-    }
-  
-  
-    merged.computeBoundingSphere();
-  
-  
-    return merged;
-  }
-  
-  createRotatedRectGeometry(
-    width,
-    height,
-    angleRad
-  ){
-  
-    const geometry =
-      new this.Three.PlaneGeometry(
-        width,
-        height
-      );
-  
-  
-    /*
-      먼저 회전
-    */
-    geometry.rotateZ(
-      angleRad
-    );
-  
-  
-    /*
-      타일 중심에서
-      반쪽 길이만큼 이동
-    */
-    geometry.translate(
-  
-      Math.cos(
-        angleRad
-      ) *
-      width / 2,
-  
-      Math.sin(
-        angleRad
-      ) *
-      width / 2,
-  
-      0
-    );
-  
-  
-    return geometry;
-  }
-  
-  getFloorGeometryPair(
-    floor
-  ){
-  
-    const THREE =
-      this.Three;
-  
-  
-    const type =
-      floor.option?.isFullspin
-        ? "fullspin"
-        : floor.option?.isMidspin
-          ? "midspin"
-          : "normal";
-  
-  
-    /*
-      같은 모양이면 같은 Geometry 사용
-    */
-    const key =
-      [
-        type,
-        floor.startAngle,
-        floor.endAngle
-      ].join("|");
-  
-  
-    const cached =
-      this.floorGeometryCache.get(
-        key
-      );
-  
-  
-    if(cached){
-  
-      return cached;
-    }
-  
-  
-    /* =========================
-       Dimensions
-    ========================= */
-  
-    const floorWidth =
-      1;
-  
-  
-    const floorHeight =
-      this.defaultHeight /
-      this.defaultWidth;
-  
-  
-    const halfW =
-      floorWidth / 2;
-  
-  
-    const radius =
-      floorHeight / 2;
-  
-  
-    const floorBorder =
-      this.defaultBorder /
-      this.defaultWidth;
-  
-  
-    const innerFloorWidth =
-      (
-        this.defaultWidth -
-        this.defaultOutlineOffset
-      ) /
-      this.defaultWidth;
-  
-  
-    const innerFloorHeight =
-      (
-        this.defaultHeight -
-        this.defaultOutlineOffset
-      ) /
-      this.defaultWidth;
-  
-  
-    const innerHalfW =
-      innerFloorWidth / 2;
-  
-  
-    const innerRadius =
-      innerFloorHeight / 2;
-  
-  
-    let outerGeometry;
-    let innerGeometry;
-  
-  
-    /* =========================
-       Normal
-    ========================= */
-  
-    if(type === "normal"){
-  
-      const a0 =
-        degToRad(
-          floor.startAngle
-        );
-  
-  
-      const a1 =
-        degToRad(
-          floor.endAngle
-        );
-  
-  
-      const outerCircle =
-        new THREE.CircleGeometry(
-          radius,
-          this.circleSegments
-        );
-  
-  
-      const outerA =
-        this.createRotatedRectGeometry(
-          halfW,
-          floorHeight,
-          a0
-        );
-  
-  
-      const outerB =
-        this.createRotatedRectGeometry(
-          halfW,
-          floorHeight,
-          a1
-        );
-  
-  
-      outerGeometry =
-        this.mergeGeometryParts([
-          outerCircle,
-          outerA,
-          outerB
-        ]);
-  
-  
-      const innerCircle =
-        new THREE.CircleGeometry(
-          innerRadius,
-          this.circleSegments
-        );
-  
-  
-      const innerA =
-        this.createRotatedRectGeometry(
-          innerHalfW,
-          innerFloorHeight,
-          a0
-        );
-  
-  
-      const innerB =
-        this.createRotatedRectGeometry(
-          innerHalfW,
-          innerFloorHeight,
-          a1
-        );
-  
-  
-      innerGeometry =
-        this.mergeGeometryParts([
-          innerCircle,
-          innerA,
-          innerB
-        ]);
-    }
-  
-  
-    /* =========================
-       Fullspin
-    ========================= */
-  
-    else if(
-      type === "fullspin"
-    ){
-  
-      const createRectShape = (
-        w,
-        h,
-        r
-      ) => {
-  
-        const shape =
-          new THREE.Shape();
-  
-  
-        const b =
-          floorBorder;
-  
-  
-        shape.moveTo(
-          -w / 2 + b,
-          -h / 2
-        );
-  
-  
-        shape.lineTo(
-          w / 2 - r - b,
-          -h / 2
-        );
-  
-  
-        shape.lineTo(
-          w / 2 - r - b,
-          h / 2
-        );
-  
-  
-        shape.lineTo(
-          -w / 2 + b,
-          h / 2
-        );
-  
-  
-        shape.closePath();
-  
-  
-        return shape;
-      };
-  
-  
-      const rotation =
-        degToRad(
-          floor.endAngle +
-          180
-        );
-  
-  
-      const outerRect =
-        new THREE.ShapeGeometry(
-          createRectShape(
-            floorWidth,
-            floorHeight,
-            radius
-          )
-        );
-  
-  
-      outerRect.rotateZ(
-        rotation
-      );
-  
-  
-      const outerCircle =
-        new THREE.CircleGeometry(
-          radius,
-          this.circleSegments
-        );
-  
-  
-      outerGeometry =
-        this.mergeGeometryParts([
-          outerRect,
-          outerCircle
-        ]);
-  
-  
-      const innerRect =
-        new THREE.ShapeGeometry(
-          createRectShape(
-            innerFloorWidth,
-            innerFloorHeight,
-            innerRadius
-          )
-        );
-  
-  
-      innerRect.rotateZ(
-        rotation
-      );
-  
-  
-      const innerCircle =
-        new THREE.CircleGeometry(
-          innerRadius,
-          this.circleSegments
-        );
-  
-  
-      innerGeometry =
-        this.mergeGeometryParts([
-          innerRect,
-          innerCircle
-        ]);
-    }
-  
-  
-    /* =========================
-       Midspin
-    ========================= */
-  
-    else{
-  
-      const createMidspinShape = (
-        w,
-        h,
-        r
-      ) => {
-  
-        const shape =
-          new THREE.Shape();
-  
-  
-        const b =
-          floorBorder;
-  
-  
-        shape.moveTo(
-          -w / 2 + b,
-          -h / 2
-        );
-  
-  
-        shape.lineTo(
-          w / 2 - r - b,
-          -h / 2
-        );
-  
-  
-        shape.lineTo(
-          w / 2 - b,
-          0
-        );
-  
-  
-        shape.lineTo(
-          w / 2 - r - b,
-          h / 2
-        );
-  
-  
-        shape.lineTo(
-          -w / 2 + b,
-          h / 2
-        );
-  
-  
-        shape.closePath();
-  
-  
-        return shape;
-      };
-  
-  
-      const rotation =
-        degToRad(
-          floor.endAngle +
-          180
-        );
-  
-  
-      outerGeometry =
-        new THREE.ShapeGeometry(
-          createMidspinShape(
-            floorWidth,
-            floorHeight,
-            radius
-          )
-        );
-  
-  
-      outerGeometry.rotateZ(
-        rotation
-      );
-  
-  
-      innerGeometry =
-        new THREE.ShapeGeometry(
-          createMidspinShape(
-            innerFloorWidth,
-            innerFloorHeight,
-            innerRadius
-          )
-        );
-  
-  
-      innerGeometry.rotateZ(
-        rotation
-      );
-  
-  
-      outerGeometry
-        .computeBoundingSphere();
-  
-  
-      innerGeometry
-        .computeBoundingSphere();
-    }
-  
-  
-    const pair = {
-  
-      outer:
-        outerGeometry,
-  
-      inner:
-        innerGeometry
-    };
-  
-  
-    this.floorGeometryCache.set(
-      key,
-      pair
-    );
-  
-  
-    return pair;
-  }
-  
-  getEventMarkerMaterial(
-    src
-  ){
-  
-    const cached =
-      this.eventMarkerMaterialCache
-        .get(src);
-  
-  
-    if(cached){
-  
-      return cached;
-    }
-  
-  
-    const texture =
-      this.getEventMarkerTexture(
-        src
-      );
-  
-  
-    const material =
-      new this.Three.MeshBasicMaterial({
-  
-        map:
-          texture,
-  
-        /*
-          transparent list로
-          분리되지 않도록 함.
-  
-          renderOrder가 타일과
-          정확하게 섞여야 한다.
-        */
-        transparent:
-          false,
-  
-        alphaTest:
-          0.02,
-  
-        depthTest:
-          false,
-  
-        depthWrite:
-          false
-      });
-  
-  
-    this.eventMarkerMaterialCache.set(
-      src,
-      material
-    );
-  
-  
-    return material;
-  }
-
-  getEventMarkerTexture(
-    src
-  ){
-
-    if(
-      this.eventTextureCache
-        .has(src)
-    ){
-
-      return this.eventTextureCache
-        .get(src);
-    }
-
-
-    const texture =
-      this.eventTextureLoader
-        .load(
-          src,
-          undefined,
-          undefined,
-          error => {
-            console.warn(
-              "Event marker texture load failed:",
-              src,
-              error
-            );
-          }
-        );
-
-
-    texture.colorSpace =
-      this.Three.SRGBColorSpace;
-
-    texture.minFilter =
-      this.Three.LinearFilter;
-
-    texture.magFilter =
-      this.Three.LinearFilter;
-
-
-    this.eventTextureCache.set(
-      src,
-      texture
-    );
-
-
-    return texture;
-  }
-
-  invalidateFloorVisibility(){
-
-    const state =
-      this.floorVisibilityState;
-  
-  
-    state.x =
-      Infinity;
-  
-    state.y =
-      Infinity;
-  
-    state.zoom =
-      -1;
-  
-    state.viewWidth =
-      -1;
-  
-    state.viewHeight =
-      -1;
-  
-  
-    this.visibleFloorMeshes =
-      [];
-  }
-
-  updateFloorVisibility(
-    camera,
-    force = false
-  ){
-  
-    if(!camera){
-      return;
-    }
-  
-  
-    const x =
-      camera.position.x;
-  
-    const y =
-      camera.position.y;
-  
-    const zoom =
-      camera.zoom;
-  
-  
-    const viewWidth =
-      (
-        camera.right -
-        camera.left
-      ) / zoom;
-  
-  
-    const viewHeight =
-      (
-        camera.top -
-        camera.bottom
-      ) / zoom;
-  
-  
-    const old =
-      this.floorVisibilityState;
-  
-  
-    if(
-      !force
-      &&
-      Math.abs(
-        x - old.x
-      ) <
-        this.visibilityRefreshDistance
-      &&
-      Math.abs(
-        y - old.y
-      ) <
-        this.visibilityRefreshDistance
-      &&
-      Math.abs(
-        zoom - old.zoom
-      ) <
-        0.001
-      &&
-      Math.abs(
-        viewWidth -
-        old.viewWidth
-      ) <
-        0.01
-      &&
-      Math.abs(
-        viewHeight -
-        old.viewHeight
-      ) <
-        0.01
-    ){
-  
-      return;
-    }
-  
-  
-    old.x =
-      x;
-  
-    old.y =
-      y;
-  
-    old.zoom =
-      zoom;
-  
-    old.viewWidth =
-      viewWidth;
-  
-    old.viewHeight =
-      viewHeight;
-  
-  
-    const halfWidth =
-      viewWidth / 2 +
-      this.visibilityMargin;
-  
-  
-    const halfHeight =
-      viewHeight / 2 +
-      this.visibilityMargin;
-  
-  
-    const size =
-      this.floorChunkSize;
-  
-  
-    const minChunkX =
-      Math.floor(
-        (
-          x -
-          halfWidth
-        ) /
-        size
-      );
-  
-  
-    const maxChunkX =
-      Math.floor(
-        (
-          x +
-          halfWidth
-        ) /
-        size
-      );
-  
-  
-    const minChunkY =
-      Math.floor(
-        (
-          y -
-          halfHeight
-        ) /
-        size
-      );
-  
-  
-    const maxChunkY =
-      Math.floor(
-        (
-          y +
-          halfHeight
-        ) /
-        size
-      );
-  
-  
-    const nextVisible =
-      [];
-  
-  
-    const nextSet =
-      new Set();
-  
-  
-    /* =========================
-       주변 Chunk만 검사
-    ========================= */
-  
-    for(
-      let cy =
-        minChunkY;
-  
-      cy <=
-        maxChunkY;
-  
-      cy++
-    ){
-  
-      for(
-        let cx =
-          minChunkX;
-  
-        cx <=
-          maxChunkX;
-  
-        cx++
-      ){
-  
-        const chunk =
-          this.floorChunks.get(
-            `${cx},${cy}`
-          );
-  
-  
-        if(!chunk){
-          continue;
-        }
-  
-  
-        for(
-          const group
-          of chunk
-        ){
-  
-          /*
-            Chunk 안에서도
-            실제 viewport 범위 확인
-          */
-          if(
-            Math.abs(
-              group.position.x -
-              x
-            ) >
-              halfWidth
-            ||
-            Math.abs(
-              group.position.y -
-              y
-            ) >
-              halfHeight
-          ){
-  
-            continue;
-          }
-  
-  
-          nextVisible.push(
-            group
-          );
-  
-  
-          nextSet.add(
-            group
-          );
-        }
-      }
-    }
-  
-  
-    /* =========================
-       화면 밖 Floor 제거
-    ========================= */
-  
-    for(
-      const group
-      of this.attachedFloorGroups
-    ){
-  
-      if(
-        !nextSet.has(
-          group
-        )
-      ){
-  
-        this.scene.remove(
-          group
-        );
-      }
-    }
-  
-  
-    /* =========================
-       새로 보이는 Floor 추가
-    ========================= */
-  
-    for(
-      const group
-      of nextSet
-    ){
-  
-      if(
-        !this.attachedFloorGroups
-          .has(group)
-      ){
-  
-        this.scene.add(
-          group
-        );
-      }
-    }
-  
-  
-    this.attachedFloorGroups =
-      nextSet;
-  
-  
-    this.visibleFloorMeshes =
-      nextVisible;
-  }
-
-  createEventMarkerVisual(
-    marker,
-    renderOrder = 0
-  ){
-  
-    if(
-      !marker?.iconSrc
-    ){
-      return null;
-    }
-  
-  
-    const mesh =
-      new this.Three.Mesh(
-  
-        this.sharedEventMarkerGeometry,
-  
-        this.getEventMarkerMaterial(
-          marker.iconSrc
-        )
-      );
-  
-  
-    mesh.renderOrder =
-      renderOrder;
-  
-  
-    mesh.userData.role =
-      "event-marker";
-  
-  
-    mesh.userData.eventType =
-      marker.type;
-  
-  
-    mesh.userData.markerType =
-      marker.type;
-
-
-    /* =====================================================
-       Twirl marker transform
-    ===================================================== */
-
-    if(
-      marker.type ===
-      "twirl"
-    ){
-
-      const rotationDeg =
-        Number(
-          marker.rotationDeg
-        );
-
-
-      if(
-        Number.isFinite(
-          rotationDeg
-        )
-      ){
-
-        mesh.rotation.z =
-          degToRad(
-            rotationDeg
-          );
-      }
-
-
-      /*
-        원본 swirl_blue / swirl_red는
-        둘 다 시계방향 공전용 이미지다.
-
-        Twirl 적용 후 반시계 공전 상태라면
-        로컬 X축을 뒤집어 거울모드로 표시한다.
-      */
-      mesh.scale.x =
-        marker.mirrorX
-          ? -1
-          : 1;
-    }
-  
-  
-    /*
-      재생 중 Generic 아이콘이면
-      처음부터 숨김.
-    */
-    mesh.visible =
-      !(
-        this.playbackVisualMode
-        &&
-        (
-          marker.type === "other"
-          ||
-          marker.type === "speed-equal"
-        )
-      );
-  
-  
-    /*
-      이벤트 아이콘 자체는
-      Picker 대상 제외.
-    */
-    mesh.raycast =
-      () => {};
-  
-  
-    return mesh;
-  }
-  
-  createFloorVisual(
-    floor,
-    eventMarker = null,
-    floorIndex = 0
-  ){
-  
-    const THREE =
-      this.Three;
-  
-  
-    const group =
-      new THREE.Group();
-  
-  
-    group.position.set(
-      floor.x,
-      floor.y,
-      0
-    );
-  
-  
-    group.userData.floorId =
-      floor.id;
-  
-  
-    group.userData.floorIndex =
-      floorIndex;
-  
-  
-    group.userData.visualSignature =
-      this.getFloorVisualSignature(
-        floor,
-        eventMarker
-      );
-  
-  
-    /* =========================
-       Geometry
-    ========================= */
-  
-    const geometryPair =
-      this.getFloorGeometryPair(
-        floor
-      );
-  
-  
-    /* =========================
-       Outer
-    ========================= */
-  
-    const outer =
-      new THREE.Mesh(
-  
-        geometryPair.outer,
-  
-        this.sharedOuterMaterial
-      );
-  
-  
-    outer.userData.role =
-      "outer";
-  
-  
-    outer.userData.floorId =
-      floor.id;
-  
-  
-    group.add(
-      outer
-    );
-  
-  
-    /* =========================
-       Inner
-    ========================= */
-  
-    const inner =
-      new THREE.Mesh(
-  
-        geometryPair.inner,
-  
-        this.sharedInnerMaterial
-      );
-  
-  
-    inner.userData.role =
-      "inner";
-  
-  
-    inner.userData.floorId =
-      floor.id;
-  
-  
-    group.add(
-      inner
-    );
-  
-  
-    /*
-      traverse를 안 하고
-      바로 접근하기 위해 저장.
-    */
-    group.userData.innerMesh =
-      inner;
-  
-  
-    /* =========================
-       Event Marker
-    ========================= */
-  
-    if(eventMarker){
-  
-      const markerMesh =
-        this.createEventMarkerVisual(
-          eventMarker,
-          0
-        );
-  
-  
-      if(markerMesh){
-  
-        group.add(
-          markerMesh
-        );
-  
-  
-        group.userData.eventMarkerMesh =
-          markerMesh;
-      }
-    }
-  
-  
-    /* =========================
-       Layer
-    ========================= */
-  
-    this.applyFloorRenderOrder(
-      group,
-      floorIndex
-    );
-  
-  
-    return group;
-  }
-  
-  // RuntimeScene 내부에 추가
-  setInnerColorByGroup(
-    group,
-    colorHex
-  ){
-  
-    if(!group){
-      return;
-    }
-  
-  
-    const inner =
-      group.userData
-        ?.innerMesh;
-  
-  
-    if(!inner){
-      return;
-    }
-  
-  
-    inner.material =
-      colorHex === 0x00ff00
-  
-        ? this
-            .sharedSelectedInnerMaterial
-  
-        : this
-            .sharedInnerMaterial;
-  }
-  
-  highlightFloorById(floorId, enabled){
-    const group = this.meshByFloorId.get(floorId);
-    if(!group) return;
-  
-    // enabled면 초록, 아니면 원래색(0x0a0a0a)
-    const color = enabled ? 0x00ff00 : 0x0a0a0a;
-    this.setInnerColorByGroup(group, color);
-  }
-  
-  setFloor(
-    floors,
-    eventMarkers = []
-  ){
-    
-    /*
-      renderOrder 계산용
-    */
-    this.renderFloorCount =
-      floors.length;
-      
-      /*
-        현재 Scene에 붙어 있는
-        Floor만 제거.
-      
-        Floor 객체 자체는 재사용 가능.
-      */
-      for(
-        const group
-        of this.attachedFloorGroups
-      ){
-      
-        this.scene.remove(
-          group
-        );
-      }
-
-
-this.attachedFloorGroups
-  .clear();
-
-
-    /*
-      이전 Runtime 객체들
-    */
-    const oldFloorMeshes =
-      this.floorMeshes;
-
-    const oldById =
-      this.meshByFloorId;
-
-
-    /*
-      새 상태
-    */
-    const nextFloorMeshes =
-      [];
-
-    const nextById =
-      new Map();
-
-    const keptGroups =
-      new Set();
-
-
-    /* =========================
-      Floor Sync
-    ========================= */
-
-    for(
-      let index = 0;
-      index < floors.length;
-      index++
-    ){
-
-      const floor =
-        floors[index];
-
-
-      const marker =
-        eventMarkers[
-          index
-        ] ?? null;
-
-
-      const signature =
-        this.getFloorVisualSignature(
-          floor,
-          marker
-        );
-
-
-      /*
-        stable ID를 이용해
-        기존 visual 검색
-      */
-      let group =
-        oldById.get(
-          floor.id
-        );
-
-
-      /*
-        모양이 완전히 같다면
-        기존 Mesh를 재사용한다.
-      */
-      const reusable =
-        group
-        &&
-        group.userData
-          .visualSignature ===
-          signature;
-
-
-      if(reusable){
-
-        /*
-          삽입/삭제 뒤에는
-          좌표만 변하는 타일이 대부분이다.
-        */
-        group.position.set(
-          floor.x,
-          floor.y,
-          0
-        );
-
-
-        /*
-          matrixAutoUpdate를 꺼놨으므로
-          직접 갱신.
-        */
-        
-
-
-        /*
-          index가 바뀌었으므로
-          layer 재설정
-        */
-        this.applyFloorRenderOrder(
-          group,
-          index
-        );
-
-
-        /*
-          rebuild 전 선택 상태가
-          visual에 남는 것 방지.
-
-          이후 EditorApp.rebuild()가
-          현재 selection을 다시 칠한다.
-        */
-        this.setInnerColorByGroup(
-          group,
-          0x0a0a0a
-        );
-      }
-
-      else{
-
-        /*
-          같은 ID인데 모양이 바뀐 경우
-          새 visual 생성.
-        */
-        group =
-          this.createFloorVisual(
-            floor,
-            marker,
-            index
-          );
-
-        
-        //this.scene.add(group);
-      }
-
-
-      nextFloorMeshes.push(
-        group
-      );
-
-
-      nextById.set(
-        floor.id,
-        group
-      );
-
-
-      keptGroups.add(
-        group
-      );
-    }
-
-
-    /* =========================
-      더 이상 사용하지 않는 것만 제거
-    ========================= */
-
-    for(
-      const oldGroup
-      of oldFloorMeshes
-    ){
-
-      if(
-        keptGroups.has(
-          oldGroup
-        )
-      ){
-        continue;
-      }
-
-
-      this.scene.remove(
-        oldGroup
-      );
-
-
-      this.disposeFloorGroup(
-        oldGroup
-      );
-    }
-
-
-    /* =========================
-      Runtime Map 갱신
-    ========================= */
-
-    this.floorMeshes =
-      nextFloorMeshes;
-
-    this.meshByFloorId =
-      nextById;
-
-
-    this.floorIdByMesh.clear();
-
-
-    for(
-      const group
-      of this.floorMeshes
-    ){
-
-      this.floorIdByMesh.set(
-        group.uuid,
-        group.userData.floorId
-      );
-    }
-
-
-    /*
-      다음 render 때
-      visibility를 다시 계산하도록 한다.
-    */
-    this.rebuildFloorSpatialIndex();
-    this.invalidateFloorVisibility();
-  }
-
-  applyFloorRenderOrder(
-    group,
-    floorIndex
-  ){
-
-    /*
-      낮은 index가 더 앞.
-
-      floorCount를 이용하므로
-      모든 타일 order가 0보다 커서
-      GridHelper보다 앞에 유지된다.
-    */
-    const baseOrder =
-      (
-        this.renderFloorCount -
-        floorIndex
-      ) * 4;
-
-
-    group.userData.floorIndex =
-      floorIndex;
-
-
-    group.traverse(
-      obj => {
-
-        if(!obj.isMesh){
-          return;
-        }
-
-
-        const role =
-          obj.userData?.role;
-
-
-        /*
-          한 타일 내부 순서
-
-          outer
-            ↓
-          inner
-            ↓
-          event icon
-        */
-        if(role === "outer"){
-
-          obj.renderOrder =
-            baseOrder;
-        }
-
-        else if(role === "inner"){
-
-          obj.renderOrder =
-            baseOrder + 1;
-        }
-
-        else if(
-          role ===
-          "event-marker"
-        ){
-
-          obj.renderOrder =
-            baseOrder + 2;
-        }
-      }
-    );
-  }
-
-
-  
-
-  getFloorVisualSignature(
-    floor,
-    marker
-  ){
-
-    return [
-      floor.startAngle,
-      floor.endAngle,
-
-      floor.option?.isFullspin
-        ? 1
-        : 0,
-
-      floor.option?.isMidspin
-        ? 1
-        : 0,
-
-      marker?.type ??
-        "",
-
-      marker?.direction ??
-        "",
-
-      marker?.iconSrc ??
-        "",
-
-      marker?.mirrorX
-        ? 1
-        : 0,
-
-      Number.isFinite(
-        Number(
-          marker?.rotationDeg
-        )
-      )
-        ? Number(
-            marker.rotationDeg
-          )
-        : 0,
-
-      Number.isFinite(
-        Number(
-          marker?.effectiveAngle
-        )
-      )
-        ? Number(
-            marker.effectiveAngle
-          )
-        : ""
-    ].join("|");
-  }
-
-  disposeFloorGroup(
-    group
-  ) {
-    
-    if (!group) {
-      return;
-    }
-    
-    
-    /*
-      Geometry / Material은
-      RuntimeScene이 공유하고 있으므로
-      여기서 dispose하면 안 된다.
-    */
-    
-    group.clear();
-    
-    
-    group.userData.innerMesh =
-      null;
-    
-    
-    group.userData.eventMarkerMesh =
-      null;
-  }
-  
-  setPlaybackVisualMode(
-    playing
-  ){
-  
-    this.playbackVisualMode =
-      !!playing;
-  
-  
-    for(
-      const group
-      of this.floorMeshes
-    ){
-  
-      const marker =
-        group.userData
-          ?.eventMarkerMesh;
-  
-  
-      if(!marker){
-        continue;
-      }
-  
-  
-      /*
-        재생 중에는 generic marker와
-        거의 변화 없는 equal 속도 마커를 숨긴다.
-      */
-      const markerType =
-        marker.userData
-          .markerType;
-
-
-      marker.visible =
-        !(
-          playing
-          &&
-          (
-            markerType === "other"
-            ||
-            markerType === "speed-equal"
-          )
-        );
-    }
-  }
-}
-
-class ModifierKeyController {
-  constructor(){
-    this.ctrl = false;
-    this.shift = false;
-
-    this.ctrlButton = null;
-    this.shiftButton = null;
-    
-    this.enabled = true;
-  }
-
-  init(){
-    this.ctrlButton = document.getElementById("ctrl-button");
-    this.shiftButton = document.getElementById("shift-button");
-
-    if(!this.ctrlButton){
-      throw new Error("ctrl-button not found");
-    }
-
-    if(!this.shiftButton){
-      throw new Error("shift-button not found");
-    }
-
-    // 모바일/화면 버튼
-    this.ctrlButton.addEventListener(
-      "click",
-      () => {
-    
-        if(!this.enabled) return;
-    
-        this.setCtrl(!this.ctrl);
-      }
-    );
-    
-    this.shiftButton.addEventListener(
-      "click",
-      () => {
-    
-        if(!this.enabled) return;
-    
-        this.setShift(!this.shift);
-      }
-    );
-
-    // 실제 키보드
-    window.addEventListener(
-      "keydown",
-      e => {
-    
-        if(!this.enabled) return;
-    
-        if(e.key === "Control"){
-          this.setCtrl(true);
-        }
-    
-        if(e.key === "Shift"){
-          this.setShift(true);
-        }
-      }
-    );
-
-    window.addEventListener("keyup", (e) => {
-      if(e.key === "Control"){
-        this.setCtrl(false);
-      }
-
-      if(e.key === "Shift"){
-        this.setShift(false);
-      }
-    });
-
-    // 앱이 백그라운드로 가거나 focus를 잃으면
-    // 키가 계속 눌린 상태로 남는 것 방지
-    window.addEventListener("blur", () => {
-      this.setCtrl(false);
-      this.setShift(false);
-    });
-
-    this.updateVisual();
-  }
-  
-  setEnabled(value){
-
-    this.enabled = value;
-  
-    this.ctrlButton.disabled =
-      !value;
-  
-    this.shiftButton.disabled =
-      !value;
-  
-  
-    if(!value){
-  
-      this.ctrl = false;
-      this.shift = false;
-  
-      this.updateVisual();
-    }
-  }
-
-  setCtrl(value){
-  this.ctrl = value;
-
-    // Ctrl을 켜면 Shift는 끈다.
-    if(value){
-      this.shift = false;
-    }
-  
-    this.updateVisual();
-  }
-  
-  setShift(value){
-    this.shift = value;
-  
-    // Shift를 켜면 Ctrl은 끈다.
-    if(value){
-      this.ctrl = false;
-    }
-  
-    this.updateVisual();
-  }
-
-  updateVisual(){
-    this.ctrlButton?.classList.toggle(
-      "active",
-      this.ctrl
-    );
-
-    this.shiftButton?.classList.toggle(
-      "active",
-      this.shift
-    );
-  }
-
-  isCtrl(){
-    return this.ctrl;
-  }
-
-  isShift(){
-    return this.shift;
-  }
-}
-
-class PlayButtonController {
-  constructor(){
-    this.button = null;
-    this.isPlaying = false;
-    this.onToggle = null;
-  }
-
-  init(onToggle){
-    this.button =
-      document.getElementById("play-button");
-
-    if(!this.button){
-      throw new Error("play-button not found");
-    }
-
-    this.onToggle = onToggle;
-
-    this.button.addEventListener(
-      "click",
-      () => {
-        this.onToggle?.();
-      }
-    );
-
-    this.setPlaying(false);
-  }
-
-  setPlaying(value){
-    this.isPlaying = value;
-
-    if(!this.button) return;
-
-    if(value){
-      this.button.textContent = "■";
-      this.button.setAttribute(
-        "aria-label",
-        "Stop"
-      );
-    }
-    else{
-      this.button.textContent = "▶";
-      this.button.setAttribute(
-        "aria-label",
-        "Play"
-      );
-    }
-  }
-}
 
 class TileEditorUI {
   constructor(){
@@ -9342,174 +5947,6 @@ class Clock{
   }
 }
 
-//에디터의 상태 정보를 담은 클래스
-class EditorState{
-  constructor(){
-
-    // 현재 선택된 모든 타일
-    this.selectedFloorIds = new Set();
-
-    // 선택된 것 중 현재 대표 타일
-    this.activeFloorId = null;
-
-    // Shift 범위 선택의 시작점
-    this.selectionAnchorId = null;
-
-    this.mode = "edit";
-  }
-}
-
-//Three.js 렌더 관리
-class RenderEngine{
-  constructor(runtime, cameraSystem,clock){
-    this.runtime = runtime; //런타임 클래스 저장
-    this.cameraSystem = cameraSystem;
-    this.clock = clock
-    this._raf = null;
-    
-    //state.mode에 따라 바뀌는 프레임 로드
-    this.onFrame = (now_ms) =>{ return; }
-
-    /*
-      UI diagnostics hook.
-      EditorApp can update its info text here without wrapping every
-      play/edit onFrame assignment separately.
-    */
-    this.afterFrame = (now_ms) =>{ return; };
-
-    this.frameCount = 0;
-    this.fps = 0;
-    this._fpsWindowStart = null;
-    this._fpsWindowFrames = 0;
-    
-    this._lastTime = null;
-  }
-
-  start(){
-  const loop = (now) => {
-
-    if(this._lastTime == null){
-      this._lastTime = now;
-    }
-
-    const dtMs = now - this._lastTime;
-    this._lastTime = now;
-
-    this.frameCount++;
-    this._fpsWindowFrames++;
-
-    if(this._fpsWindowStart === null){
-      this._fpsWindowStart = now;
-    }
-
-    const fpsElapsed =
-      now - this._fpsWindowStart;
-
-    if(fpsElapsed >= 500){
-      this.fps =
-        this._fpsWindowFrames *
-        1000 /
-        fpsElapsed;
-
-      this._fpsWindowFrames = 0;
-      this._fpsWindowStart = now;
-    }
-
-    this.onFrame(now);
-    this.afterFrame(now);
-
-    this.runtime.render(
-      this.cameraSystem.camera
-    );
-
-    this._raf = requestAnimationFrame(loop);
-  };
-
-  this._raf = requestAnimationFrame(loop);
-}
-
-  stop(){ //렌더링 종료
-    if (this._raf) cancelAnimationFrame(this._raf);
-    this._raf = null;
-    this._lastTime = null;
-  }
-}
-
-//컴파일돤 프로젝트를 클래스 형태로 저장
-class CompiledProject{
-  constructor(){
-    this.floors = null;
-    
-    this.bpms = [];
-
-    /*
-      Effective orbit/timing angle for each floor after Twirl/MID
-      resolution. 180° = 1 beat.
-    */
-    this.relativeAngles = [];
-
-    this.beats = [];
-    this.floorStarts_us = [];
-    this.floorDurations_us = [];
-    
-    
-    /*
-      Pause countdown으로 인해
-      추가로 발생하는 hitsound 시간
-    */
-    this.countdownHitTimes_us = [];
-    
-    
-    /*
-      일반 타일 hit +
-      countdown hit을 합친 최종 배열
-    */
-    
-    
-    this.playerCameraPositions = [];
-
-    /*
-      index별 이벤트 표시 정보
-
-      null
-      또는
-
-      {
-        type: "...",
-        color: 0xffffff
-      }
-    */
-    this.eventMarkers = [];
-    
-    /*
-    실제 타일을 밟을 때
-    발생하는 hitsound 목록
-  
-    [
-      {
-        time_us,
-        hitsound,
-        volume,
-        pitch,
-        kind
-      }
-    ]
-  */
-  this.hitSoundEvents =
-    [];
-  
-  
-  /*
-    PlaySound는 정확한 offset 해석을
-    이후에 확정하기 전까지
-  
-    원본 정보를 컴파일 결과에
-    보존만 해둔다.
-  */
-  this.playSoundActions =
-    [];
-  }
-}
 
 //직접적으로 에디터에 사용가능하고 수정 삭제따위에 용이한 문서 클래스
 class Document {
@@ -10965,6 +7402,7 @@ class EditorApp{
     this.clipboardInitialized = false;
 
     this.editorUI = new TileEditorUI();
+    this.settingsController = new EditorSettingsController(this);
     
     this.resizeObserver = null;
     
@@ -11021,6 +7459,9 @@ class EditorApp{
     ========================= */
 
     this.projectSettingsInitialized =
+      false;
+
+    this.levelLoadHelpInitialized =
       false;
 
     this.editorSettingsInitialized =
@@ -12176,9 +8617,11 @@ class EditorApp{
     
     });
 
-    this.initProjectSettingsUI();
+    this.settingsController.initProjectSettingsUI();
 
-    this.initEditorSettingsUI();
+    this.settingsController.initLevelLoadHelp();
+
+    this.settingsController.initEditorSettingsUI();
 
     this.initWelcomeNotice();
 
@@ -12373,22 +8816,102 @@ class EditorApp{
         "editor-welcome-continue"
       );
 
-    if(!overlay || !closeButton){
+    const neverInput =
+      document.getElementById(
+        "editor-welcome-never"
+      );
+
+    if(!overlay || !closeButton || !neverInput){
       return;
     }
 
-    /*
-      The legal / sharing notice is intentionally shown on every
-      page load. It is session UI, not a remembered preference.
-    */
-    overlay.hidden = false;
+    const preferenceKey =
+      "adofai-editor-hide-welcome-v1";
 
-    closeButton.addEventListener(
-      "click",
-      () => {
-        overlay.hidden = true;
+    const syncCheckboxState = () => {
+      const hidden =
+        this.readEditorPreference(
+          preferenceKey,
+          "0"
+        ) === "1";
+
+      neverInput.checked = hidden;
+    };
+
+    const savePreference = () => {
+      this.writeEditorPreference(
+        preferenceKey,
+        neverInput.checked ? "1" : "0"
+      );
+    };
+
+    const closeWelcomeNotice = () => {
+      savePreference();
+      overlay.hidden = true;
+    };
+
+    overlay.addEventListener(
+      "pointerdown",
+      e => {
+        if(e.target === overlay){
+          closeWelcomeNotice();
+        }
       }
     );
+
+    closeButton.onclick = () => {
+      closeWelcomeNotice();
+    };
+
+    syncCheckboxState();
+
+    if(this.readEditorPreference(preferenceKey, "0") === "1"){
+      overlay.hidden = true;
+      return;
+    }
+
+    overlay.hidden = false;
+  }
+
+  openWelcomeNotice(){
+    const overlay =
+      document.getElementById(
+        "editor-welcome-overlay"
+      );
+
+    const continueButton =
+      document.getElementById(
+        "editor-welcome-continue"
+      );
+
+    const neverInput =
+      document.getElementById(
+        "editor-welcome-never"
+      );
+
+    if(!overlay || !continueButton || !neverInput){
+      return false;
+    }
+
+    const preferenceKey =
+      "adofai-editor-hide-welcome-v1";
+
+    neverInput.checked =
+      this.readEditorPreference(
+        preferenceKey,
+        "0"
+      ) === "1";
+
+    continueButton.onclick = () => {
+      this.writeEditorPreference(
+        preferenceKey,
+        neverInput.checked ? "1" : "0"
+      );
+      overlay.hidden = true;
+    };
+
+    overlay.hidden = false;
+    return true;
   }
 
 
@@ -12442,6 +8965,11 @@ class EditorApp{
         "editor-setting-offset"
       );
 
+    const openWelcomeButton =
+      document.getElementById(
+        "editor-open-welcome-button"
+      );
+
     const openLogsButton =
       document.getElementById(
         "editor-open-logs-button"
@@ -12490,6 +9018,7 @@ class EditorApp{
       !gridInput ||
       !infoInput ||
       !offsetInput ||
+      !openWelcomeButton ||
       !openLogsButton ||
       !clearCacheButton ||
       !logOverlay ||
@@ -12684,6 +9213,13 @@ class EditorApp{
           commitEditorOffset();
           offsetInput.blur();
         }
+      }
+    );
+
+    openWelcomeButton.addEventListener(
+      "click",
+      () => {
+        this.openWelcomeNotice();
       }
     );
 
@@ -12895,7 +9431,7 @@ class EditorApp{
     loadLevelButton?.addEventListener(
       "click",
       () => {
-        levelInput.click();
+        this.openLevelLoadHelp();
       }
     );
 
@@ -12928,17 +9464,26 @@ class EditorApp{
       "change",
       async () => {
 
-        const file =
-          levelInput.files?.[0];
+        const files =
+          Array.from(
+            levelInput.files ?? []
+          );
 
         levelInput.value = "";
 
-        if(!file){
+        if(!files.length){
           return;
         }
 
+        const file =
+          files.find(
+            item =>
+              /\.adofai$/i.test(item.name)
+          ) ?? files[0];
+
         await this.loadProjectFromFile(
-          file
+          file,
+          files
         );
       }
     );
@@ -13229,6 +9774,113 @@ class EditorApp{
 
     select.value =
       currentValue;
+  }
+
+
+  initLevelLoadHelp(){
+
+    if(this.levelLoadHelpInitialized){
+      return;
+    }
+
+
+    const overlay =
+      document.getElementById(
+        "level-load-help-overlay"
+      );
+
+    const cancelButton =
+      document.getElementById(
+        "level-load-help-cancel"
+      );
+
+    const okButton =
+      document.getElementById(
+        "level-load-help-ok"
+      );
+
+    const neverInput =
+      document.getElementById(
+        "level-load-help-never"
+      );
+
+    const levelInput =
+      document.getElementById(
+        "level-file-input"
+      );
+
+    if(
+      !overlay ||
+      !cancelButton ||
+      !okButton ||
+      !neverInput ||
+      !levelInput
+    ){
+      return;
+    }
+
+
+    overlay.hidden = true;
+
+    cancelButton.addEventListener(
+      "click",
+      () => {
+        overlay.hidden = true;
+      }
+    );
+
+    okButton.addEventListener(
+      "click",
+      () => {
+
+        if(neverInput.checked){
+          this.writeEditorPreference(
+            "adofai-editor-hide-load-help-v1",
+            "1"
+          );
+        }
+
+        overlay.hidden = true;
+        levelInput.click();
+      }
+    );
+
+    this.levelLoadHelpInitialized = true;
+  }
+
+
+  openLevelLoadHelp(){
+
+    const hidden =
+      this.readEditorPreference(
+        "adofai-editor-hide-load-help-v1",
+        "0"
+      ) === "1";
+
+    const levelInput =
+      document.getElementById(
+        "level-file-input"
+      );
+
+    if(hidden){
+      levelInput?.click();
+      return;
+    }
+
+
+    this.initLevelLoadHelp();
+
+    const overlay =
+      document.getElementById(
+        "level-load-help-overlay"
+      );
+
+    if(!overlay){
+      levelInput?.click();
+      return;
+    }
+
+    overlay.hidden = false;
   }
 
 
@@ -13591,8 +10243,111 @@ class EditorApp{
   }
 
 
+  findLocalSongFile(
+    files,
+    songFilename
+  ){
+
+    const expectedName =
+      String(
+        songFilename ?? ""
+      ).trim();
+
+    if(
+      !expectedName ||
+      !Array.isArray(files)
+    ){
+      return null;
+    }
+
+
+    const normalizedExpected =
+      expectedName.replace(/\\/g, "/");
+
+    const expectedBaseName =
+      normalizedExpected
+        .split("/")
+        .pop();
+
+    return files.find(
+      file =>
+        file.name === expectedBaseName
+    ) ?? null;
+  }
+
+
+  async loadSongFromLocalFiles(
+    files
+  ){
+
+    const expectedSong =
+      String(
+        this.doc?.settings
+          ?.songFilename ??
+        ""
+      ).trim();
+
+    if(!expectedSong){
+      await this.song.init(
+        this.hitSound.ctx,
+        null
+      );
+
+      this.songLoadState = {
+        loaded: false,
+        message:
+          "No song is assigned to this level. Please choose a song file."
+      };
+
+      return false;
+    }
+
+
+    const songFile =
+      this.findLocalSongFile(
+        files,
+        expectedSong
+      );
+
+    if(!songFile){
+      await this.song.init(
+        this.hitSound.ctx,
+        null
+      );
+
+      this.songLoadState = {
+        loaded: false,
+        message:
+          `음원 파일을 찾을 수 없습니다. (${expectedSong})`
+      };
+
+      this.showToast(
+        "음원 파일을 찾을 수 없습니다.",
+        "error",
+        5000
+      );
+
+      return false;
+    }
+
+
+    return await this.selectSongFile(
+      songFile,
+      {
+        updateSongFilename: false,
+        statusMessage:
+          `Song loaded automatically: ${songFile.name}`
+      }
+    );
+  }
+
+
   async selectSongFile(
-    file
+    file,
+    {
+      updateSongFilename = true,
+      statusMessage = null
+    } = {}
   ){
 
     if(!file || !this.hitSound.ctx){
@@ -13629,10 +10384,12 @@ class EditorApp{
         );
       }
 
-      this.doc.settings.songFilename =
-        file.name;
+      if(updateSongFilename){
+        this.doc.settings.songFilename =
+          file.name;
 
-      this.syncSettingsToProject();
+        this.syncSettingsToProject();
+      }
 
       /*
         File objects cannot be reopened from their original local
@@ -13663,6 +10420,7 @@ class EditorApp{
         ? {
             loaded: true,
             message:
+              statusMessage ??
               `Song selected: ${file.name}`
           }
         : {
@@ -13788,7 +10546,8 @@ class EditorApp{
 
 
   async loadProjectFromFile(
-    file
+    file,
+    files = [file]
   ){
 
     if(!file){
@@ -13826,39 +10585,16 @@ class EditorApp{
       );
 
 
-      /*
-        중요:
-        <input type=file>로 받은 File 객체에는
-        같은 폴더의 다른 파일에 접근할 권한이 없다.
-
-        songFilename이 있어도 자동 탐색할 수 없으므로
-        곡 선택을 요청한다.
-      */
-      await this.song.init(
-        this.hitSound.ctx,
-        null
-      );
-
-
-      const expectedSong =
-        String(
-          this.doc.settings
-            ?.songFilename ??
-          ""
-        ).trim();
-
-
-      this.songLoadState = {
-        loaded: false,
-        message:
-          expectedSong
-            ? `This level uses ${expectedSong}. Browser security prevents automatic access to files in the same local folder, so please choose the song manually.`
-            : "No song is assigned to this level. Please choose a song file."
-      };
-
+      const songLoaded =
+        await this.loadSongFromLocalFiles(
+          files
+        );
 
       this.refreshProjectSettingsUI();
-      this.openProjectSettings();
+
+      if(!songLoaded){
+        this.openProjectSettings();
+      }
 
       this.logger.info(
         "Local level loaded",

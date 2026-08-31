@@ -1,3 +1,12 @@
+/* Import Godo Maum Font */
+@font-face {
+  font-family: "GodoMaum";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/godoMaum.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* =========================================================
    Theme / Reset
 ========================================================= */
@@ -2350,14 +2359,37 @@ img.editor-tab-icon {
   color:
     #eee;
 
+  font-family:
+    "GodoMaum",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif;
+
   font-size:
-    12px;
+    40px;
 
   font-weight:
-    650;
+    400;
 
   text-align:
     center;
+}
+
+@media (max-width: 768px) {
+  #level-title {
+    font-size: 20px !important;
+  }
+}
+
+#level-title,
+#level-title * {
+  font-family:
+    "GodoMaum",
+    "Malgun Gothic",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif;
 }
 
 
@@ -2637,6 +2669,73 @@ img.editor-tab-icon {
   color: #6f6f6f;
   font-size: 9px;
   line-height: 1.5;
+}
+
+#level-load-help-overlay .project-settings-scroll {
+  padding: 14px 16px 18px;
+}
+
+#level-load-help-overlay .settings-local-note {
+  margin: 10px 2px 0;
+
+  color: #d5d5d5;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+#level-load-help-overlay .editor-setting-toggle {
+  margin-top: 18px;
+  margin-bottom: 26px;
+  padding: 12px 12px;
+
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+
+  background: rgba(255, 255, 255, 0.02);
+  color: #ededed;
+
+  font-size: 15px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+#level-load-help-overlay .level-load-help-action-row {
+  margin-top: 4px;
+}
+
+#level-load-help-overlay .editor-setting-toggle input {
+  flex: 0 0 auto;
+
+  width: 18px;
+  height: 18px;
+
+  margin: 0;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: 2px solid #5d5d5d;
+  border-radius: 6px;
+
+  background:
+    #101010
+    center / 12px 12px
+    no-repeat;
+
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+#level-load-help-overlay .editor-setting-toggle input:checked {
+  border-color: #7ecb8d;
+  background-color: #7ecb8d;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.4L4.7 9.1L10 3.8' fill='none' stroke='%23101010' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 @media (max-width: 520px) {
@@ -5098,14 +5197,18 @@ img.editor-tab-icon {
 
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
 
-  gap: 16px;
+  gap: 12px;
 
   color: #ddd;
 
   font-size: 16px;
   font-weight: 650;
+}
+
+.editor-setting-toggle span {
+  flex: 1 1 auto;
 }
 
 .editor-setting-toggle input {
@@ -5605,6 +5708,54 @@ img.editor-tab-icon {
 
 .editor-welcome-scroll .editor-welcome-note {
   color: #c2c2c2;
+}
+
+.editor-welcome-toggle {
+  margin: 12px 0 6px;
+  padding: 12px 12px;
+
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+
+  background: rgba(255, 255, 255, 0.02);
+  color: #ededed;
+
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.editor-welcome-toggle input {
+  flex: 0 0 auto;
+
+  width: 18px;
+  height: 18px;
+
+  margin: 0;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: 2px solid #5d5d5d;
+  border-radius: 6px;
+
+  background:
+    #101010
+    center / 12px 12px
+    no-repeat;
+
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.editor-welcome-toggle input:checked {
+  border-color: #7ecb8d;
+  background-color: #7ecb8d;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.4L4.7 9.1L10 3.8' fill='none' stroke='%23101010' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .editor-welcome-continue {
