@@ -633,19 +633,11 @@
 
           <div class="settings-action-row">
             <button
-              id="load-level-folder-button"
-              class="settings-secondary-button"
-              type="button"
-            >
-              Load Level
-            </button>
-
-            <button
               id="load-level-file-button"
               class="settings-secondary-button"
               type="button"
             >
-              Load File
+              Load Level
             </button>
 
             <button
@@ -822,8 +814,9 @@
         </section>
 
         <p class="settings-local-note">
-          For local levels, use Load Folder to let the editor find
-          songFilename next to the .adofai file automatically.
+          When a local .adofai file is selected directly, browser security
+          prevents automatic access to audio files in the same folder.
+          Please choose the song file manually in that case.
         </p>
       </div>
     </section>
@@ -1106,16 +1099,7 @@
   <input
     id="level-file-input"
     type="file"
-    multiple
-    accept=".adofai,application/json,text/plain,audio/*,.ogg,.mp3,.wav"
-    hidden
-  >
-
-  <input
-    id="level-folder-input"
-    type="file"
-    webkitdirectory
-    multiple
+    accept=".adofai,application/json,text/plain"
     hidden
   >
 
