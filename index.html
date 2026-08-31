@@ -1113,13 +1113,13 @@
 
       <div class="project-settings-scroll">
         <p class="settings-local-note">
-          Because of browser security, selecting only one .adofai file does not let this editor read sibling audio files automatically.
-          If you select the .adofai file and the audio file named by songFilename together in Load Level, the song will load without choosing it separately.
+          Because of browser security, selecting only one .adofai file does not let this editor read sibling audio files automatically.<br>
+          If you select the .adofai file and the audio file together in file selecting window, the song will load without choosing it separately.
         </p>
 
         <p class="settings-local-note">
-          브라우저 보안 정책상 .adofai 파일 하나만 선택하면 같은 폴더의 음원 파일을 자동으로 읽을 수 없습니다.
-          Load Level에서 .adofai 파일과 songFilename에 적힌 음원 파일을 동시에 선택하면 음원 파일을 따로 불러오지 않아도 됩니다.
+          브라우저 보안 정책상 .adofai 파일 하나만 선택하면 같은 폴더의 음원 파일을 자동으로 읽을 수 없습니다.<br>
+          파일 선택 창에서 .adofai 파일과 음원 파일을 동시에 선택하면 음원 파일을 따로 불러오지 않아도 됩니다.
         </p>
 
         <label class="editor-setting-toggle">
@@ -1127,23 +1127,23 @@
             id="level-load-help-never"
             type="checkbox"
           >
-          <span>다시 표시하지 않음 / Do not show again</span>
+          <span>Do not show again / 다시 표시하지 않음</span>
         </label>
 
-        <div class="settings-action-row">
-          <button
-            id="level-load-help-cancel"
-            class="settings-secondary-button"
-            type="button"
-          >
-            취소 / Cancel
-          </button>
+        <div class="settings-action-row level-load-help-action-row">
           <button
             id="level-load-help-ok"
             class="settings-secondary-button"
             type="button"
           >
-            확인 / OK
+            OK / 확인
+          </button>
+          <button
+            id="level-load-help-cancel"
+            class="settings-secondary-button"
+            type="button"
+          >
+            Cancel / 취소
           </button>
         </div>
       </div>
