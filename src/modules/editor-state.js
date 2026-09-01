@@ -1,9 +1,16 @@
 export class Floor {
-  constructor(id, x, y, startAngle, endAngle, option = {
-    isTwirled: false,
-    isFullspin: false,
-    isMidspin: false
-  }) {
+  constructor(
+    id,
+    x,
+    y,
+    startAngle,
+    endAngle,
+    option = {
+      isTwirled: false,
+      isFullspin: false,
+      isMidspin: false,
+    },
+  ) {
     this.id = id;
     this.startAngle = startAngle;
     this.endAngle = endAngle;

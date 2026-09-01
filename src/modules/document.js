@@ -13,7 +13,7 @@ export class Document {
       id: this.newId(),
       floorId,
       eventType,
-      ...data
+      ...data,
     };
 
     this.actions.push(action);
@@ -58,7 +58,7 @@ export class Compiler {
   compile(doc) {
     this.compiled = {
       floors: doc?.actions ?? [],
-      version: 1
+      version: 1,
     };
     return this.compiled;
   }

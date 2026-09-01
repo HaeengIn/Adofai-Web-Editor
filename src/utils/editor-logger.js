@@ -11,7 +11,7 @@ export class EditorLogger {
     this.originalConsole = {
       log: console.log.bind(console),
       warn: console.warn.bind(console),
-      error: console.error.bind(console)
+      error: console.error.bind(console),
     };
 
     this.load();
@@ -52,13 +52,11 @@ export class EditorLogger {
       if (typeof text === "string") {
         return text.length > 3000 ? text.slice(0, 3000) + "…" : text;
       }
-    }
-    catch {}
+    } catch {}
 
     try {
       return String(value);
-    }
-    catch {
+    } catch {
       return "[Unprintable value]";
     }
   }
@@ -76,8 +74,7 @@ export class EditorLogger {
       if (Array.isArray(parsed)) {
         this.entries = parsed.slice(-this.maxEntries);
       }
-    }
-    catch {}
+    } catch {}
   }
 
   persist() {
@@ -87,16 +84,14 @@ export class EditorLogger {
 
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.entries));
-    }
-    catch {}
+    } catch {}
   }
 
   emit() {
     for (const listener of this.listeners) {
       try {
         listener(this.entries);
-      }
-      catch {}
+      } catch {}
     }
   }
 
@@ -105,7 +100,7 @@ export class EditorLogger {
       time: new Date().toISOString(),
       level,
       source,
-      message: args.map((value) => this.formatValue(value)).join(" ")
+      message: args.map((value) => this.formatValue(value)).join(" "),
     };
 
     this.entries.push(entry);
@@ -143,7 +138,7 @@ export class EditorLogger {
     const map = {
       log: "INFO",
       warn: "WARN",
-      error: "ERROR"
+      error: "ERROR",
     };
 
     for (const method of Object.keys(map)) {
@@ -162,8 +157,7 @@ export class EditorLogger {
     if (persist) {
       try {
         localStorage.removeItem(this.storageKey);
-      }
-      catch {}
+      } catch {}
     }
 
     this.emit();
@@ -184,11 +178,12 @@ export class EditorLogger {
       `Exported: ${new Date().toISOString()}`,
       `URL: ${location.href}`,
       `User Agent: ${navigator.userAgent}`,
-      ""
+      "",
     ];
 
-    const body = this.entries.map((entry) =>
-      `[${entry.time}] [${entry.level}] [${entry.source}] ${entry.message}`
+    const body = this.entries.map(
+      (entry) =>
+        `[${entry.time}] [${entry.level}] [${entry.source}] ${entry.message}`,
     );
 
     return [...header, ...body].join("\n");

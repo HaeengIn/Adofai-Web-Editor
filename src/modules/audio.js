@@ -12,7 +12,7 @@ export class Clock {
 
   startAt(timeUs, startTimeSec = null) {
     this.startedAtUs = Number(timeUs) || 0;
-    this.startTimeSec = startTimeSec ?? (this.audioContext?.currentTime ?? 0);
+    this.startTimeSec = startTimeSec ?? this.audioContext?.currentTime ?? 0;
     this.isRunning = true;
   }
 
@@ -116,7 +116,7 @@ export class Evaluator {
     return {
       compiled,
       tUs,
-      knownIndex
+      knownIndex,
     };
   }
 

@@ -6,7 +6,7 @@ export const EVENT_MARKER_ICONS = {
   equal: "./icons/equal.png",
   twirlBlue: "./icons/swirl_blue.png",
   twirlRed: "./icons/swirl_red.png",
-  star: "./icons/tile_vfx.png"
+  star: "./icons/tile_vfx.png",
 };
 
 export const EVENT_TAB_DEFS = {
@@ -21,9 +21,9 @@ export const EVENT_TAB_DEFS = {
       speedType: "Bpm",
       beatsPerMinute: 100,
       bpmMultiplier: 1,
-      angleOffset: 0
+      angleOffset: 0,
     },
-    order: 10
+    order: 10,
   },
 
   Twirl: {
@@ -34,7 +34,7 @@ export const EVENT_TAB_DEFS = {
     allowMultiple: false,
     openTabOnCreate: false,
     defaultData: {},
-    order: 20
+    order: 20,
   },
 
   Pause: {
@@ -47,9 +47,9 @@ export const EVENT_TAB_DEFS = {
     defaultData: {
       duration: 1,
       countdownTicks: 0,
-      angleCorrectionDir: "None"
+      angleCorrectionDir: "None",
     },
-    order: 30
+    order: 30,
   },
 
   SetHitsound: {
@@ -62,10 +62,10 @@ export const EVENT_TAB_DEFS = {
     defaultData: {
       gameSound: "Hitsound",
       hitsound: "Kick",
-      hitsoundVolume: 100
+      hitsoundVolume: 100,
     },
-    order: 40
-  }
+    order: 40,
+  },
 };
 
 export function getEventDefinition(eventType) {
@@ -88,7 +88,7 @@ export function createEventTabGroups(actions) {
           iconSrc: "./icons/tile_vfx.png",
           order: 1000,
           editable: false,
-          actions: []
+          actions: [],
         });
       }
 
@@ -102,7 +102,7 @@ export function createEventTabGroups(actions) {
         title: def.title,
         iconSrc: def.iconSrc,
         order: def.order,
-        actions: []
+        actions: [],
       });
     }
 

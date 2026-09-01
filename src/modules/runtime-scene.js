@@ -37,22 +37,25 @@ export class RuntimeScene {
     this.sharedOuterMaterial = new this.Three.MeshBasicMaterial({
       color: 0xffffff,
       depthTest: false,
-      depthWrite: false
+      depthWrite: false,
     });
 
     this.sharedInnerMaterial = new this.Three.MeshBasicMaterial({
       color: 0x0a0a0a,
       depthTest: false,
-      depthWrite: false
+      depthWrite: false,
     });
 
     this.sharedSelectedInnerMaterial = new this.Three.MeshBasicMaterial({
       color: 0x00ff00,
       depthTest: false,
-      depthWrite: false
+      depthWrite: false,
     });
 
-    this.sharedEventMarkerGeometry = new this.Three.PlaneGeometry(this.eventMarkerSize, this.eventMarkerSize);
+    this.sharedEventMarkerGeometry = new this.Three.PlaneGeometry(
+      this.eventMarkerSize,
+      this.eventMarkerSize,
+    );
     this.eventMarkerMaterialCache = new Map();
     this.playbackVisualMode = false;
     this.visibleFloorMeshes = [];
@@ -63,7 +66,7 @@ export class RuntimeScene {
       y: Infinity,
       zoom: -1,
       viewWidth: -1,
-      viewHeight: -1
+      viewHeight: -1,
     };
     this.floorChunkSize = 8;
     this.floorChunks = new Map();
@@ -83,7 +86,7 @@ export class RuntimeScene {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
-      powerPreference: "high-performance"
+      powerPreference: "high-performance",
     });
 
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -222,13 +225,21 @@ export class RuntimeScene {
   createRotatedRectGeometry(width, height, angleRad) {
     const geometry = new this.Three.PlaneGeometry(width, height);
     geometry.rotateZ(angleRad);
-    geometry.translate(Math.cos(angleRad) * width / 2, Math.sin(angleRad) * width / 2, 0);
+    geometry.translate(
+      (Math.cos(angleRad) * width) / 2,
+      (Math.sin(angleRad) * width) / 2,
+      0,
+    );
     return geometry;
   }
 
   getFloorGeometryPair(floor) {
     const THREE = this.Three;
-    const type = floor.option?.isFullspin ? "fullspin" : floor.option?.isMidspin ? "midspin" : "normal";
+    const type = floor.option?.isFullspin
+      ? "fullspin"
+      : floor.option?.isMidspin
+        ? "midspin"
+        : "normal";
     const key = [type, floor.startAngle, floor.endAngle].join("|");
     const cached = this.floorGeometryCache.get(key);
     if (cached) {
@@ -240,8 +251,10 @@ export class RuntimeScene {
     const halfW = floorWidth / 2;
     const radius = floorHeight / 2;
     const floorBorder = this.defaultBorder / this.defaultWidth;
-    const innerFloorWidth = (this.defaultWidth - this.defaultOutlineOffset) / this.defaultWidth;
-    const innerFloorHeight = (this.defaultHeight - this.defaultOutlineOffset) / this.defaultWidth;
+    const innerFloorWidth =
+      (this.defaultWidth - this.defaultOutlineOffset) / this.defaultWidth;
+    const innerFloorHeight =
+      (this.defaultHeight - this.defaultOutlineOffset) / this.defaultWidth;
     const innerHalfW = innerFloorWidth / 2;
     const innerRadius = innerFloorHeight / 2;
 
@@ -257,9 +270,20 @@ export class RuntimeScene {
       const outerB = this.createRotatedRectGeometry(halfW, floorHeight, a1);
       outerGeometry = this.mergeGeometryParts([outerCircle, outerA, outerB]);
 
-      const innerCircle = new THREE.CircleGeometry(innerRadius, this.circleSegments);
-      const innerA = this.createRotatedRectGeometry(innerHalfW, innerFloorHeight, a0);
-      const innerB = this.createRotatedRectGeometry(innerHalfW, innerFloorHeight, a1);
+      const innerCircle = new THREE.CircleGeometry(
+        innerRadius,
+        this.circleSegments,
+      );
+      const innerA = this.createRotatedRectGeometry(
+        innerHalfW,
+        innerFloorHeight,
+        a0,
+      );
+      const innerB = this.createRotatedRectGeometry(
+        innerHalfW,
+        innerFloorHeight,
+        a1,
+      );
       innerGeometry = this.mergeGeometryParts([innerCircle, innerA, innerB]);
     } else if (type === "fullspin") {
       const createRectShape = (w, h, r) => {
@@ -276,14 +300,21 @@ export class RuntimeScene {
 
       const rotation = degToRad(floor.endAngle + 180);
 
-      const outerRect = new THREE.ShapeGeometry(createRectShape(floorWidth, floorHeight, radius));
+      const outerRect = new THREE.ShapeGeometry(
+        createRectShape(floorWidth, floorHeight, radius),
+      );
       outerRect.rotateZ(rotation);
       const outerCircle = new THREE.CircleGeometry(radius, this.circleSegments);
       outerGeometry = this.mergeGeometryParts([outerRect, outerCircle]);
 
-      const innerRect = new THREE.ShapeGeometry(createRectShape(innerFloorWidth, innerFloorHeight, innerRadius));
+      const innerRect = new THREE.ShapeGeometry(
+        createRectShape(innerFloorWidth, innerFloorHeight, innerRadius),
+      );
       innerRect.rotateZ(rotation);
-      const innerCircle = new THREE.CircleGeometry(innerRadius, this.circleSegments);
+      const innerCircle = new THREE.CircleGeometry(
+        innerRadius,
+        this.circleSegments,
+      );
       innerGeometry = this.mergeGeometryParts([innerRect, innerCircle]);
     } else {
       const createMidspinShape = (w, h, r) => {
@@ -301,10 +332,14 @@ export class RuntimeScene {
 
       const rotation = degToRad(floor.endAngle + 180);
 
-      outerGeometry = new THREE.ShapeGeometry(createMidspinShape(floorWidth, floorHeight, radius));
+      outerGeometry = new THREE.ShapeGeometry(
+        createMidspinShape(floorWidth, floorHeight, radius),
+      );
       outerGeometry.rotateZ(rotation);
 
-      innerGeometry = new THREE.ShapeGeometry(createMidspinShape(innerFloorWidth, innerFloorHeight, innerRadius));
+      innerGeometry = new THREE.ShapeGeometry(
+        createMidspinShape(innerFloorWidth, innerFloorHeight, innerRadius),
+      );
       innerGeometry.rotateZ(rotation);
 
       outerGeometry.computeBoundingSphere();
@@ -328,7 +363,7 @@ export class RuntimeScene {
       transparent: false,
       alphaTest: 0.02,
       depthTest: false,
-      depthWrite: false
+      depthWrite: false,
     });
 
     this.eventMarkerMaterialCache.set(src, material);
@@ -346,7 +381,7 @@ export class RuntimeScene {
       undefined,
       (error) => {
         console.warn("Event marker texture load failed:", src, error);
-      }
+      },
     );
 
     texture.colorSpace = this.Three.SRGBColorSpace;
@@ -453,7 +488,7 @@ export class RuntimeScene {
 
     const mesh = new this.Three.Mesh(
       this.sharedEventMarkerGeometry,
-      this.getEventMarkerMaterial(marker.iconSrc)
+      this.getEventMarkerMaterial(marker.iconSrc),
     );
 
     mesh.renderOrder = renderOrder;
@@ -469,7 +504,10 @@ export class RuntimeScene {
       mesh.scale.x = marker.mirrorX ? -1 : 1;
     }
 
-    mesh.visible = !(this.playbackVisualMode && (marker.type === "other" || marker.type === "speed-equal"));
+    mesh.visible = !(
+      this.playbackVisualMode &&
+      (marker.type === "other" || marker.type === "speed-equal")
+    );
     mesh.raycast = () => {};
 
     return mesh;
@@ -482,7 +520,10 @@ export class RuntimeScene {
     group.position.set(floor.x, floor.y, 0);
     group.userData.floorId = floor.id;
     group.userData.floorIndex = floorIndex;
-    group.userData.visualSignature = this.getFloorVisualSignature(floor, eventMarker);
+    group.userData.visualSignature = this.getFloorVisualSignature(
+      floor,
+      eventMarker,
+    );
 
     const geometryPair = this.getFloorGeometryPair(floor);
 
@@ -519,7 +560,10 @@ export class RuntimeScene {
       return;
     }
 
-    inner.material = colorHex === 0x00ff00 ? this.sharedSelectedInnerMaterial : this.sharedInnerMaterial;
+    inner.material =
+      colorHex === 0x00ff00
+        ? this.sharedSelectedInnerMaterial
+        : this.sharedInnerMaterial;
   }
 
   highlightFloorById(floorId, enabled) {
@@ -619,8 +663,12 @@ export class RuntimeScene {
       marker?.direction ?? "",
       marker?.iconSrc ?? "",
       marker?.mirrorX ? 1 : 0,
-      Number.isFinite(Number(marker?.rotationDeg)) ? Number(marker.rotationDeg) : 0,
-      Number.isFinite(Number(marker?.effectiveAngle)) ? Number(marker.effectiveAngle) : ""
+      Number.isFinite(Number(marker?.rotationDeg))
+        ? Number(marker.rotationDeg)
+        : 0,
+      Number.isFinite(Number(marker?.effectiveAngle))
+        ? Number(marker.effectiveAngle)
+        : "",
     ].join("|");
   }
 
@@ -644,7 +692,10 @@ export class RuntimeScene {
       }
 
       const markerType = marker.userData.markerType;
-      marker.visible = !(playing && (markerType === "other" || markerType === "speed-equal"));
+      marker.visible = !(
+        playing &&
+        (markerType === "other" || markerType === "speed-equal")
+      );
     }
   }
 }

@@ -26,7 +26,7 @@ export class CameraSystem {
       toTgt: new this.THREE.Vector3(),
       startMs: 0,
       durationSec: 1,
-      ease: "outquad"
+      ease: "outquad",
     };
 
     this.viewportWidth = 1;
@@ -38,7 +38,14 @@ export class CameraSystem {
     const halfW = this.baseViewWidth / 2;
     const halfH = this.baseViewHeight / 2;
 
-    this.camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 2000);
+    this.camera = new THREE.OrthographicCamera(
+      -halfW,
+      halfW,
+      halfH,
+      -halfH,
+      0.1,
+      2000,
+    );
     this.camera.position.copy(this.pos);
     this.camera.lookAt(this.tgt);
 

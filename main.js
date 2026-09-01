@@ -6,23 +6,23 @@ import {
   EVENT_MARKER_ICONS,
   EVENT_TAB_DEFS,
   getEventDefinition,
-  createEventTabGroups
+  createEventTabGroups,
 } from "./src/config/event-config.js";
 import {
   degToRad,
   radToDeg,
   normalizeAngle,
-  reverseAngle
+  reverseAngle,
 } from "./src/utils/math.js";
 import {
   Floor,
   EditorState,
   RenderEngine,
-  CompiledProject
+  CompiledProject,
 } from "./src/modules/editor-state.js";
 import {
   ModifierKeyController,
-  PlayButtonController
+  PlayButtonController,
 } from "./src/modules/controls.js";
 import { CameraSystem } from "./src/modules/camera-system.js";
 import { RuntimeScene } from "./src/modules/runtime-scene.js";
@@ -30,14 +30,12 @@ import { EditorSettingsController } from "./src/modules/editor-settings.js";
 
 const EDITOR_LOGGER = new EditorLogger();
 
-
 function createEventMarkerInfo(
   actions,
   bpmBefore,
   twirlState, // false = 시계, true = 반시계
-  twirlVisual = null
-){
-
+  twirlVisual = null,
+) {
   let marker = null;
 
   /*
@@ -51,226 +49,129 @@ function createEventMarkerInfo(
     같은 우선순위에서는
     뒤의 action이 앞의 action을 덮는다.
   */
-  let markerPriority =
-    -Infinity;
+  let markerPriority = -Infinity;
 
-
-  const setMarker = (
-    nextMarker,
-    priority
-  ) => {
-
-    if(
-      priority <
-      markerPriority
-    ){
+  const setMarker = (nextMarker, priority) => {
+    if (priority < markerPriority) {
       return;
     }
 
-    marker =
-      nextMarker;
+    marker = nextMarker;
 
-    markerPriority =
-      priority;
+    markerPriority = priority;
   };
 
+  let tempBpm = Number(bpmBefore);
 
-  let tempBpm =
-    Number(bpmBefore);
-
-
-  if(
-    !Number.isFinite(tempBpm)
-  ){
+  if (!Number.isFinite(tempBpm)) {
     tempBpm = 100;
   }
 
-
-  for(
-    const action
-    of actions
-  ){
-
-    if(!action){
+  for (const action of actions) {
+    if (!action) {
       continue;
     }
-
 
     /* =========================
        SetSpeed
     ========================= */
 
-    if(
-      action.eventType ===
-      "SetSpeed"
-    ){
+    if (action.eventType === "SetSpeed") {
+      const oldBpm = tempBpm;
 
-      const oldBpm =
-        tempBpm;
+      let nextBpm = oldBpm;
 
-      let nextBpm =
-        oldBpm;
+      const speedType = String(action.speedType ?? "Bpm").toLowerCase();
 
+      if (speedType === "bpm") {
+        const value = Number(action.beatsPerMinute);
 
-      const speedType =
-        String(
-          action.speedType ??
-          "Bpm"
-        ).toLowerCase();
+        if (Number.isFinite(value)) {
+          nextBpm = value;
+        }
+      } else if (speedType === "multiplier") {
+        const multiplier = Number(action.bpmMultiplier);
 
-
-      if(
-        speedType === "bpm"
-      ){
-
-        const value =
-          Number(
-            action.beatsPerMinute
-          );
-
-
-        if(
-          Number.isFinite(value)
-        ){
-          nextBpm =
-            value;
+        if (Number.isFinite(multiplier)) {
+          nextBpm = oldBpm * multiplier;
         }
       }
 
-      else if(
-        speedType ===
-        "multiplier"
-      ){
-
-        const multiplier =
-          Number(
-            action.bpmMultiplier
-          );
-
-
-        if(
-          Number.isFinite(
-            multiplier
-          )
-        ){
-
-          nextBpm =
-            oldBpm *
-            multiplier;
-        }
-      }
-
-
-      const ratio =
-        oldBpm !== 0
-          ? nextBpm / oldBpm
-          : 1;
-
+      const ratio = oldBpm !== 0 ? nextBpm / oldBpm : 1;
 
       /*
         0.95x ~ 1.05x는 시각적으로 거의 동일한 속도 변화다.
         편집 중에는 equal.png, Twirl보다 낮은 우선순위,
         재생 중에는 숨김으로 처리한다.
       */
-      if(
-        Number.isFinite(ratio)
-        &&
-        ratio >= 0.95
-        &&
-        ratio <= 1.05
-      ){
-
+      if (Number.isFinite(ratio) && ratio >= 0.95 && ratio <= 1.05) {
         setMarker(
           {
-            type:
-              "speed-equal",
+            type: "speed-equal",
 
             ratio,
 
-            iconSrc:
-              EVENT_MARKER_ICONS.equal
+            iconSrc: EVENT_MARKER_ICONS.equal,
           },
 
-          10
+          10,
         );
-      }
-
+      } else if (ratio > 1.05) {
 
       /* 의미 있게 빨라짐 */
-      else if(ratio > 1.05){
-
         setMarker(
           {
-            type:
-              "speed-up",
+            type: "speed-up",
 
             ratio,
 
             iconSrc:
               ratio <= 2.05
                 ? EVENT_MARKER_ICONS.rabbit
-                : EVENT_MARKER_ICONS.rabbitFast
+                : EVENT_MARKER_ICONS.rabbitFast,
           },
 
-          30
+          30,
         );
-      }
-
+      } else if (ratio < 0.95) {
 
       /* 의미 있게 느려짐 */
-      else if(ratio < 0.95){
-
         setMarker(
           {
-            type:
-              "speed-down",
+            type: "speed-down",
 
             ratio,
 
             iconSrc:
               ratio <= 0.45
                 ? EVENT_MARKER_ICONS.snailSlow
-                : EVENT_MARKER_ICONS.snail
+                : EVENT_MARKER_ICONS.snail,
           },
 
-          30
+          30,
         );
-      }
-
-
-      else{
-
+      } else {
         setMarker(
           {
-            type:
-              "other",
+            type: "other",
 
-            iconSrc:
-              EVENT_MARKER_ICONS.star
+            iconSrc: EVENT_MARKER_ICONS.star,
           },
 
-          0
+          0,
         );
       }
 
-
-      tempBpm =
-        nextBpm;
-
+      tempBpm = nextBpm;
 
       continue;
     }
-
 
     /* =========================
        Twirl
     ========================= */
 
-    if(
-      action.eventType ===
-      "Twirl"
-    ){
-
+    if (action.eventType === "Twirl") {
       /*
         Twirl의 색상은 공전 방향과 무관하다.
 
@@ -280,25 +181,11 @@ function createEventMarkerInfo(
         180° 이상 = blue
         180° 미만 = red
       */
-      const effectiveAngle =
-        Number(
-          twirlVisual?.effectiveAngle
-        );
+      const effectiveAngle = Number(twirlVisual?.effectiveAngle);
 
+      const isBlue = Number.isFinite(effectiveAngle) && effectiveAngle >= 180;
 
-      const isBlue =
-        Number.isFinite(
-          effectiveAngle
-        )
-        &&
-        effectiveAngle >= 180;
-
-
-      const nextAbsoluteAngle =
-        Number(
-          twirlVisual?.nextAbsoluteAngle
-        );
-
+      const nextAbsoluteAngle = Number(twirlVisual?.nextAbsoluteAngle);
 
       /*
         Twirl 이미지 회전 규칙.
@@ -323,88 +210,47 @@ function createEventMarkerInfo(
             nextAbsoluteAngle = 135°
             -> red rotation = +67.5°
       */
-      let rotationDeg =
-        0;
+      let rotationDeg = 0;
 
+      if (!isBlue && Number.isFinite(nextAbsoluteAngle)) {
+        rotationDeg = normalizeAngle(nextAbsoluteAngle / 2);
+      } else {
+        const baseRotationDeg = Number.isFinite(nextAbsoluteAngle)
+          ? normalizeAngle(nextAbsoluteAngle - 90)
+          : 0;
 
-      if(
-        !isBlue
-        &&
-        Number.isFinite(
-          nextAbsoluteAngle
-        )
-      ){
-
-        rotationDeg =
-          normalizeAngle(
-            nextAbsoluteAngle /
-            2
-          );
+        rotationDeg = normalizeAngle(baseRotationDeg + (twirlState ? 180 : 0));
       }
-      else{
-
-        const baseRotationDeg =
-          Number.isFinite(
-            nextAbsoluteAngle
-          )
-            ? normalizeAngle(
-                nextAbsoluteAngle -
-                90
-              )
-            : 0;
-
-
-        rotationDeg =
-          normalizeAngle(
-            baseRotationDeg +
-            (
-              twirlState
-                ? 180
-                : 0
-            )
-          );
-      }
-
 
       setMarker(
         {
-          type:
-            "twirl",
+          type: "twirl",
 
-          direction:
-            twirlState
-              ? "counterclockwise"
-              : "clockwise",
+          direction: twirlState ? "counterclockwise" : "clockwise",
 
-          iconSrc:
-            isBlue
-              ? EVENT_MARKER_ICONS.twirlBlue
-              : EVENT_MARKER_ICONS.twirlRed,
+          iconSrc: isBlue
+            ? EVENT_MARKER_ICONS.twirlBlue
+            : EVENT_MARKER_ICONS.twirlRed,
 
           /*
             두 원본 이미지 모두 시계방향용.
             Twirl을 밟은 뒤 공전이 반시계면
             X축 거울반전한다.
           */
-          mirrorX:
-            Boolean(
-              twirlState
-            ),
+          mirrorX: Boolean(twirlState),
 
           rotationDeg,
 
           effectiveAngle,
 
-          nextAbsoluteAngle
+          nextAbsoluteAngle,
         },
 
-        20
+        20,
       );
-
 
       continue;
     }
-
 
     /* =========================
        Pause + 기타 모든 이벤트
@@ -412,17 +258,14 @@ function createEventMarkerInfo(
 
     setMarker(
       {
-        type:
-          "other",
+        type: "other",
 
-        iconSrc:
-          EVENT_MARKER_ICONS.star
+        iconSrc: EVENT_MARKER_ICONS.star,
       },
 
-      0
+      0,
     );
   }
-
 
   return marker;
 }
@@ -435,10 +278,8 @@ function createEventMarkerInfo(
   actions 배열에서 뒤의 이벤트가 앞의 이벤트를 덮는다.
 */
 
-
 class TileEditorUI {
-  constructor(){
-
+  constructor() {
     this.root = null;
 
     this.quickButtons = [];
@@ -462,7 +303,7 @@ class TileEditorUI {
 
     this.multiSelectionCount = null;
     this.deleteSelectedButton = null;
-    
+
     this.deleteFloorButton = null;
 
     this.isAdvanced = false;
@@ -472,35 +313,33 @@ class TileEditorUI {
     this.dialAngle = 0;
 
     this.data = null;
-    
+
     this.tabsElement = null;
 
-    this.activeTabKey =
-      "tile";
-    
+    this.activeTabKey = "tile";
+
     this.eventTabGroups = [];
 
     this.callback = {
-
       onAddAngle: null,
       onAddFullspin: null,
       onAddMidspin: null,
-    
+
       onDeleteFloor: null,
       onDeleteSelected: null,
-    
+
       onUpdateEvent: null,
       onAddEvent: null,
       onDeleteEvent: null,
       onCopyEvent: null,
       onPasteEvent: null,
     };
-    
+
     this.snapEnabled = true;
     this.snapStep = 15;
-    
+
     this.snapToggleButton = null;
-    
+
     this.eventPanel = null;
 
     this.eventScreenIcon = null;
@@ -508,2087 +347,1067 @@ class TileEditorUI {
     this.eventScreenSubtitle = null;
     this.eventScreenBody = null;
 
-    this.eventPaletteElement =
-      null;
+    this.eventPaletteElement = null;
 
-    this.eventPaletteItems =
-      [];
+    this.eventPaletteItems = [];
 
-    this.hitsoundOptions =
-      [
-        {
-          value: "None",
-          label: "None"
-        },
-        {
-          value: "Kick",
-          label: "Kick"
-        }
-      ];
+    this.hitsoundOptions = [
+      {
+        value: "None",
+        label: "None",
+      },
+      {
+        value: "Kick",
+        label: "Kick",
+      },
+    ];
   }
 
-
-  init(callback = {}){
-
+  init(callback = {}) {
     this.callback = {
       ...this.callback,
-      ...callback
+      ...callback,
     };
 
+    this.root = document.getElementById("editor");
 
-    this.root =
-      document.getElementById("editor");
+    this.quickButtons = [...document.querySelectorAll(".angle-button")];
 
+    this.fullspinButton = document.getElementById("fullspin-button");
 
-    this.quickButtons = [
-      ...document.querySelectorAll(
-        ".angle-button"
-      )
-    ];
+    this.midspinButton = document.getElementById("midspin-button");
 
-
-    this.fullspinButton =
-      document.getElementById(
-        "fullspin-button"
-      );
-
-    this.midspinButton =
-      document.getElementById(
-        "midspin-button"
-      );
-
-    this.advancedFullspinButton =
-      document.getElementById(
-        "advanced-fullspin-button"
-      );
-
-    this.advancedMidspinButton =
-      document.getElementById(
-        "advanced-midspin-button"
-      );
-
-    this.advancedButton =
-      document.getElementById(
-        "advanced-button"
-      );
-
-    this.advancedBackButton =
-      document.getElementById(
-        "advanced-back-button"
-      );
-
-    this.advancedAddButton =
-      document.getElementById(
-        "advanced-add-button"
-      );
-
-    this.advancedDeleteFloorButton =
-      document.getElementById(
-        "advanced-delete-floor-button"
-      );
-
-
-    this.currentAngleLabel =
-      document.getElementById(
-        "angle-current"
-      );
-
-    this.advancedAngleValue =
-      document.getElementById(
-        "advanced-angle-value"
-      );
-
-
-    this.angleDial =
-      document.getElementById(
-        "angle-dial"
-      );
-
-    this.angleDialNeedle =
-      document.getElementById(
-        "angle-dial-needle"
-      );
-
-
-    this.multiSelectionCount =
-      document.getElementById(
-        "multi-selection-count"
-      );
-      
-    this.snapToggleButton =
-      document.getElementById(
-        "snap-toggle-button"
-      );
-
-    this.deleteSelectedButton =
-      document.getElementById(
-        "delete-selected-button"
-      );
-      
-    this.deleteFloorButton =
-      document.getElementById(
-        "delete-floor-button"
-      );
-    
-    this.tabsElement =
-      document.getElementById(
-      "editor-tabs"
+    this.advancedFullspinButton = document.getElementById(
+      "advanced-fullspin-button",
     );
-    
-    this.eventPanel =
-      document.getElementById(
-        "event-panel"
-      );
 
+    this.advancedMidspinButton = document.getElementById(
+      "advanced-midspin-button",
+    );
 
-    this.eventScreenIcon =
-      document.getElementById(
-        "event-screen-icon"
-      );
-    
-    
-    this.eventScreenTitle =
-      document.getElementById(
-        "event-screen-title"
-      );
-    
-    
-    this.eventScreenSubtitle =
-      document.getElementById(
-        "event-screen-subtitle"
-      );
-    
-    
-    this.eventScreenBody =
-      document.getElementById(
-        "event-screen-body"
-      );
-    
-    this.eventPaletteElement =
-      document.getElementById(
-        "event-palette-list"
-      );
-      
+    this.advancedButton = document.getElementById("advanced-button");
 
+    this.advancedBackButton = document.getElementById("advanced-back-button");
+
+    this.advancedAddButton = document.getElementById("advanced-add-button");
+
+    this.advancedDeleteFloorButton = document.getElementById(
+      "advanced-delete-floor-button",
+    );
+
+    this.currentAngleLabel = document.getElementById("angle-current");
+
+    this.advancedAngleValue = document.getElementById("advanced-angle-value");
+
+    this.angleDial = document.getElementById("angle-dial");
+
+    this.angleDialNeedle = document.getElementById("angle-dial-needle");
+
+    this.multiSelectionCount = document.getElementById("multi-selection-count");
+
+    this.snapToggleButton = document.getElementById("snap-toggle-button");
+
+    this.deleteSelectedButton = document.getElementById(
+      "delete-selected-button",
+    );
+
+    this.deleteFloorButton = document.getElementById("delete-floor-button");
+
+    this.tabsElement = document.getElementById("editor-tabs");
+
+    this.eventPanel = document.getElementById("event-panel");
+
+    this.eventScreenIcon = document.getElementById("event-screen-icon");
+
+    this.eventScreenTitle = document.getElementById("event-screen-title");
+
+    this.eventScreenSubtitle = document.getElementById("event-screen-subtitle");
+
+    this.eventScreenBody = document.getElementById("event-screen-body");
+
+    this.eventPaletteElement = document.getElementById("event-palette-list");
 
     /* =========================
        기본 각도
        누르는 즉시 타일 추가
     ========================= */
 
-    for(const button of this.quickButtons){
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if(button.disabled){
-            return;
-          }
-
-          const angle =
-            Number(
-              button.dataset.angle
-            );
-
-          this.callback
-            .onAddAngle?.(
-              angle
-            );
+    for (const button of this.quickButtons) {
+      button.addEventListener("click", () => {
+        if (button.disabled) {
+          return;
         }
-      );
-    }
 
+        const angle = Number(button.dataset.angle);
+
+        this.callback.onAddAngle?.(angle);
+      });
+    }
 
     /* =========================
        360 / Midspin
     ========================= */
 
-    this.fullspinButton
-      .addEventListener(
-        "click",
-        () => {
+    this.fullspinButton.addEventListener("click", () => {
+      if (this.fullspinButton.disabled) {
+        return;
+      }
 
-          if(
-            this.fullspinButton.disabled
-          ){
-            return;
-          }
+      this.callback.onAddFullspin?.();
+    });
 
-          this.callback
-            .onAddFullspin?.();
-        }
-      );
+    this.midspinButton.addEventListener("click", () => {
+      if (this.midspinButton.disabled) {
+        return;
+      }
 
+      this.callback.onAddMidspin?.();
+    });
 
-    this.midspinButton
-      .addEventListener(
-        "click",
-        () => {
+    this.advancedFullspinButton?.addEventListener("click", () => {
+      if (this.advancedFullspinButton.disabled) {
+        return;
+      }
 
-          if(
-            this.midspinButton.disabled
-          ){
-            return;
-          }
+      this.callback.onAddFullspin?.();
+    });
 
-          this.callback
-            .onAddMidspin?.();
-        }
-      );
+    this.advancedMidspinButton?.addEventListener("click", () => {
+      if (this.advancedMidspinButton.disabled) {
+        return;
+      }
 
-
-    this.advancedFullspinButton
-      ?.addEventListener(
-        "click",
-        () => {
-
-          if(
-            this.advancedFullspinButton.disabled
-          ){
-            return;
-          }
-
-          this.callback
-            .onAddFullspin?.();
-        }
-      );
-
-
-    this.advancedMidspinButton
-      ?.addEventListener(
-        "click",
-        () => {
-
-          if(
-            this.advancedMidspinButton.disabled
-          ){
-            return;
-          }
-
-          this.callback
-            .onAddMidspin?.();
-        }
-      );
-
+      this.callback.onAddMidspin?.();
+    });
 
     /* =========================
        Advanced 열기
     ========================= */
 
-    this.advancedButton
-      .addEventListener(
-        "click",
-        () => {
+    this.advancedButton.addEventListener("click", () => {
+      if (this.advancedButton.disabled) {
+        return;
+      }
 
-          if(
-            this.advancedButton.disabled
-          ){
-            return;
-          }
+      this.isAdvanced = true;
 
-          this.isAdvanced = true;
+      this.setDialAngle(this.dialAngle);
 
-          this.setDialAngle(
-            this.dialAngle
-          );
+      this.render();
+    });
 
-          this.render();
-        }
-      );
+    this.advancedBackButton.addEventListener("click", () => {
+      this.isAdvanced = false;
 
-
-    this.advancedBackButton
-      .addEventListener(
-        "click",
-        () => {
-
-          this.isAdvanced = false;
-
-          this.render();
-        }
-      );
-
+      this.render();
+    });
 
     /*
       Advanced에서는
       여기서만 실제 타일을 추가한다.
     */
-    this.advancedAddButton
-    .addEventListener(
-      "click",
-      e => {
-  
-        e.stopPropagation();
-  
-  
-        if(
-          this.advancedAddButton
-            .disabled
-        ){
-          return;
-        }
-  
-  
-        this.callback
-          .onAddAngle?.(
-            this.dialAngle,
-            {
-              /*
-                Advanced FREE는 선택 타일 기준 상대각도.
-                SNAP은 기존처럼 절대각도.
-              */
-              relative:
-                !this.snapEnabled
-            }
-          );
-      }
-    );
+    this.advancedAddButton.addEventListener("click", (e) => {
+      e.stopPropagation();
 
-
-    this.deleteSelectedButton
-      .addEventListener(
-        "click",
-        () => {
-
-          this.callback
-            .onDeleteSelected?.();
-        }
-      );
-      
-      this.advancedAddButton
-      .addEventListener(
-        "pointerdown",
-        e => {
-    
-          /*
-            버튼 터치가
-            다이얼 drag로 전달되는 것 방지
-          */
-          e.stopPropagation();
-        }
-      );
-      
-      
-        
-        this.snapToggleButton
-      .addEventListener(
-        "click",
-        () => {
-    
-          this.snapEnabled =
-            !this.snapEnabled;
-    
-    
-          this.snapToggleButton
-            .classList.toggle(
-              "active",
-              this.snapEnabled
-            );
-    
-    
-          this.snapToggleButton
-            .textContent =
-              this.snapEnabled
-                ? "15° SNAP"
-                : "FREE";
-        }
-      );
-      
-      this.deleteFloorButton
-  .addEventListener(
-    "click",
-    () => {
-
-      if(
-        this.deleteFloorButton.disabled
-      ){
+      if (this.advancedAddButton.disabled) {
         return;
       }
 
+      this.callback.onAddAngle?.(this.dialAngle, {
+        /*
+                Advanced FREE는 선택 타일 기준 상대각도.
+                SNAP은 기존처럼 절대각도.
+              */
+        relative: !this.snapEnabled,
+      });
+    });
 
-      this.callback
-        .onDeleteFloor?.();
-    }
-  );
+    this.deleteSelectedButton.addEventListener("click", () => {
+      this.callback.onDeleteSelected?.();
+    });
 
+    this.advancedAddButton.addEventListener("pointerdown", (e) => {
+      /*
+            버튼 터치가
+            다이얼 drag로 전달되는 것 방지
+          */
+      e.stopPropagation();
+    });
 
-    this.advancedDeleteFloorButton
-      ?.addEventListener(
-        "click",
-        () => {
+    this.snapToggleButton.addEventListener("click", () => {
+      this.snapEnabled = !this.snapEnabled;
 
-          if(
-            this.advancedDeleteFloorButton.disabled
-          ){
-            return;
-          }
+      this.snapToggleButton.classList.toggle("active", this.snapEnabled);
 
-          this.callback
-            .onDeleteFloor?.();
-        }
-      );
+      this.snapToggleButton.textContent = this.snapEnabled
+        ? "15° SNAP"
+        : "FREE";
+    });
 
+    this.deleteFloorButton.addEventListener("click", () => {
+      if (this.deleteFloorButton.disabled) {
+        return;
+      }
 
-    this.advancedAngleValue
-      ?.addEventListener(
-        "input",
-        () => {
+      this.callback.onDeleteFloor?.();
+    });
 
-          const rawValue =
-            String(
-              this.advancedAngleValue.value ??
-              ""
-            ).trim();
+    this.advancedDeleteFloorButton?.addEventListener("click", () => {
+      if (this.advancedDeleteFloorButton.disabled) {
+        return;
+      }
 
-          if(rawValue === ""){
-            return;
-          }
+      this.callback.onDeleteFloor?.();
+    });
 
-          const value =
-            Number(rawValue);
+    this.advancedAngleValue?.addEventListener("input", () => {
+      const rawValue = String(this.advancedAngleValue.value ?? "").trim();
 
-          if(!Number.isFinite(value)){
-            return;
-          }
+      if (rawValue === "") {
+        return;
+      }
 
-          this.dialAngle =
-            normalizeAngle(value);
+      const value = Number(rawValue);
 
-          if(this.angleDialNeedle){
+      if (!Number.isFinite(value)) {
+        return;
+      }
 
-            this.angleDialNeedle
-              .style.transform =
-                `rotate(${-this.dialAngle}deg)`;
-          }
-        }
-      );
+      this.dialAngle = normalizeAngle(value);
 
+      if (this.angleDialNeedle) {
+        this.angleDialNeedle.style.transform = `rotate(${-this.dialAngle}deg)`;
+      }
+    });
 
-    const commitAdvancedAngleInput =
-      () => {
+    const commitAdvancedAngleInput = () => {
+      const rawValue = String(this.advancedAngleValue?.value ?? "").trim();
 
-        const rawValue =
-          String(
-            this.advancedAngleValue?.value ??
-            ""
-          ).trim();
+      if (rawValue === "") {
+        this.setDialAngle(this.dialAngle);
 
-        if(rawValue === ""){
+        return;
+      }
 
-          this.setDialAngle(
-            this.dialAngle
-          );
+      const value = Number(rawValue);
 
-          return;
-        }
+      if (!Number.isFinite(value)) {
+        this.setDialAngle(this.dialAngle);
 
-        const value =
-          Number(rawValue);
+        return;
+      }
 
-        if(!Number.isFinite(value)){
+      this.setDialAngle(value);
+    };
 
-          this.setDialAngle(
-            this.dialAngle
-          );
+    this.advancedAngleValue?.addEventListener(
+      "change",
+      commitAdvancedAngleInput,
+    );
 
-          return;
-        }
+    this.advancedAngleValue?.addEventListener("blur", commitAdvancedAngleInput);
 
-        this.setDialAngle(
-          value
-        );
-      };
+    this.advancedAngleValue?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
 
+        commitAdvancedAngleInput();
 
-    this.advancedAngleValue
-      ?.addEventListener(
-        "change",
-        commitAdvancedAngleInput
-      );
-
-
-    this.advancedAngleValue
-      ?.addEventListener(
-        "blur",
-        commitAdvancedAngleInput
-      );
-
-
-    this.advancedAngleValue
-      ?.addEventListener(
-        "keydown",
-        e => {
-
-          if(e.key === "Enter"){
-
-            e.preventDefault();
-
-            commitAdvancedAngleInput();
-
-            this.advancedAngleValue
-              .blur();
-          }
-        }
-      );
-
+        this.advancedAngleValue.blur();
+      }
+    });
 
     this.initDial();
   }
-  
-  getActiveEventGroup(){
 
-    if(
-      this.activeTabKey ===
-      "tile"
-    ){
+  getActiveEventGroup() {
+    if (this.activeTabKey === "tile") {
       return null;
     }
-  
-  
+
     return (
-      this.eventTabGroups.find(
-        group =>
-          group.key ===
-          this.activeTabKey
-      )
-      ??
+      this.eventTabGroups.find((group) => group.key === this.activeTabKey) ??
       null
     );
   }
-  
-  createEventInfoRow(
-    label,
-    value
-  ){
-  
-    const row =
-      document.createElement(
-        "div"
-      );
-  
-  
-    row.className =
-      "event-info-row";
-  
-  
-    const labelElement =
-      document.createElement(
-        "span"
-      );
-  
-  
-    labelElement.className =
-      "event-info-label";
-  
-    labelElement.textContent =
-      label;
-  
-  
-    const valueElement =
-      document.createElement(
-        "span"
-      );
-  
-  
-    valueElement.className =
-      "event-info-value";
-  
-    valueElement.textContent =
-      value;
-  
-  
-    row.append(
-      labelElement,
-      valueElement
-    );
-  
-  
+
+  createEventInfoRow(label, value) {
+    const row = document.createElement("div");
+
+    row.className = "event-info-row";
+
+    const labelElement = document.createElement("span");
+
+    labelElement.className = "event-info-label";
+
+    labelElement.textContent = label;
+
+    const valueElement = document.createElement("span");
+
+    valueElement.className = "event-info-value";
+
+    valueElement.textContent = value;
+
+    row.append(labelElement, valueElement);
+
     return row;
   }
-  
-  createEventCard(
-    title,
-    onDelete = null,
-    onCopy = null
-  ){
 
-    const card =
-      document.createElement(
-        "div"
-      );
+  createEventCard(title, onDelete = null, onCopy = null) {
+    const card = document.createElement("div");
 
-    card.className =
-      "event-card";
+    card.className = "event-card";
 
-    const header =
-      document.createElement(
-        "div"
-      );
+    const header = document.createElement("div");
 
-    header.className =
-      "event-card-header";
+    header.className = "event-card-header";
 
-    const heading =
-      document.createElement(
-        "div"
-      );
+    const heading = document.createElement("div");
 
-    heading.className =
-      "event-card-title";
+    heading.className = "event-card-title";
 
-    heading.textContent =
-      title;
+    heading.textContent = title;
 
-    header.appendChild(
-      heading
-    );
+    header.appendChild(heading);
 
-    if(onCopy || onDelete){
-      const actions =
-        document.createElement(
-          "div"
-        );
+    if (onCopy || onDelete) {
+      const actions = document.createElement("div");
 
-      actions.className =
-        "event-card-actions";
+      actions.className = "event-card-actions";
 
-      if(onCopy){
-        const copyButton =
-          document.createElement(
-            "button"
-          );
+      if (onCopy) {
+        const copyButton = document.createElement("button");
 
-        copyButton.type =
-          "button";
-        copyButton.className =
-          "event-card-copy";
-        copyButton.textContent =
-          "Copy";
-        copyButton.setAttribute(
-          "aria-label",
-          `Copy ${title}`
-        );
-        copyButton.addEventListener(
-          "click",
-          () => onCopy()
-        );
-        actions.appendChild(
-          copyButton
-        );
+        copyButton.type = "button";
+        copyButton.className = "event-card-copy";
+        copyButton.textContent = "Copy";
+        copyButton.setAttribute("aria-label", `Copy ${title}`);
+        copyButton.addEventListener("click", () => onCopy());
+        actions.appendChild(copyButton);
       }
 
-      if(onDelete){
-        const deleteButton =
-          document.createElement(
-            "button"
-          );
+      if (onDelete) {
+        const deleteButton = document.createElement("button");
 
-        deleteButton.type =
-          "button";
-        deleteButton.className =
-          "event-card-delete";
-        deleteButton.textContent =
-          "×";
-        deleteButton.setAttribute(
-          "aria-label",
-          `Delete ${title}`
-        );
-        deleteButton.addEventListener(
-          "click",
-          () => onDelete()
-        );
-        actions.appendChild(
-          deleteButton
-        );
+        deleteButton.type = "button";
+        deleteButton.className = "event-card-delete";
+        deleteButton.textContent = "×";
+        deleteButton.setAttribute("aria-label", `Delete ${title}`);
+        deleteButton.addEventListener("click", () => onDelete());
+        actions.appendChild(deleteButton);
       }
 
-      header.appendChild(
-        actions
-      );
+      header.appendChild(actions);
     }
 
-    card.appendChild(
-      header
-    );
+    card.appendChild(header);
 
     return card;
   }
 
+  renderSpeedEventScreen(group) {
+    this.eventScreenBody.innerHTML = "";
 
-  renderSpeedEventScreen(
-    group
-  ){
-  
-    this.eventScreenBody
-      .innerHTML = "";
-  
-  
-    group.actions.forEach(
-      (action, index) => {
-  
-        const card =
-          this.createEventCard(
-            group.actions.length > 1
-              ? `Set Speed ${index + 1}`
-              : "Set Speed",
-            () => {
-              this.callback.onDeleteEvent?.(action);
-            },
-            () => {
-              this.callback.onCopyEvent?.(action);
-            }
-          );
+    group.actions.forEach((action, index) => {
+      const card = this.createEventCard(
+        group.actions.length > 1 ? `Set Speed ${index + 1}` : "Set Speed",
+        () => {
+          this.callback.onDeleteEvent?.(action);
+        },
+        () => {
+          this.callback.onCopyEvent?.(action);
+        },
+      );
 
+      const rawSpeedType = String(action.speedType ?? "Bpm").toLowerCase();
 
-        const rawSpeedType =
-          String(
-            action.speedType ??
-            "Bpm"
-          ).toLowerCase();
-  
-  
-        const speedType =
-          rawSpeedType ===
-          "multiplier"
-            ? "Multiplier"
-            : "Bpm";
-  
-  
-        const bpm =
-          Number.isFinite(
-            Number(
-              action.beatsPerMinute
-            )
-          )
-            ? Number(
-                action.beatsPerMinute
-              )
-            : 100;
-  
-  
-        const multiplier =
-          Number.isFinite(
-            Number(
-              action.bpmMultiplier
-            )
-          )
-            ? Number(
-                action.bpmMultiplier
-              )
-            : 1;
-  
-  
-        /* =========================
+      const speedType = rawSpeedType === "multiplier" ? "Multiplier" : "Bpm";
+
+      const bpm = Number.isFinite(Number(action.beatsPerMinute))
+        ? Number(action.beatsPerMinute)
+        : 100;
+
+      const multiplier = Number.isFinite(Number(action.bpmMultiplier))
+        ? Number(action.bpmMultiplier)
+        : 1;
+
+      /* =========================
            Speed Type
         ========================= */
-  
-        card.appendChild(
-          this.createSegmentedField({
-  
-            label:
-              "Speed type",
-  
-            value:
-              speedType,
-  
-            options: [
-              {
-                label: "BPM",
-                value: "Bpm"
-              },
-              {
-                label: "Multiplier",
-                value: "Multiplier"
-              }
-            ],
-  
-            onChange:
-              value => {
-  
-                const patch = {
-                  speedType:
-                    value
-                };
-  
-  
-                /*
+
+      card.appendChild(
+        this.createSegmentedField({
+          label: "Speed type",
+
+          value: speedType,
+
+          options: [
+            {
+              label: "BPM",
+              value: "Bpm",
+            },
+            {
+              label: "Multiplier",
+              value: "Multiplier",
+            },
+          ],
+
+          onChange: (value) => {
+            const patch = {
+              speedType: value,
+            };
+
+            /*
                   값이 없는 옛 이벤트라도
                   안전하게 기본값 생성
                 */
-                if(
-                  value === "Bpm" &&
-                  !Number.isFinite(
-                    Number(
-                      action.beatsPerMinute
-                    )
-                  )
-                ){
-  
-                  patch.beatsPerMinute =
-                    100;
-                }
-  
-  
-                if(
-                  value === "Multiplier" &&
-                  !Number.isFinite(
-                    Number(
-                      action.bpmMultiplier
-                    )
-                  )
-                ){
-  
-                  patch.bpmMultiplier =
-                    1;
-                }
-  
-  
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    patch
-                  );
-              }
-          })
-        );
-  
-  
-        /* =========================
+            if (
+              value === "Bpm" &&
+              !Number.isFinite(Number(action.beatsPerMinute))
+            ) {
+              patch.beatsPerMinute = 100;
+            }
+
+            if (
+              value === "Multiplier" &&
+              !Number.isFinite(Number(action.bpmMultiplier))
+            ) {
+              patch.bpmMultiplier = 1;
+            }
+
+            this.callback.onUpdateEvent?.(action, patch);
+          },
+        }),
+      );
+
+      /* =========================
            BPM
         ========================= */
-  
-        card.appendChild(
-          this.createNumberField({
-  
-            label:
-              "Beats per minute",
-  
-            value:
-              bpm,
-  
-            defaultValue:
-              100,
-  
-            step:
-              "any",
-  
-            min:
-              0,
-  
-            disabled:
-              speedType !== "Bpm",
-  
-            onCommit:
-              value => {
-  
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      beatsPerMinute:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-  
-  
-        /* =========================
+
+      card.appendChild(
+        this.createNumberField({
+          label: "Beats per minute",
+
+          value: bpm,
+
+          defaultValue: 100,
+
+          step: "any",
+
+          min: 0,
+
+          disabled: speedType !== "Bpm",
+
+          onCommit: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              beatsPerMinute: value,
+            });
+          },
+        }),
+      );
+
+      /* =========================
            Multiplier
         ========================= */
-  
-        card.appendChild(
-          this.createNumberField({
-  
-            label:
-              "BPM Multiplier",
-  
-            value:
-              multiplier,
-  
-            defaultValue:
-              1,
-  
-            step:
-              "any",
-  
-            min:
-              0,
-  
-            disabled:
-              speedType !==
-              "Multiplier",
-  
-            onCommit:
-              value => {
-  
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      bpmMultiplier:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-  
-  
-        this.appendAngleOffsetField(
-          card,
-          action
-        );
-  
-  
-        this.eventScreenBody
-          .appendChild(
-            card
-          );
-      }
-    );
-  }
-  
-  renderTwirlEventScreen(
-    group
-  ){
-  
-    this.eventScreenBody
-      .innerHTML = "";
-  
-  
-    for(
-      const action
-      of group.actions
-    ){
-  
-      const card =
-        this.createEventCard(
-          "Twirl",
-          () => {
-            this.callback.onDeleteEvent?.(action);
+
+      card.appendChild(
+        this.createNumberField({
+          label: "BPM Multiplier",
+
+          value: multiplier,
+
+          defaultValue: 1,
+
+          step: "any",
+
+          min: 0,
+
+          disabled: speedType !== "Multiplier",
+
+          onCommit: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              bpmMultiplier: value,
+            });
           },
-          () => {
-            this.callback.onCopyEvent?.(action);
-          }
-        );
+        }),
+      );
 
+      this.appendAngleOffsetField(card, action);
 
-      this.eventScreenBody
-        .appendChild(
-          card
-        );
+      this.eventScreenBody.appendChild(card);
+    });
+  }
+
+  renderTwirlEventScreen(group) {
+    this.eventScreenBody.innerHTML = "";
+
+    for (const action of group.actions) {
+      const card = this.createEventCard(
+        "Twirl",
+        () => {
+          this.callback.onDeleteEvent?.(action);
+        },
+        () => {
+          this.callback.onCopyEvent?.(action);
+        },
+      );
+
+      this.eventScreenBody.appendChild(card);
     }
   }
-  
-  appendAngleOffsetField(
-    card,
-    action
-  ){
-  
-    const angleOffset =
-      Number.isFinite(
-        Number(
-          action.angleOffset
-        )
-      )
-        ? Number(
-            action.angleOffset
-          )
-        : 0;
-  
-  
+
+  appendAngleOffsetField(card, action) {
+    const angleOffset = Number.isFinite(Number(action.angleOffset))
+      ? Number(action.angleOffset)
+      : 0;
+
     card.appendChild(
       this.createNumberField({
-  
-        label:
-          "Angle Offset",
-  
-        value:
-          angleOffset,
-  
-        defaultValue:
-          0,
-  
-        step:
-          "any",
-  
-        onCommit:
-          value => {
-  
-            this.callback
-              .onUpdateEvent?.(
-                action,
-                {
-                  angleOffset:
-                    value
-                }
-              );
-          }
-      })
+        label: "Angle Offset",
+
+        value: angleOffset,
+
+        defaultValue: 0,
+
+        step: "any",
+
+        onCommit: (value) => {
+          this.callback.onUpdateEvent?.(action, {
+            angleOffset: value,
+          });
+        },
+      }),
     );
   }
-  
+
   createNumberField({
     label,
     value,
     defaultValue = 0,
-  
+
     step = "any",
     min = null,
-  
-        max = null,
-  
-integer = false,
+
+    max = null,
+
+    integer = false,
     disabled = false,
-  
-    onCommit = null
-  }){
-  
-    const row =
-      document.createElement(
-        "label"
-      );
-  
-  
-    row.className =
-      "event-form-row";
-  
-  
-    const labelElement =
-      document.createElement(
-        "span"
-      );
-  
-  
-    labelElement.className =
-      "event-form-label";
-  
-    labelElement.textContent =
-      label;
-  
-  
-    const input =
-      document.createElement(
-        "input"
-      );
-  
-  
-    input.className =
-      "event-form-input";
-  
-    input.type =
-      "number";
-  
-    input.step =
-      step;
-  
-    input.inputMode =
-      integer
-        ? "numeric"
-        : "decimal";
-  
-    input.disabled =
-      disabled;
-  
-  
-    if(min !== null){
-  
-      input.min =
-        String(min);
+
+    onCommit = null,
+  }) {
+    const row = document.createElement("label");
+
+    row.className = "event-form-row";
+
+    const labelElement = document.createElement("span");
+
+    labelElement.className = "event-form-label";
+
+    labelElement.textContent = label;
+
+    const input = document.createElement("input");
+
+    input.className = "event-form-input";
+
+    input.type = "number";
+
+    input.step = step;
+
+    input.inputMode = integer ? "numeric" : "decimal";
+
+    input.disabled = disabled;
+
+    if (min !== null) {
+      input.min = String(min);
     }
 
-
-    if(max !== null){
-
-      input.max =
-        String(max);
+    if (max !== null) {
+      input.max = String(max);
     }
-  
-  
-    let initialValue =
-      Number(value);
-  
-  
-    if(
-      !Number.isFinite(
-        initialValue
-      )
-    ){
-  
-      initialValue =
-        defaultValue;
+
+    let initialValue = Number(value);
+
+    if (!Number.isFinite(initialValue)) {
+      initialValue = defaultValue;
     }
-  
-  
-    input.value =
-      String(initialValue);
-  
-  
+
+    input.value = String(initialValue);
+
     const commit = () => {
-  
-      let nextValue =
-        Number(
-          input.value
-        );
-  
-  
-      if(
-        !Number.isFinite(
-          nextValue
-        )
-      ){
-  
-        nextValue =
-          defaultValue;
-      }
-  
-  
-      if(integer){
-  
-        nextValue =
-          Math.trunc(
-            nextValue
-          );
-      }
-  
-  
-      if(
-        min !== null
-      ){
-  
-        nextValue =
-          Math.max(
-            min,
-            nextValue
-          );
+      let nextValue = Number(input.value);
+
+      if (!Number.isFinite(nextValue)) {
+        nextValue = defaultValue;
       }
 
-
-      if(
-        max !== null
-      ){
-
-        nextValue =
-          Math.min(
-            max,
-            nextValue
-          );
+      if (integer) {
+        nextValue = Math.trunc(nextValue);
       }
-  
-  
-      input.value =
-        String(nextValue);
-  
-  
-      if(
-        nextValue ===
-        initialValue
-      ){
+
+      if (min !== null) {
+        nextValue = Math.max(min, nextValue);
+      }
+
+      if (max !== null) {
+        nextValue = Math.min(max, nextValue);
+      }
+
+      input.value = String(nextValue);
+
+      if (nextValue === initialValue) {
         return;
       }
-  
-  
-      onCommit?.(
-        nextValue
-      );
+
+      onCommit?.(nextValue);
     };
-  
-  
+
     /*
       매 글자마다 rebuild하지 않는다.
   
       입력이 끝난 시점에만 적용.
     */
-    input.addEventListener(
-      "change",
-      commit
-    );
-  
-  
-    input.addEventListener(
-      "keydown",
-      e => {
-  
-        if(
-          e.key === "Enter"
-        ){
-  
-          e.preventDefault();
-  
-          input.blur();
-        }
+    input.addEventListener("change", commit);
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+
+        input.blur();
       }
-    );
-  
-  
-    row.append(
-      labelElement,
-      input
-    );
-  
-  
+    });
+
+    row.append(labelElement, input);
+
     return row;
   }
-  
-  createSelectField({
-    label,
-    value,
-    options,
-    onChange = null
-  }){
-  
-    const row =
-      document.createElement(
-        "label"
-      );
-  
-  
-    row.className =
-      "event-form-row";
-  
-  
-    const labelElement =
-      document.createElement(
-        "span"
-      );
-  
-  
-    labelElement.className =
-      "event-form-label";
-  
-    labelElement.textContent =
-      label;
-  
-  
-    const select =
-      document.createElement(
-        "select"
-      );
-  
-  
-    select.className =
-      "event-form-select";
-  
-  
-    for(
-      const optionInfo
-      of options
-    ){
-  
-      const option =
-        document.createElement(
-          "option"
-        );
-  
-  
-      option.value =
-        optionInfo.value;
-  
-      option.textContent =
-        optionInfo.label;
-  
-  
-      if(
-        optionInfo.value ===
-        value
-      ){
-  
-        option.selected =
-          true;
+
+  createSelectField({ label, value, options, onChange = null }) {
+    const row = document.createElement("label");
+
+    row.className = "event-form-row";
+
+    const labelElement = document.createElement("span");
+
+    labelElement.className = "event-form-label";
+
+    labelElement.textContent = label;
+
+    const select = document.createElement("select");
+
+    select.className = "event-form-select";
+
+    for (const optionInfo of options) {
+      const option = document.createElement("option");
+
+      option.value = optionInfo.value;
+
+      option.textContent = optionInfo.label;
+
+      if (optionInfo.value === value) {
+        option.selected = true;
       }
-  
-  
-      select.appendChild(
-        option
-      );
+
+      select.appendChild(option);
     }
-  
-  
-    select.addEventListener(
-      "change",
-      () => {
-  
-        onChange?.(
-          select.value
-        );
-      }
-    );
-  
-  
-    row.append(
-      labelElement,
-      select
-    );
-  
-  
+
+    select.addEventListener("change", () => {
+      onChange?.(select.value);
+    });
+
+    row.append(labelElement, select);
+
     return row;
   }
-  
-  createSegmentedField({
-    label,
-    value,
-    options,
-    onChange = null
-  }){
-  
-    const row =
-      document.createElement(
-        "div"
-      );
-  
-  
-    row.className =
-      "event-form-row";
-  
-  
-    const labelElement =
-      document.createElement(
-        "span"
-      );
-  
-  
-    labelElement.className =
-      "event-form-label";
-  
-    labelElement.textContent =
-      label;
-  
-  
-    const control =
-      document.createElement(
-        "div"
-      );
-  
-  
-    control.className =
-      "event-segmented";
-  
-  
-    for(
-      const optionInfo
-      of options
-    ){
-  
-      const button =
-        document.createElement(
-          "button"
-        );
-  
-  
-      button.type =
-        "button";
-  
-      button.className =
-        "event-segment-button";
-  
-      button.textContent =
-        optionInfo.label;
-  
-  
-      if(
-        optionInfo.value ===
-        value
-      ){
-  
-        button.classList.add(
-          "active"
-        );
+
+  createSegmentedField({ label, value, options, onChange = null }) {
+    const row = document.createElement("div");
+
+    row.className = "event-form-row";
+
+    const labelElement = document.createElement("span");
+
+    labelElement.className = "event-form-label";
+
+    labelElement.textContent = label;
+
+    const control = document.createElement("div");
+
+    control.className = "event-segmented";
+
+    for (const optionInfo of options) {
+      const button = document.createElement("button");
+
+      button.type = "button";
+
+      button.className = "event-segment-button";
+
+      button.textContent = optionInfo.label;
+
+      if (optionInfo.value === value) {
+        button.classList.add("active");
       }
-  
-  
-      button.addEventListener(
-        "click",
+
+      button.addEventListener("click", () => {
+        if (optionInfo.value === value) {
+          return;
+        }
+
+        onChange?.(optionInfo.value);
+      });
+
+      control.appendChild(button);
+    }
+
+    row.append(labelElement, control);
+
+    return row;
+  }
+
+  renderPauseEventScreen(group) {
+    this.eventScreenBody.innerHTML = "";
+
+    group.actions.forEach((action, index) => {
+      const card = this.createEventCard(
+        group.actions.length > 1 ? `Pause ${index + 1}` : "Pause",
         () => {
-  
-          if(
-            optionInfo.value ===
-            value
-          ){
-            return;
-          }
-  
-  
-          onChange?.(
-            optionInfo.value
-          );
-        }
+          this.callback.onDeleteEvent?.(action);
+        },
+        () => {
+          this.callback.onCopyEvent?.(action);
+        },
       );
-  
-  
-      control.appendChild(
-        button
+
+      const duration = Number.isFinite(Number(action.duration))
+        ? Number(action.duration)
+        : 1;
+
+      const countdownTicks = Number.isFinite(Number(action.countdownTicks))
+        ? Math.trunc(Number(action.countdownTicks))
+        : 0;
+
+      const validDirections = new Set(["None", "Forward", "Backward"]);
+
+      const angleCorrectionDir = validDirections.has(action.angleCorrectionDir)
+        ? action.angleCorrectionDir
+        : "None";
+
+      /* Duration */
+
+      card.appendChild(
+        this.createNumberField({
+          label: "Duration",
+
+          value: duration,
+
+          defaultValue: 1,
+
+          step: "any",
+
+          min: 0,
+
+          onCommit: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              duration: value,
+            });
+          },
+        }),
       );
-    }
-  
-  
-    row.append(
-      labelElement,
-      control
-    );
-  
-  
-    return row;
-  }
-  
-  renderPauseEventScreen(
-    group
-  ){
-  
-    this.eventScreenBody
-      .innerHTML = "";
-  
-  
-    group.actions.forEach(
-      (action, index) => {
-  
-        const card =
-          this.createEventCard(
-            group.actions.length > 1
-              ? `Pause ${index + 1}`
-              : "Pause",
-            () => {
-              this.callback.onDeleteEvent?.(action);
+
+      /* Countdown ticks */
+
+      card.appendChild(
+        this.createNumberField({
+          label: "Countdown ticks",
+
+          value: countdownTicks,
+
+          defaultValue: 0,
+
+          step: "1",
+
+          min: 0,
+
+          integer: true,
+
+          onCommit: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              countdownTicks: value,
+            });
+          },
+        }),
+      );
+
+      /* Angle correction */
+
+      card.appendChild(
+        this.createSelectField({
+          label: "Angle Correction",
+
+          value: angleCorrectionDir,
+
+          options: [
+            {
+              label: "None",
+              value: "None",
             },
-            () => {
-              this.callback.onCopyEvent?.(action);
-            }
-          );
-
-
-        const duration =
-          Number.isFinite(
-            Number(
-              action.duration
-            )
-          )
-            ? Number(
-                action.duration
-              )
-            : 1;
-  
-  
-        const countdownTicks =
-          Number.isFinite(
-            Number(
-              action.countdownTicks
-            )
-          )
-            ? Math.trunc(
-                Number(
-                  action.countdownTicks
-                )
-              )
-            : 0;
-  
-  
-        const validDirections =
-          new Set([
-            "None",
-            "Forward",
-            "Backward"
-          ]);
-  
-  
-        const angleCorrectionDir =
-          validDirections.has(
-            action.angleCorrectionDir
-          )
-            ? action.angleCorrectionDir
-            : "None";
-  
-  
-        /* Duration */
-  
-        card.appendChild(
-          this.createNumberField({
-  
-            label:
-              "Duration",
-  
-            value:
-              duration,
-  
-            defaultValue:
-              1,
-  
-            step:
-              "any",
-  
-            min:
-              0,
-  
-            onCommit:
-              value => {
-  
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      duration:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-  
-  
-        /* Countdown ticks */
-  
-        card.appendChild(
-          this.createNumberField({
-  
-            label:
-              "Countdown ticks",
-  
-            value:
-              countdownTicks,
-  
-            defaultValue:
-              0,
-  
-            step:
-              "1",
-  
-            min:
-              0,
-  
-            integer:
-              true,
-  
-            onCommit:
-              value => {
-  
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      countdownTicks:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-  
-  
-        /* Angle correction */
-  
-        card.appendChild(
-          this.createSelectField({
-  
-            label:
-              "Angle Correction",
-  
-            value:
-              angleCorrectionDir,
-  
-            options: [
-              {
-                label: "None",
-                value: "None"
-              },
-              {
-                label: "Forward",
-                value: "Forward"
-              },
-              {
-                label: "Backward",
-                value: "Backward"
-              }
-            ],
-  
-            onChange:
-              value => {
-  
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      angleCorrectionDir:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-  
-  
-        this.eventScreenBody
-          .appendChild(
-            card
-          );
-      }
-    );
-  }
-  
-  renderHitsoundEventScreen(
-    group
-  ){
-
-    this.eventScreenBody
-      .innerHTML = "";
-
-
-    const availableHitsounds =
-      Array.isArray(
-        this.hitsoundOptions
-      )
-        ? this.hitsoundOptions
-        : [];
-
-
-    group.actions.forEach(
-      (action, index) => {
-
-        const card =
-          this.createEventCard(
-            group.actions.length > 1
-              ? `Set Hitsound ${index + 1}`
-              : "Set Hitsound",
-            () => {
-              this.callback.onDeleteEvent?.(action);
+            {
+              label: "Forward",
+              value: "Forward",
             },
-            () => {
-              this.callback.onCopyEvent?.(action);
-            }
-          );
+            {
+              label: "Backward",
+              value: "Backward",
+            },
+          ],
 
+          onChange: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              angleCorrectionDir: value,
+            });
+          },
+        }),
+      );
 
-        const gameSound =
-          String(
-            action.gameSound ??
-            "Hitsound"
-          )
+      this.eventScreenBody.appendChild(card);
+    });
+  }
+
+  renderHitsoundEventScreen(group) {
+    this.eventScreenBody.innerHTML = "";
+
+    const availableHitsounds = Array.isArray(this.hitsoundOptions)
+      ? this.hitsoundOptions
+      : [];
+
+    group.actions.forEach((action, index) => {
+      const card = this.createEventCard(
+        group.actions.length > 1 ? `Set Hitsound ${index + 1}` : "Set Hitsound",
+        () => {
+          this.callback.onDeleteEvent?.(action);
+        },
+        () => {
+          this.callback.onCopyEvent?.(action);
+        },
+      );
+
+      const gameSound =
+        String(action.gameSound ?? "Hitsound")
           .trim()
-          .toLowerCase() ===
-          "midspin"
-            ? "Midspin"
-            : "Hitsound";
+          .toLowerCase() === "midspin"
+          ? "Midspin"
+          : "Hitsound";
 
+      const hitsound = String(action.hitsound ?? "Kick");
 
-        const hitsound =
-          String(
-            action.hitsound ??
-            "Kick"
-          );
+      const rawVolume = Number(action.hitsoundVolume);
 
+      const volume = Number.isFinite(rawVolume)
+        ? Math.max(0, Math.min(100, rawVolume))
+        : 100;
 
-        const rawVolume =
-          Number(
-            action.hitsoundVolume
-          );
+      card.appendChild(
+        this.createSegmentedField({
+          label: "Game Sound",
 
+          value: gameSound,
 
-        const volume =
-          Number.isFinite(
-            rawVolume
-          )
-            ? Math.max(
-                0,
-                Math.min(
-                  100,
-                  rawVolume
-                )
-              )
-            : 100;
+          options: [
+            {
+              label: "Hit Sound",
+              value: "Hitsound",
+            },
+            {
+              label: "Midspin",
+              value: "Midspin",
+            },
+          ],
 
+          onChange: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              gameSound: value,
+            });
+          },
+        }),
+      );
 
-        card.appendChild(
-          this.createSegmentedField({
+      const selectOptions = availableHitsounds.map((option) => ({
+        value: String(option?.value ?? option),
 
-            label:
-              "Game Sound",
+        label: String(option?.label ?? option?.value ?? option),
+      }));
 
-            value:
-              gameSound,
+      if (
+        hitsound &&
+        !selectOptions.some((option) => option.value === hitsound)
+      ) {
+        selectOptions.push({
+          value: hitsound,
 
-            options: [
-              {
-                label: "Hit Sound",
-                value: "Hitsound"
-              },
-              {
-                label: "Midspin",
-                value: "Midspin"
-              }
-            ],
-
-            onChange:
-              value => {
-
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      gameSound:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-
-
-        const selectOptions =
-          availableHitsounds
-          .map(
-            option => ({
-              value:
-                String(
-                  option?.value ??
-                  option
-                ),
-
-              label:
-                String(
-                  option?.label ??
-                  option?.value ??
-                  option
-                )
-            })
-          );
-
-
-        if(
-          hitsound &&
-          !selectOptions.some(
-            option =>
-              option.value ===
-              hitsound
-          )
-        ){
-
-          selectOptions.push({
-            value:
-              hitsound,
-
-            label:
-              hitsound
-          });
-        }
-
-
-        card.appendChild(
-          this.createSelectField({
-
-            label:
-              "Hitsound",
-
-            value:
-              hitsound,
-
-            options:
-              selectOptions,
-
-            onChange:
-              value => {
-
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      hitsound:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-
-
-        card.appendChild(
-          this.createNumberField({
-
-            label:
-              "Sound Volume (%)",
-
-            value:
-              volume,
-
-            defaultValue:
-              100,
-
-            step:
-              "1",
-
-            min:
-              0,
-
-            max:
-              100,
-
-            onCommit:
-              value => {
-
-                this.callback
-                  .onUpdateEvent?.(
-                    action,
-                    {
-                      hitsoundVolume:
-                        value
-                    }
-                  );
-              }
-          })
-        );
-
-
-        this.eventScreenBody
-          .appendChild(
-            card
-          );
+          label: hitsound,
+        });
       }
-    );
+
+      card.appendChild(
+        this.createSelectField({
+          label: "Hitsound",
+
+          value: hitsound,
+
+          options: selectOptions,
+
+          onChange: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              hitsound: value,
+            });
+          },
+        }),
+      );
+
+      card.appendChild(
+        this.createNumberField({
+          label: "Sound Volume (%)",
+
+          value: volume,
+
+          defaultValue: 100,
+
+          step: "1",
+
+          min: 0,
+
+          max: 100,
+
+          onCommit: (value) => {
+            this.callback.onUpdateEvent?.(action, {
+              hitsoundVolume: value,
+            });
+          },
+        }),
+      );
+
+      this.eventScreenBody.appendChild(card);
+    });
   }
 
+  renderUnsupportedEventScreen(group) {
+    this.eventScreenBody.innerHTML = "";
 
-  renderUnsupportedEventScreen(
-    group
-  ){
-  
-    this.eventScreenBody
-      .innerHTML = "";
-  
-  
-    const notice =
-      document.createElement(
-        "div"
-      );
-  
-  
-    notice.className =
-      "unsupported-event-notice";
-  
-  
-    notice.textContent =
-      "These events are not editable in the current editor.";
-  
-  
-    this.eventScreenBody
-      .appendChild(
-        notice
-      );
-  
-  
+    const notice = document.createElement("div");
+
+    notice.className = "unsupported-event-notice";
+
+    notice.textContent = "These events are not editable in the current editor.";
+
+    this.eventScreenBody.appendChild(notice);
+
     /*
       같은 eventType은 한 번만 표시
     */
-    const eventTypes =
-      [
-        ...new Set(
-          group.actions.map(
-            action =>
-              action.eventType ??
-              "Unknown"
-          )
-        )
-      ];
-  
-  
-    for(
-      const eventType
-      of eventTypes
-    ){
-  
-      const item =
-        document.createElement(
-          "div"
-        );
-  
-  
-      item.className =
-        "unsupported-event-item";
-  
-  
-      item.textContent =
-        eventType;
-  
-  
-      this.eventScreenBody
-        .appendChild(
-          item
-        );
+    const eventTypes = [
+      ...new Set(group.actions.map((action) => action.eventType ?? "Unknown")),
+    ];
+
+    for (const eventType of eventTypes) {
+      const item = document.createElement("div");
+
+      item.className = "unsupported-event-item";
+
+      item.textContent = eventType;
+
+      this.eventScreenBody.appendChild(item);
     }
   }
-  
-  renderActiveEventScreen(){
 
-    const group =
-      this.getActiveEventGroup();
-  
-  
-    if(
-      !group ||
-      !this.eventScreenBody
-    ){
+  renderActiveEventScreen() {
+    const group = this.getActiveEventGroup();
+
+    if (!group || !this.eventScreenBody) {
       return;
     }
-  
-  
+
     /*
       Header
     */
-  
-    if(
-      this.eventScreenIcon
-    ){
-  
-      this.eventScreenIcon.src =
-        group.iconSrc ?? "";
-  
-      this.eventScreenIcon.alt =
-        group.title ?? group.key;
+
+    if (this.eventScreenIcon) {
+      this.eventScreenIcon.src = group.iconSrc ?? "";
+
+      this.eventScreenIcon.alt = group.title ?? group.key;
     }
-  
-  
-    if(
-      this.eventScreenTitle
-    ){
-  
-      this.eventScreenTitle
-        .textContent =
-          group.title ??
-          group.key;
+
+    if (this.eventScreenTitle) {
+      this.eventScreenTitle.textContent = group.title ?? group.key;
     }
-  
-  
-    if(
-      this.eventScreenSubtitle
-    ){
-  
-      const count =
-        group.actions.length;
-  
-  
-      this.eventScreenSubtitle
-        .textContent =
-          `${count} event${count === 1 ? "" : "s"}`;
+
+    if (this.eventScreenSubtitle) {
+      const count = group.actions.length;
+
+      this.eventScreenSubtitle.textContent = `${count} event${count === 1 ? "" : "s"}`;
     }
-  
-  
+
     /*
       Body
     */
-  
-    switch(
-      group.key
-    ){
-  
+
+    switch (group.key) {
       case "speed":
-  
-        this.renderSpeedEventScreen(
-          group
-        );
-  
+        this.renderSpeedEventScreen(group);
+
         break;
-  
-  
+
       case "twirl":
-  
-        this.renderTwirlEventScreen(
-          group
-        );
-  
+        this.renderTwirlEventScreen(group);
+
         break;
-  
-  
+
       case "pause":
-  
-        this.renderPauseEventScreen(
-          group
-        );
-  
+        this.renderPauseEventScreen(group);
+
         break;
-  
-  
+
       case "hitsound":
-
-        this.renderHitsoundEventScreen(
-          group
-        );
+        this.renderHitsoundEventScreen(group);
 
         break;
-
 
       case "unsupported":
-  
-        this.renderUnsupportedEventScreen(
-          group
-        );
-  
+        this.renderUnsupportedEventScreen(group);
+
         break;
-  
-  
+
       default:
-  
-        this.eventScreenBody
-          .textContent =
-            "This event editor has not been implemented yet.";
-  
+        this.eventScreenBody.textContent =
+          "This event editor has not been implemented yet.";
+
         break;
     }
   }
 
-  initDial(){
-
-    if(!this.angleDial){
+  initDial() {
+    if (!this.angleDial) {
       return;
     }
 
+    const updateFromPointer = (e) => {
+      const rect = this.angleDial.getBoundingClientRect();
 
-    const updateFromPointer =
-      e => {
+      const cx = rect.left + rect.width / 2;
 
-        const rect =
-          this.angleDial
-            .getBoundingClientRect();
+      const cy = rect.top + rect.height / 2;
 
+      const dx = e.clientX - cx;
 
-        const cx =
-          rect.left +
-          rect.width / 2;
+      const dy = cy - e.clientY;
 
-        const cy =
-          rect.top +
-          rect.height / 2;
+      let angle = radToDeg(Math.atan2(dy, dx));
 
+      angle = normalizeAngle(angle);
 
-        const dx =
-          e.clientX - cx;
-
-        const dy =
-          cy - e.clientY;
-
-
-        let angle =
-          radToDeg(
-            Math.atan2(
-              dy,
-              dx
-            )
-          );
-
-
-        angle =
-          normalizeAngle(angle);
-
-
-        // 15도 스냅
-        if (this.snapEnabled) {
-  
-        angle =
-          Math.round(
-            angle /
-            this.snapStep
-          ) *
-          this.snapStep;
+      // 15도 스냅
+      if (this.snapEnabled) {
+        angle = Math.round(angle / this.snapStep) * this.snapStep;
       }
-      
-      
+
       /*
         다이얼 조작:
           SNAP = 15° 단위
@@ -2597,227 +1416,129 @@ integer = false,
         소수 자유각은 상단 숫자 입력칸에서
         직접 입력할 수 있다.
       */
-      if(!this.snapEnabled){
-
-        angle =
-          Math.round(
-            angle
-          );
+      if (!this.snapEnabled) {
+        angle = Math.round(angle);
       }
 
+      angle = normalizeAngle(angle);
 
-      angle =
-        normalizeAngle(
-          angle
-        );
+      this.setDialAngle(angle);
+    };
 
+    this.angleDial.addEventListener("pointerdown", (e) => {
+      if (!this.data?.canAdd) {
+        return;
+      }
 
-        this.setDialAngle(
-          angle
-        );
-      };
+      this.draggingDial = true;
 
+      this.angleDial.setPointerCapture?.(e.pointerId);
 
-    this.angleDial
-      .addEventListener(
-        "pointerdown",
-        e => {
+      updateFromPointer(e);
+    });
 
-          if(
-            !this.data?.canAdd
-          ){
-            return;
-          }
+    this.angleDial.addEventListener("pointermove", (e) => {
+      if (!this.draggingDial) {
+        return;
+      }
 
-          this.draggingDial = true;
+      updateFromPointer(e);
+    });
 
+    this.angleDial.addEventListener("pointerup", (e) => {
+      if (!this.draggingDial) {
+        return;
+      }
 
-          this.angleDial
-            .setPointerCapture?.(
-              e.pointerId
-            );
+      updateFromPointer(e);
 
+      this.draggingDial = false;
 
-          updateFromPointer(e);
-        }
-      );
-
-
-    this.angleDial
-      .addEventListener(
-        "pointermove",
-        e => {
-
-          if(
-            !this.draggingDial
-          ){
-            return;
-          }
-
-          updateFromPointer(e);
-        }
-      );
-
-
-    this.angleDial
-      .addEventListener(
-        "pointerup",
-        e => {
-
-          if(
-            !this.draggingDial
-          ){
-            return;
-          }
-
-          updateFromPointer(e);
-
-          this.draggingDial = false;
-
-          /*
+      /*
             중요:
             여기서는 타일을 만들지 않는다.
 
             슬라이더는 각도 설정만 한다.
           */
-        }
-      );
+    });
 
-
-    this.angleDial
-      .addEventListener(
-        "pointercancel",
-        () => {
-
-          this.draggingDial = false;
-        }
-      );
+    this.angleDial.addEventListener("pointercancel", () => {
+      this.draggingDial = false;
+    });
   }
 
+  setDialAngle(angle) {
+    this.dialAngle = normalizeAngle(angle);
 
-  setDialAngle(angle){
-
-    this.dialAngle =
-      normalizeAngle(angle);
-
-
-    if(this.advancedAngleValue){
-
-      this.advancedAngleValue
-        .value =
-          String(
-            Number(
-              this.dialAngle
-                .toFixed(4)
-            )
-          );
+    if (this.advancedAngleValue) {
+      this.advancedAngleValue.value = String(Number(this.dialAngle.toFixed(4)));
     }
 
-
-    if(this.angleDialNeedle){
-
-      this.angleDialNeedle
-        .style.transform =
-          `rotate(${-this.dialAngle}deg)`;
+    if (this.angleDialNeedle) {
+      this.angleDialNeedle.style.transform = `rotate(${-this.dialAngle}deg)`;
     }
   }
 
+  update(data) {
+    this.data = data;
 
-  update(data){
+    this.eventTabGroups = data.eventTabGroups ?? [];
 
-    this.data =
-      data;
-  
-  
-    this.eventTabGroups =
-      data.eventTabGroups ??
-      [];
-    
-    this.eventPaletteItems =
-      data.eventPaletteItems ??
-      [];
+    this.eventPaletteItems = data.eventPaletteItems ?? [];
 
     this.hitsoundOptions =
-      Array.isArray(
-        data.hitsoundOptions
-      ) &&
-      data.hitsoundOptions.length > 0
+      Array.isArray(data.hitsoundOptions) && data.hitsoundOptions.length > 0
         ? data.hitsoundOptions
         : [
             {
               value: "None",
-              label: "None"
+              label: "None",
             },
             {
               value: "Kick",
-              label: "Kick"
-            }
+              label: "Kick",
+            },
           ];
-  
-  
+
     /*
       선택된 타일에서 현재 탭이
       여전히 존재하는지 확인
     */
-    const validTabKeys =
-      new Set([
-        "tile",
-  
-        ...this.eventTabGroups.map(
-          group =>
-            group.key
-        )
-      ]);
-  
-  
+    const validTabKeys = new Set([
+      "tile",
+
+      ...this.eventTabGroups.map((group) => group.key),
+    ]);
+
     /*
       다른 타일로 이동했는데
       현재 이벤트가 없다면
       타일 생성 탭으로 복귀
     */
-    if(
-      !validTabKeys.has(
-        this.activeTabKey
-      )
-    ){
-  
-      this.activeTabKey =
-        "tile";
+    if (!validTabKeys.has(this.activeTabKey)) {
+      this.activeTabKey = "tile";
     }
-  
-  
+
     /*
       재생 또는 다중 선택에서는
       이벤트 탭 화면을 종료
     */
-    if(
-      data.mode === "play" ||
-      data.selectedCount !== 1
-    ){
-  
-      this.isAdvanced =
-        false;
-  
-      this.activeTabKey =
-        "tile";
+    if (data.mode === "play" || data.selectedCount !== 1) {
+      this.isAdvanced = false;
+
+      this.activeTabKey = "tile";
     }
-  
-  
+
     this.render();
   }
-  
-  renderTabs(){
 
-    if(!this.tabsElement){
+  renderTabs() {
+    if (!this.tabsElement) {
       return;
     }
-  
-  
-    const groups =
-      this.eventTabGroups ??
-      [];
-  
-  
+
+    const groups = this.eventTabGroups ?? [];
+
     /*
       매번 새로 만드는 방식.
   
@@ -2825,344 +1546,189 @@ integer = false,
       성능 문제 없음.
     */
     this.tabsElement.innerHTML = "";
-  
-  
+
     /* =========================
        Tile 생성 탭
     ========================= */
-  
-    const tileTab =
-      document.createElement(
-        "button"
-      );
-  
-  
-    tileTab.type =
-      "button";
-  
-    tileTab.className =
-      "editor-tab";
-  
-    tileTab.dataset.tab =
-      "tile";
-  
-    tileTab.innerHTML =
-      `<span class="editor-tab-icon">＋</span>`;
-  
-  
-    if(
-      this.activeTabKey ===
-      "tile"
-    ){
-      tileTab.classList.add(
-        "active"
-      );
+
+    const tileTab = document.createElement("button");
+
+    tileTab.type = "button";
+
+    tileTab.className = "editor-tab";
+
+    tileTab.dataset.tab = "tile";
+
+    tileTab.innerHTML = `<span class="editor-tab-icon">＋</span>`;
+
+    if (this.activeTabKey === "tile") {
+      tileTab.classList.add("active");
     }
-  
-  
-    tileTab.addEventListener(
-      "click",
-      () => {
-    
-        this.activeTabKey =
-          "tile";
-    
-    
-        /*
+
+    tileTab.addEventListener("click", () => {
+      this.activeTabKey = "tile";
+
+      /*
           Advanced 화면에서 이벤트 갔다가
           돌아오는 등의 상태 꼬임 방지
         */
-        this.isAdvanced =
-          false;
-    
-    
-        this.render();
-      }
-    );
-  
-  
-    this.tabsElement.appendChild(
-      tileTab
-    );
-  
-  
+      this.isAdvanced = false;
+
+      this.render();
+    });
+
+    this.tabsElement.appendChild(tileTab);
+
     /* =========================
        Event Tabs
     ========================= */
-  
-    for(const group of groups){
-  
-      const button =
-        document.createElement(
-          "button"
-        );
-  
-  
-      button.type =
-        "button";
-  
-      button.className =
-        "editor-tab";
-  
-      button.dataset.tab =
-        group.key;
-  
-  
-      const icon =
-  document.createElement(
-    "img"
-  );
 
+    for (const group of groups) {
+      const button = document.createElement("button");
 
-      icon.className =
-        "editor-tab-icon";
-      
-      
-      icon.src =
-        group.iconSrc;
-      
-      
-      icon.alt =
-        group.key;
-      
-      
-      icon.draggable =
-        false;
-      
-      
-      button.appendChild(
-        icon
-      );
-  
-  
+      button.type = "button";
+
+      button.className = "editor-tab";
+
+      button.dataset.tab = group.key;
+
+      const icon = document.createElement("img");
+
+      icon.className = "editor-tab-icon";
+
+      icon.src = group.iconSrc;
+
+      icon.alt = group.key;
+
+      icon.draggable = false;
+
+      button.appendChild(icon);
+
       /*
         같은 종류 이벤트가 여러 개면
         숫자 배지 표시
       */
-      if(
-        group.actions.length > 1
-      ){
-  
-        const count =
-          document.createElement(
-            "span"
-          );
-  
-  
-        count.className =
-          "editor-tab-count";
-  
-        count.textContent =
-          group.actions.length;
-  
-  
-        button.appendChild(
-          count
-        );
+      if (group.actions.length > 1) {
+        const count = document.createElement("span");
+
+        count.className = "editor-tab-count";
+
+        count.textContent = group.actions.length;
+
+        button.appendChild(count);
       }
-  
-  
-      if(
-        this.activeTabKey ===
-        group.key
-      ){
-  
-        button.classList.add(
-          "active"
-        );
+
+      if (this.activeTabKey === group.key) {
+        button.classList.add("active");
       }
-  
-  
-      button.addEventListener(
-      "click",
-      () => {
-    
-        this.activeTabKey =
-          group.key;
-    
-    
+
+      button.addEventListener("click", () => {
+        this.activeTabKey = group.key;
+
         /*
           이벤트 탭은 Advanced와
           동시에 존재하지 않도록 함
         */
-        this.isAdvanced =
-          false;
-    
-    
+        this.isAdvanced = false;
+
         this.render();
-      }
-    );
-  
-  
-      this.tabsElement.appendChild(
-        button
-      );
+      });
+
+      this.tabsElement.appendChild(button);
     }
 
-    const pasteEventButton =
-      document.createElement(
-        "button"
-      );
+    const pasteEventButton = document.createElement("button");
 
-    pasteEventButton.type =
-      "button";
-    pasteEventButton.className =
-      "editor-tab event-paste-tab";
-    pasteEventButton.dataset.tab =
-      "paste-event";
-    pasteEventButton.disabled =
-      !this.data?.canPasteEvent;
+    pasteEventButton.type = "button";
+    pasteEventButton.className = "editor-tab event-paste-tab";
+    pasteEventButton.dataset.tab = "paste-event";
+    pasteEventButton.disabled = !this.data?.canPasteEvent;
 
-    const copiedEventType =
-      String(
-        this.data?.eventClipboardType ?? ""
-      );
+    const copiedEventType = String(this.data?.eventClipboardType ?? "");
 
     pasteEventButton.setAttribute(
       "aria-label",
-      copiedEventType
-        ? `Paste ${copiedEventType}`
-        : "Paste copied event"
+      copiedEventType ? `Paste ${copiedEventType}` : "Paste copied event",
     );
-    pasteEventButton.title =
-      copiedEventType
-        ? `Paste ${copiedEventType}`
-        : "Paste Event";
+    pasteEventButton.title = copiedEventType
+      ? `Paste ${copiedEventType}`
+      : "Paste Event";
 
-    const pasteIcon =
-      document.createElement(
-        "span"
-      );
-    pasteIcon.className =
-      "editor-tab-icon event-paste-icon";
-    pasteIcon.textContent =
-      "⎘";
-    pasteEventButton.appendChild(
-      pasteIcon
-    );
+    const pasteIcon = document.createElement("span");
+    pasteIcon.className = "editor-tab-icon event-paste-icon";
+    pasteIcon.textContent = "⎘";
+    pasteEventButton.appendChild(pasteIcon);
 
-    pasteEventButton.addEventListener(
-      "click",
-      () => {
-        if(pasteEventButton.disabled){
-          return;
-        }
-
-        const pasted =
-          this.callback.onPasteEvent?.();
-
-        if(!pasted){
-          return;
-        }
-
-        const def =
-          getEventDefinition(
-            pasted.eventType
-          );
-
-        if(def && def.openTabOnCreate !== false){
-          this.activeTabKey =
-            def.key;
-        }
-
-        this.isAdvanced =
-          false;
-        this.render();
+    pasteEventButton.addEventListener("click", () => {
+      if (pasteEventButton.disabled) {
+        return;
       }
-    );
 
-    this.tabsElement.appendChild(
-      pasteEventButton
-    );
+      const pasted = this.callback.onPasteEvent?.();
+
+      if (!pasted) {
+        return;
+      }
+
+      const def = getEventDefinition(pasted.eventType);
+
+      if (def && def.openTabOnCreate !== false) {
+        this.activeTabKey = def.key;
+      }
+
+      this.isAdvanced = false;
+      this.render();
+    });
+
+    this.tabsElement.appendChild(pasteEventButton);
   }
 
-  renderEventPalette(){
-
-    if(
-      !this.eventPaletteElement
-    ){
+  renderEventPalette() {
+    if (!this.eventPaletteElement) {
       return;
     }
 
+    this.eventPaletteElement.innerHTML = "";
 
-    this.eventPaletteElement
-      .innerHTML = "";
+    for (const item of this.eventPaletteItems) {
+      const button = document.createElement("button");
 
+      button.type = "button";
 
-    for(
-      const item
-      of this.eventPaletteItems
-    ){
+      button.className = "event-palette-button";
 
-      const button =
-        document.createElement(
-          "button"
-        );
+      button.disabled = !item.canAdd;
 
+      button.setAttribute("aria-label", `Add ${item.title}`);
 
-      button.type =
-        "button";
-
-      button.className =
-        "event-palette-button";
-
-
-      button.disabled =
-        !item.canAdd;
-
-
-      button.setAttribute(
-        "aria-label",
-        `Add ${item.title}`
-      );
-
-
-      button.title =
-        `Add ${item.title}`;
-
+      button.title = `Add ${item.title}`;
 
       /* =========================
         Icon
       ========================= */
 
-      const icon =
-        document.createElement(
-          "img"
-        );
+      const icon = document.createElement("img");
 
+      icon.className = "event-palette-icon";
 
-      icon.className =
-        "event-palette-icon";
+      icon.src = item.iconSrc;
 
-      icon.src =
-        item.iconSrc;
+      icon.alt = "";
 
-      icon.alt =
-        "";
+      icon.draggable = false;
 
-      icon.draggable =
-        false;
-
-
-      button.appendChild(
-        icon
-      );
-
+      button.appendChild(icon);
 
       /* =========================
         Add Event
       ========================= */
 
-      button.addEventListener(
-        "click",
-        () => {
+      button.addEventListener("click", () => {
+        if (button.disabled) {
+          return;
+        }
 
-          if(button.disabled){
-            return;
-          }
-
-
-          /*
+        /*
             이벤트 종류별로 생성 후 탭 이동 여부를 다르게 한다.
 
             예:
@@ -3172,370 +1738,271 @@ integer = false,
               Twirl
                 -> 현재 탭 유지
           */
-          const previousTab =
-            this.activeTabKey;
+        const previousTab = this.activeTabKey;
 
+        const added = this.callback.onAddEvent?.(item.eventType);
 
-          const added =
-            this.callback
-              .onAddEvent?.(
-                item.eventType
-              );
-
-
-          /*
+        /*
             추가 실패 시 현재 탭을 그대로 유지한다.
           */
-          if(!added){
+        if (!added) {
+          this.activeTabKey = previousTab;
 
-            this.activeTabKey =
-              previousTab;
+          this.render();
 
-            this.render();
+          return;
+        }
 
-            return;
-          }
+        if (item.openTabOnCreate !== false) {
+          this.activeTabKey = item.key;
 
-
-          if(
-            item.openTabOnCreate !==
-            false
-          ){
-
-            this.activeTabKey =
-              item.key;
-
-            /*
+          /*
               addEventToSelected() 내부 rebuild는
               이전 activeTabKey 상태에서 이미 끝났으므로,
               여기서 새 탭을 한 번 더 렌더한다.
             */
-            this.render();
-          }
+          this.render();
         }
-      );
+      });
 
-
-      this.eventPaletteElement
-        .appendChild(
-          button
-        );
+      this.eventPaletteElement.appendChild(button);
     }
   }
 
-
-  render(){
-
-    if(!this.root){
+  render() {
+    if (!this.root) {
       return;
     }
 
-
-    const data =
-      this.data ?? {
-        mode: "edit",
-        selectedCount: 0,
-        canAdd: false,
-        label: "—"
-      };
-
+    const data = this.data ?? {
+      mode: "edit",
+      selectedCount: 0,
+      canAdd: false,
+      label: "—",
+    };
 
     let uiMode;
 
-
-    if(data.mode === "play"){
+    if (data.mode === "play") {
       uiMode = "play";
-    }
-    else if(data.selectedCount === 0){
+    } else if (data.selectedCount === 0) {
       uiMode = "empty";
-    }
-    else if(data.selectedCount > 1){
+    } else if (data.selectedCount > 1) {
       uiMode = "multi";
-    }
-    else if(this.isAdvanced){
+    } else if (this.isAdvanced) {
       uiMode = "advanced";
-    }
-    else{
+    } else {
       uiMode = "single";
     }
 
-
-    for(
-      const mode
-      of [
-        "empty",
-        "single",
-        "advanced",
-        "multi",
-        "play"
-      ]
-    ){
-
-      this.root.classList.remove(
-        `ui-${mode}`
-      );
+    for (const mode of ["empty", "single", "advanced", "multi", "play"]) {
+      this.root.classList.remove(`ui-${mode}`);
     }
 
+    this.root.classList.add(`ui-${uiMode}`);
 
-    this.root.classList.add(
-      `ui-${uiMode}`
-    );
-    
     /*
       현재 탭 콘텐츠 종류
     */
-    const isEventTab =
-      uiMode === "single" &&
-      this.activeTabKey !== "tile";
-    
-    
-    this.root.classList.toggle(
-      "tab-event",
-      isEventTab
-    );
-    
-    
-    this.root.classList.toggle(
-      "tab-tile",
-      !isEventTab
-    );
+    const isEventTab = uiMode === "single" && this.activeTabKey !== "tile";
 
+    this.root.classList.toggle("tab-event", isEventTab);
 
-    if(this.currentAngleLabel){
+    this.root.classList.toggle("tab-tile", !isEventTab);
 
-      this.currentAngleLabel
-        .textContent =
-          data.label ?? "—";
+    if (this.currentAngleLabel) {
+      this.currentAngleLabel.textContent = data.label ?? "—";
     }
 
-
-    for(
-      const button
-      of this.quickButtons
-    ){
-
-      button.disabled =
-        !data.canAdd;
+    for (const button of this.quickButtons) {
+      button.disabled = !data.canAdd;
 
       // 이제 active angle 개념 없음
-      button.classList.remove(
-        "active"
-      );
+      button.classList.remove("active");
     }
 
+    this.fullspinButton.disabled = !data.canAdd;
 
-    this.fullspinButton.disabled =
-      !data.canAdd;
+    this.midspinButton.disabled = !data.canAdd;
 
-    this.midspinButton.disabled =
-      !data.canAdd;
-
-    if(this.advancedFullspinButton){
-      this.advancedFullspinButton.disabled =
-        !data.canAdd;
+    if (this.advancedFullspinButton) {
+      this.advancedFullspinButton.disabled = !data.canAdd;
     }
 
-    if(this.advancedMidspinButton){
-      this.advancedMidspinButton.disabled =
-        !data.canAdd;
+    if (this.advancedMidspinButton) {
+      this.advancedMidspinButton.disabled = !data.canAdd;
     }
 
-    this.advancedButton.disabled =
-      !data.canAdd;
+    this.advancedButton.disabled = !data.canAdd;
 
-    this.advancedAddButton.disabled =
-      !data.canAdd;
-    
-    if(this.deleteFloorButton){
+    this.advancedAddButton.disabled = !data.canAdd;
 
-      this.deleteFloorButton.disabled =
-        !data.canDelete;
+    if (this.deleteFloorButton) {
+      this.deleteFloorButton.disabled = !data.canDelete;
     }
 
-    if(this.advancedDeleteFloorButton){
-
-      this.advancedDeleteFloorButton.disabled =
-        !data.canDelete;
+    if (this.advancedDeleteFloorButton) {
+      this.advancedDeleteFloorButton.disabled = !data.canDelete;
     }
 
+    this.fullspinButton.classList.remove("active");
 
-    this.fullspinButton
-      .classList.remove(
-        "active"
-      );
+    this.midspinButton.classList.remove("active");
 
-    this.midspinButton
-      .classList.remove(
-        "active"
-      );
-
-
-    if(this.multiSelectionCount){
-
-      this.multiSelectionCount
-        .textContent =
-          `${data.selectedCount} tile${data.selectedCount === 1 ? "" : "s"} selected`;
+    if (this.multiSelectionCount) {
+      this.multiSelectionCount.textContent = `${data.selectedCount} tile${data.selectedCount === 1 ? "" : "s"} selected`;
     }
 
-
-    if(
-      uiMode === "advanced" &&
-      !this.draggingDial
-    ){
-
-      this.setDialAngle(
-        this.dialAngle
-      );
+    if (uiMode === "advanced" && !this.draggingDial) {
+      this.setDialAngle(this.dialAngle);
     }
-    
+
     this.renderTabs();
     this.renderEventPalette();
 
-
-    if(isEventTab){
-    
+    if (isEventTab) {
       this.renderActiveEventScreen();
     }
   }
 }
 
 //입력 관리 클래스
-class InputController{
-  constructor(runtime, cameraSystem){
+class InputController {
+  constructor(runtime, cameraSystem) {
     this.runtime = runtime;
-    this.cameraSystem = cameraSystem
+    this.cameraSystem = cameraSystem;
     this.canvas = this.runtime.renderer.domElement;
 
     this.activePointers = new Map(); // pointerId -> {x,y}
-    this.lastCenter = null;          // 이전 프레임 중심점
-    
+    this.lastCenter = null; // 이전 프레임 중심점
+
     this.isDragging = false;
     this.dragThreshold = 5;
-    
+
     this.enabled = true;
-    
+
     this.picker = new Picker(runtime, cameraSystem);
-    
+
     //콜백
     this.callback = {
-      onSelectFloor : null,
-    }
+      onSelectFloor: null,
+    };
 
-    this.canvas.addEventListener('pointerdown', this.onDown.bind(this));
-    this.canvas.addEventListener('pointermove', this.onMove.bind(this));
-    this.canvas.addEventListener('pointerup', this.onUp.bind(this));
-    this.canvas.addEventListener('pointercancel', this.onUp.bind(this));
+    this.canvas.addEventListener("pointerdown", this.onDown.bind(this));
+    this.canvas.addEventListener("pointermove", this.onMove.bind(this));
+    this.canvas.addEventListener("pointerup", this.onUp.bind(this));
+    this.canvas.addEventListener("pointercancel", this.onUp.bind(this));
   }
-  
-  setEnabled(v){
+
+  setEnabled(v) {
     this.enabled = v;
   }
 
-  onDown(e){
+  onDown(e) {
     this.canvas.setPointerCapture?.(e.pointerId);
     this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     // 새 중심점 기준 설정
     this.lastCenter = this.getCenter();
     this.isDragging = false;
-    
+
     const n = this.activePointers.size;
-    if(n > 1) this.isDragging = true;
+    if (n > 1) this.isDragging = true;
   }
 
-  onMove(e){
-    if(!this.activePointers.has(e.pointerId)) return;
+  onMove(e) {
+    if (!this.activePointers.has(e.pointerId)) return;
 
     // 포인터 좌표 업데이트
     const p = this.activePointers.get(e.pointerId);
     p.x = e.clientX;
     p.y = e.clientY;
-    
+
     const n = this.activePointers.size;
-    if(n > 1) this.isDragging = true;
+    if (n > 1) this.isDragging = true;
 
     const center = this.getCenter();
-    if(!this.lastCenter || !center) return;
+    if (!this.lastCenter || !center) return;
 
     const dx = center.x - this.lastCenter.x;
     const dy = center.y - this.lastCenter.y;
 
     // 드래그량이 너무 작으면 무시 (노이즈 방지)
-    if(Math.hypot(dx, dy) < this.dragThreshold) return;
-    
+    if (Math.hypot(dx, dy) < this.dragThreshold) return;
+
     this.isDragging = true;
 
-    if(this.enabled){
+    if (this.enabled) {
       this.cameraSystem.requestPanByPixels(dx, dy);
     }
 
     this.lastCenter = center;
   }
 
-  onUp(e){
+  onUp(e) {
     const n = this.activePointers.size;
-  
-    if(n > 1) this.isDragging = true;
-  
-    if(!this.isDragging && this.enabled){
+
+    if (n > 1) this.isDragging = true;
+
+    if (!this.isDragging && this.enabled) {
       this.handleTap(e.clientX, e.clientY);
     }
-  
+
     this.activePointers.delete(e.pointerId);
-  
+
     this.lastCenter = this.getCenter();
-  
-    if(this.activePointers.size === 0){
+
+    if (this.activePointers.size === 0) {
       this.isDragging = false;
     }
   }
 
   // 모든 포인터 좌표의 평균
-  getCenter(){
+  getCenter() {
     const n = this.activePointers.size;
-    if(n === 0) return null;
+    if (n === 0) return null;
 
-    let sx = 0, sy = 0;
-    for(const p of this.activePointers.values()){
+    let sx = 0,
+      sy = 0;
+    for (const p of this.activePointers.values()) {
       sx += p.x;
       sy += p.y;
     }
     return { x: sx / n, y: sy / n };
   }
-  
-  handleTap(x, y){
+
+  handleTap(x, y) {
     const floorId = this.picker.pickFloorId(x, y);
-    if(!floorId){
+    if (!floorId) {
       this.callback.onSelectFloor?.(floorId);
       return;
     }
-  
+
     // runtime에서 그룹(mesh) 찾기
     const group = this.runtime.meshByFloorId.get(floorId);
-    if(!group) return;
-  
+    if (!group) return;
+
     //const floorIndex = group.userData.floorIndex; // 여기로 index 가져오기
-  
+
     // EditorApp 콜백 호출
     this.callback.onSelectFloor?.(floorId);
   }
-  
 }
 
 //레이캐스팅을 이용한 뽑기 전용 클래스
-class Picker{
-  constructor(runtime, cameraSystem){
+class Picker {
+  constructor(runtime, cameraSystem) {
     this.runtime = runtime;
     this.cameraSystem = cameraSystem;
-    
+
     this.raycaster = new this.runtime.Three.Raycaster();
     this.ndc = new this.runtime.Three.Vector2();
-    
+
     this.prevSelectArr = [];
     this.selectArrIdx = 0;
   }
 
-  pickFloorId(clientX, clientY){
+  pickFloorId(clientX, clientY) {
     const dom = this.runtime.renderer.domElement;
     const rect = dom.getBoundingClientRect();
 
@@ -3545,26 +2012,24 @@ class Picker{
 
     this.raycaster.setFromCamera(this.ndc, this.cameraSystem.camera);
 
-    const hits =
-      this.raycaster.intersectObjects(
-        this.runtime
-          .visibleFloorMeshes,
-        true
-      );
-    if(hits.length === 0){
-      return null
+    const hits = this.raycaster.intersectObjects(
+      this.runtime.visibleFloorMeshes,
+      true,
+    );
+    if (hits.length === 0) {
+      return null;
     }
 
     const result = [];
     const seen = new Set();
 
-    for(const hit of hits){
+    for (const hit of hits) {
       let obj = hit.object;
 
-      while(obj){
+      while (obj) {
         const fid = obj.userData?.floorId;
-        if(fid){
-          if(!seen.has(fid)){
+        if (fid) {
+          if (!seen.has(fid)) {
             seen.add(fid);
             result.push(fid); // depth 순서 유지
           }
@@ -3573,143 +2038,89 @@ class Picker{
         obj = obj.parent;
       }
     }
-    
-    result.sort(
-      (a, b) => {
 
-        const groupA =
-          this.runtime
-            .meshByFloorId
-            .get(a);
+    result.sort((a, b) => {
+      const groupA = this.runtime.meshByFloorId.get(a);
 
-        const groupB =
-          this.runtime
-            .meshByFloorId
-            .get(b);
+      const groupB = this.runtime.meshByFloorId.get(b);
 
+      const indexA = groupA?.userData?.floorIndex ?? Infinity;
 
-        const indexA =
-          groupA?.userData
-            ?.floorIndex ??
-          Infinity;
+      const indexB = groupB?.userData?.floorIndex ?? Infinity;
 
-        const indexB =
-          groupB?.userData
-            ?.floorIndex ??
-          Infinity;
-
-
-        /*
+      /*
           작은 index가 화면 위이므로
           먼저 선택
         */
-        return (
-          indexA -
-          indexB
-        );
-      }
-    );
-    
+      return indexA - indexB;
+    });
+
     const compare = (a, b) => {
-      if(!a || !b) return false;
-      if(a.length != b.length) return false;
-      for(let i = 0; i<a.length; i++){
-        if(a[i] !== b[i]) return false;
+      if (!a || !b) return false;
+      if (a.length != b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
       }
       //console.log('same')
       return true;
-    }
-    
-    if(!compare(result, this.prevSelectArr)){
+    };
+
+    if (!compare(result, this.prevSelectArr)) {
       this.prevSelectArr = [...result];
       this.selectArrIdx = 0;
     }
-    
-    if(result.length === 0){
 
+    if (result.length === 0) {
       this.prevSelectArr = [];
-    
+
       this.selectArrIdx = 0;
-    
+
       return null;
     }
-    
+
     const id = result[this.selectArrIdx];
-    this.selectArrIdx = (this.selectArrIdx + 1)%this.prevSelectArr.length;
-    return id
+    this.selectArrIdx = (this.selectArrIdx + 1) % this.prevSelectArr.length;
+    return id;
   }
 }
 
 //Playback을 위한 계산 클래스
-class Evaluator{
-  constructor(){
+class Evaluator {
+  constructor() {
     this.compiled = null;
-    this.startTime_us = null,
-    this.lastTime_us = -Infinity;
+    ((this.startTime_us = null), (this.lastTime_us = -Infinity));
     this.lastIndex = null;
-    
-    this.activePlayerCameraPositions = [];
-    
-    this.playerCameraPosition = {
-      x : 0,
-      y : 0,
-    }
-  }
-  
-  init(
-    compiled,
-    t_us,
-    startFloorIndex = null
-  ){
 
+    this.activePlayerCameraPositions = [];
+
+    this.playerCameraPosition = {
+      x: 0,
+      y: 0,
+    };
+  }
+
+  init(compiled, t_us, startFloorIndex = null) {
     this.reset();
 
-    this.compiled =
-      compiled;
+    this.compiled = compiled;
 
-    this.startTime_us =
-      Number(t_us);
+    this.startTime_us = Number(t_us);
 
-    if(
-      !Number.isFinite(
-        this.startTime_us
-      )
-    ){
+    if (!Number.isFinite(this.startTime_us)) {
       this.startTime_us = 0;
     }
 
-    this.lastTime_us =
-      this.startTime_us;
+    this.lastTime_us = this.startTime_us;
 
-    const maxIndex =
-      Math.max(
-        0,
-        (
-          this.compiled?.floors?.length ??
-          1
-        ) - 1
-      );
+    const maxIndex = Math.max(0, (this.compiled?.floors?.length ?? 1) - 1);
 
-    let index =
-      Number.isInteger(
-        startFloorIndex
-      )
-        ? startFloorIndex
-        : this.findFloorIndexByTime_us(
-            this.startTime_us
-          );
+    let index = Number.isInteger(startFloorIndex)
+      ? startFloorIndex
+      : this.findFloorIndexByTime_us(this.startTime_us);
 
-    index =
-      Math.max(
-        0,
-        Math.min(
-          maxIndex,
-          index
-        )
-      );
+    index = Math.max(0, Math.min(maxIndex, index));
 
-    this.lastIndex =
-      index;
+    this.lastIndex = index;
 
     /*
       Playback may begin from an arbitrary selected tile.
@@ -3722,139 +2133,84 @@ class Evaluator{
       From here, evaluateAt() only consumes moves N+1, N+2 ... ,
       so the first transition after the chosen start stays smooth.
     */
-    const floor =
-      this.compiled?.floors?.[
-        index
-      ];
+    const floor = this.compiled?.floors?.[index];
 
-    this.playerCameraPosition.x =
-      Number.isFinite(
-        Number(floor?.x)
-      )
-        ? Number(floor.x)
-        : 0;
+    this.playerCameraPosition.x = Number.isFinite(Number(floor?.x))
+      ? Number(floor.x)
+      : 0;
 
-    this.playerCameraPosition.y =
-      Number.isFinite(
-        Number(floor?.y)
-      )
-        ? Number(floor.y)
-        : 0;
+    this.playerCameraPosition.y = Number.isFinite(Number(floor?.y))
+      ? Number(floor.y)
+      : 0;
 
-    this.activePlayerCameraPositions =
-      [];
+    this.activePlayerCameraPositions = [];
   }
-  
+
   //특정 시간대 계산
-  evaluateAt(compiled, t_us, knownIndex = null){
+  evaluateAt(compiled, t_us, knownIndex = null) {
+    this.compiled = compiled;
 
-    this.compiled =
-      compiled;
+    this.lastTime_us = t_us;
 
-    this.lastTime_us =
-      t_us;
+    const index = knownIndex ?? this.findFloorIndexByTime_us(t_us);
 
+    const floor = this.compiled.floors[index];
 
-    const index =
-      knownIndex ??
-      this.findFloorIndexByTime_us(
-        t_us
-      );
-
-
-    const floor =
-      this.compiled.floors[
-        index
-      ];
-    
     //새로운 플레이어 카메라 오브젝트 추가
-    if(this.lastIndex == null){
+    if (this.lastIndex == null) {
       this.lastIndex = index;
     }
 
-    for(
-      let i = this.lastIndex + 1;
-      i <= index;
-      i++
-    ){
+    for (let i = this.lastIndex + 1; i <= index; i++) {
+      const move = this.compiled.playerCameraPositions[i];
 
-      const move =
-        this.compiled
-          .playerCameraPositions[i];
-
-      if(move){
-        this.activePlayerCameraPositions
-          .push(move);
+      if (move) {
+        this.activePlayerCameraPositions.push(move);
       }
     }
-    
+
     let dx = 0;
     let dy = 0;
-    
-    for(
-      let i =
-        this.activePlayerCameraPositions.length - 1;
-      i >= 0;
-      i--
-    ){
 
-      const obj =
-        this.activePlayerCameraPositions[i];
+    for (let i = this.activePlayerCameraPositions.length - 1; i >= 0; i--) {
+      const obj = this.activePlayerCameraPositions[i];
 
-      if(
+      if (
         !obj ||
         !Number.isFinite(Number(obj.duration_us)) ||
         Number(obj.duration_us) <= 0
-      ){
+      ) {
         this.activePlayerCameraPositions.splice(i, 1);
         continue;
       }
-      
-      let progress =
-        (
-          t_us -
-          Number(obj.start_us)
-        ) /
-        Number(obj.duration_us);
 
-      progress =
-        Math.max(
-          0,
-          Math.min(
-            1,
-            progress
-          )
-        );
+      let progress = (t_us - Number(obj.start_us)) / Number(obj.duration_us);
 
-      if(progress >= 1){
-        this.playerCameraPosition.x +=
-          Number(obj.dx) || 0;
+      progress = Math.max(0, Math.min(1, progress));
 
-        this.playerCameraPosition.y +=
-          Number(obj.dy) || 0;
+      if (progress >= 1) {
+        this.playerCameraPosition.x += Number(obj.dx) || 0;
 
-        this.activePlayerCameraPositions.splice(i,1);
+        this.playerCameraPosition.y += Number(obj.dy) || 0;
+
+        this.activePlayerCameraPositions.splice(i, 1);
         continue;
       }
-      
-      dx +=
-        progress *
-        (Number(obj.dx) || 0);
 
-      dy +=
-        progress *
-        (Number(obj.dy) || 0);
+      dx += progress * (Number(obj.dx) || 0);
+
+      dy += progress * (Number(obj.dy) || 0);
     }
-    
+
     //console.log(this.activePlayerCameraPositiois.length)
-    
+
     const frameState = {
-      camera : {}
+      camera: {},
     };
-    
+
     frameState.camera.x = this.playerCameraPosition.x + dx;
     frameState.camera.y = this.playerCameraPosition.y + dy;
-    
+
     //간이 카메라 정보, 일단 해당 타일로 카메라가 바로 이동하도록 하기
     /*
     frameState.camera.x = floor.x;
@@ -3862,141 +2218,97 @@ class Evaluator{
     frameState.camera.rotation = 0;
     frameState.camera.zoom = 100;
     */
-    
-    this.lastIndex = index
+
+    this.lastIndex = index;
     return frameState;
   }
-  
-  reset(){
+
+  reset() {
     this.compiled = null;
-    this.startTime_us = null,
-    this.lastTime_us = -Infinity;
+    ((this.startTime_us = null), (this.lastTime_us = -Infinity));
     this.lastIndex = null;
 
     this.activePlayerCameraPositions = [];
-    
+
     this.playerCameraPosition = {
       x: 0,
       y: 0,
-    }
+    };
   }
-  
-  evaluatePlayerCameraPosition(){
-    
-  }
-  
+
+  evaluatePlayerCameraPosition() {}
+
   //시간 -> 타일 인덱스 출력 (바이너리 서치)
-  findFloorIndexByTime_us(t_us){
-
-    const arr =
-      this.compiled
-        .floorStarts_us;
-
+  findFloorIndexByTime_us(t_us) {
+    const arr = this.compiled.floorStarts_us;
 
     let low = 0;
 
-    let high =
-      arr.length - 1;
+    let high = arr.length - 1;
 
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
 
-    while(
-      low < high
-    ){
-
-      const mid =
-        Math.ceil(
-          (low + high) / 2
-        );
-
-
-      if(
-        arr[mid] <= t_us
-      ){
-
-        low =
-          mid;
-      }
-      else{
-
-        high =
-          mid - 1;
+      if (arr[mid] <= t_us) {
+        low = mid;
+      } else {
+        high = mid - 1;
       }
     }
-
 
     return low;
   }
 }
 
 class HitSoundSystem {
-  constructor(){
-    this.ctx =
-      null;
-    
-    
+  constructor() {
+    this.ctx = null;
+
     /*
       일반 타일 hitsound
     */
-    this.buffer =
-      null;
-    
-    
+    this.buffer = null;
+
     /*
       Countdown.mp3
     */
-    this.countdownBuffer =
-      null;
-      
+    this.countdownBuffer = null;
+
     /*
       Hitsound 이름
       →
       AudioBuffer
     */
-    this.buffers =
-      new Map();
-    
-    
+    this.buffers = new Map();
+
     /*
       아직 로드 실패 로그를
       반복 출력하지 않기 위함
     */
-    this.missingSoundWarnings =
-      new Set();
-    
-    
-    
+    this.missingSoundWarnings = new Set();
 
     /*
       External hitsound manifest.
     */
-    this.soundEntries =
-      [];
+    this.soundEntries = [];
 
-    this.soundDefinitions =
-      new Map();
+    this.soundDefinitions = new Map();
 
-    this.masterGain =
-      null;
-    
-    
+    this.masterGain = null;
+
     /*
       일반 타일 시간
     */
-    this.hitEvents =
-      [];
-    
-    this.nextIndex =
-      0;
-    
-    
+    this.hitEvents = [];
+
+    this.nextIndex = 0;
+
     /*
       Countdown 시간
     */
-    this.countdownTimes_us =
-      [];
-    
-    this.nextCountdownIndex =
-      0;
+    this.countdownTimes_us = [];
+
+    this.nextCountdownIndex = 0;
 
     // 앞으로 120ms까지 미리 예약
     this.lookAhead_us = 120000;
@@ -4005,246 +2317,132 @@ class HitSoundSystem {
     this.scheduledSources = new Set();
 
     this.enabled = true;
-    
-    this.maxSchedulePerUpdate =
-      64;
-    
-    
-    this.maxActiveSources =
-      128;
+
+    this.maxSchedulePerUpdate = 64;
+
+    this.maxActiveSources = 128;
 
     /*
       Level speed only changes scheduling time.
       Individual hitsound playbackRate/pitch is untouched.
     */
-    this.timelineRate =
-      1;
+    this.timelineRate = 1;
 
-
-  /*
+    /*
     같은 정확한 시간의 히트는
     하나만 울린다.
   
     0 duration 타일 연속 구간
     AudioNode 폭증 방지.
   */
-  this.lastScheduledHit_us =
-    null;
-    
-  this.lastScheduledCountdown_us =
-    null;
+    this.lastScheduledHit_us = null;
+
+    this.lastScheduledCountdown_us = null;
   }
 
   async init(
-    manifestUrl =
-      "./sfx/hitsounds.json",
+    manifestUrl = "./sfx/hitsounds.json",
 
-    countdownHitsound =
-      "Hat"
-  ){
+    countdownHitsound = "Hat",
+  ) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
-    const AudioContextClass =
-      window.AudioContext ||
-      window.webkitAudioContext;
-
-
-    if(!AudioContextClass){
-
-      throw new Error(
-        "Web Audio API is not supported."
-      );
+    if (!AudioContextClass) {
+      throw new Error("Web Audio API is not supported.");
     }
 
+    this.ctx = new AudioContextClass();
 
-    this.ctx =
-      new AudioContextClass();
+    this.masterGain = this.ctx.createGain();
 
+    this.masterGain.gain.value = 0.3;
 
-    this.masterGain =
-      this.ctx.createGain();
+    this.masterGain.connect(this.ctx.destination);
 
+    await this.loadSoundLibrary(manifestUrl);
 
-    this.masterGain.gain.value =
-      0.3;
+    this.buffer = this.getBufferForHitsound("Kick");
 
-
-    this.masterGain.connect(
-      this.ctx.destination
-    );
-
-
-    await this.loadSoundLibrary(
-      manifestUrl
-    );
-
-
-    this.buffer =
-      this.getBufferForHitsound(
-        "Kick"
-      );
-
-
-    this.countdownBuffer =
-      this.getBufferForHitsound(
-        countdownHitsound
-      );
+    this.countdownBuffer = this.getBufferForHitsound(countdownHitsound);
   }
 
-  async resume(){
-    if(!this.ctx) return;
+  async resume() {
+    if (!this.ctx) return;
 
-    if(this.ctx.state === "suspended"){
+    if (this.ctx.state === "suspended") {
       await this.ctx.resume();
     }
   }
-  
-  normalizeHitsoundKey(
-    name
-  ){
 
-    return String(
-      name ??
-      ""
-    )
-    .trim()
-    .toLowerCase()
-    .replace(
-      /[^a-z0-9]+/g,
-      ""
-    );
+  normalizeHitsoundKey(name) {
+    return String(name ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
   }
 
+  getSoundDefinition(name) {
+    const key = this.normalizeHitsoundKey(name);
 
-  getSoundDefinition(
-    name
-  ){
-
-    const key =
-      this.normalizeHitsoundKey(
-        name
-      );
-
-
-    if(!key){
+    if (!key) {
       return null;
     }
 
-
-    return (
-      this.soundDefinitions.get(
-        key
-      ) ??
-      null
-    );
+    return this.soundDefinitions.get(key) ?? null;
   }
 
+  getBufferForHitsound(name) {
+    const definition = this.getSoundDefinition(name);
 
-  getBufferForHitsound(
-    name
-  ){
-
-    const definition =
-      this.getSoundDefinition(
-        name
-      );
-
-
-    if(!definition){
+    if (!definition) {
       return null;
     }
 
-
-    return (
-      this.buffers.get(
-        definition.name
-      ) ??
-      null
-    );
+    return this.buffers.get(definition.name) ?? null;
   }
 
-
-  isSilentHitsound(
-    name
-  ){
-
-    const definition =
-      this.getSoundDefinition(
-        name
-      );
-
+  isSilentHitsound(name) {
+    const definition = this.getSoundDefinition(name);
 
     return Boolean(
       definition &&
-      (
-        definition.file === null ||
+      (definition.file === null ||
         definition.file === "" ||
-        definition.file === false
-      )
+        definition.file === false),
     );
   }
 
+  getAvailableHitsoundOptions() {
+    const options = this.soundEntries
+      .map((entry) => ({
+        value: String(entry?.name ?? "").trim(),
 
-  getAvailableHitsoundOptions(){
+        label: String(entry?.label ?? entry?.name ?? "").trim(),
+      }))
+      .filter((option) => option.value.length > 0);
 
-    const options =
-      this.soundEntries
-      .map(
-        entry => ({
-          value:
-            String(
-              entry?.name ??
-              ""
-            ).trim(),
-
-          label:
-            String(
-              entry?.label ??
-              entry?.name ??
-              ""
-            ).trim()
-        })
-      )
-      .filter(
-        option =>
-          option.value.length > 0
-      );
-
-
-    if(options.length > 0){
+    if (options.length > 0) {
       return options;
     }
-
 
     return [
       {
         value: "None",
-        label: "None"
+        label: "None",
       },
       {
         value: "Kick",
-        label: "Kick"
-      }
+        label: "Kick",
+      },
     ];
   }
 
-
-  getAvailableHitsoundNames(){
-
-    return this
-      .getAvailableHitsoundOptions()
-      .map(
-        option =>
-          option.value
-      );
+  getAvailableHitsoundNames() {
+    return this.getAvailableHitsoundOptions().map((option) => option.value);
   }
 
-
-  async loadSoundLibrary(
-    manifestUrl
-  ){
-
-    this.soundEntries =
-      [];
+  async loadSoundLibrary(manifestUrl) {
+    this.soundEntries = [];
 
     this.soundDefinitions.clear();
 
@@ -4252,268 +2450,121 @@ class HitSoundSystem {
 
     this.missingSoundWarnings.clear();
 
+    try {
+      const manifestAbsoluteUrl = new URL(manifestUrl, window.location.href);
 
-    try{
+      const response = await fetch(manifestAbsoluteUrl.href);
 
-      const manifestAbsoluteUrl =
-        new URL(
-          manifestUrl,
-          window.location.href
-        );
-
-
-      const response =
-        await fetch(
-          manifestAbsoluteUrl.href
-        );
-
-
-      if(!response.ok){
-
-        throw new Error(
-          `hitsound manifest load failed: ${response.status}`
-        );
+      if (!response.ok) {
+        throw new Error(`hitsound manifest load failed: ${response.status}`);
       }
 
+      const manifest = await response.json();
 
-      const manifest =
-        await response.json();
+      const entries = Array.isArray(manifest)
+        ? manifest
+        : Array.isArray(manifest?.sounds)
+          ? manifest.sounds
+          : [];
 
+      this.soundEntries = entries
+        .filter((entry) => entry && typeof entry.name === "string")
+        .map((entry) => ({
+          name: String(entry.name),
 
-      const entries =
-        Array.isArray(
-          manifest
-        )
-          ? manifest
-          : Array.isArray(
-              manifest?.sounds
-            )
-              ? manifest.sounds
-              : [];
+          label: String(entry.label ?? entry.name),
 
+          file: entry.file == null ? null : String(entry.file),
 
-      this.soundEntries =
-        entries
-        .filter(
-          entry =>
-            entry &&
-            typeof entry.name ===
-              "string"
-        )
-        .map(
-          entry => ({
-            name:
-              String(
-                entry.name
-              ),
+          aliases: Array.isArray(entry.aliases)
+            ? entry.aliases.map((alias) => String(alias))
+            : [],
+        }));
 
-            label:
-              String(
-                entry.label ??
-                entry.name
-              ),
+      for (const entry of this.soundEntries) {
+        const names = [entry.name, ...entry.aliases];
 
-            file:
-              entry.file == null
-                ? null
-                : String(
-                    entry.file
-                  ),
+        for (const name of names) {
+          const key = this.normalizeHitsoundKey(name);
 
-            aliases:
-              Array.isArray(
-                entry.aliases
-              )
-                ? entry.aliases.map(
-                    alias =>
-                      String(alias)
-                  )
-                : []
-          })
-        );
-
-
-      for(
-        const entry
-        of this.soundEntries
-      ){
-
-        const names =
-          [
-            entry.name,
-            ...entry.aliases
-          ];
-
-
-        for(
-          const name
-          of names
-        ){
-
-          const key =
-            this.normalizeHitsoundKey(
-              name
-            );
-
-
-          if(key){
-
-            this.soundDefinitions.set(
-              key,
-              entry
-            );
+          if (key) {
+            this.soundDefinitions.set(key, entry);
           }
         }
       }
 
-
       await Promise.all(
         this.soundEntries
-        .filter(
-          entry =>
-            typeof entry.file ===
-              "string" &&
-            entry.file.length > 0
-        )
-        .map(
-          entry => {
+          .filter(
+            (entry) => typeof entry.file === "string" && entry.file.length > 0,
+          )
+          .map((entry) => {
+            const soundUrl = new URL(entry.file, manifestAbsoluteUrl).href;
 
-            const soundUrl =
-              new URL(
-                entry.file,
-                manifestAbsoluteUrl
-              ).href;
-
-
-            return this.loadSound(
-              entry.name,
-              soundUrl
-            );
-          }
-        )
+            return this.loadSound(entry.name, soundUrl);
+          }),
       );
-
 
       console.log(
-        `hitsound library loaded: ${this.soundEntries.length} definitions, ${this.buffers.size} audio buffers`
+        `hitsound library loaded: ${this.soundEntries.length} definitions, ${this.buffers.size} audio buffers`,
       );
 
-
       return true;
-    }
-    catch(error){
-
+    } catch (error) {
       console.warn(
         "Failed to load hitsound library. Missing sounds will use beep fallback.",
-        error
+        error,
       );
-
 
       return false;
     }
   }
 
+  async loadSound(name, url) {
+    try {
+      const response = await fetch(url);
 
-  async loadSound(
-    name,
-    url
-  ){
-  
-    try{
-  
-      const response =
-        await fetch(
-          url
-        );
-  
-  
-      if(!response.ok){
-  
-        throw new Error(
-          `${response.status}`
-        );
+      if (!response.ok) {
+        throw new Error(`${response.status}`);
       }
-  
-  
-      const data =
-        await response
-          .arrayBuffer();
-  
-  
-      const buffer =
-        await this.ctx
-          .decodeAudioData(
-            data
-          );
-  
-  
-      this.buffers.set(
-        name,
-        buffer
-      );
-  
-  
+
+      const data = await response.arrayBuffer();
+
+      const buffer = await this.ctx.decodeAudioData(data);
+
+      this.buffers.set(name, buffer);
+
       return true;
-    }
-    catch(error){
-  
-      console.warn(
-        `hitsound load failed: ${name}`,
-        url,
-        error
-      );
-  
-  
+    } catch (error) {
+      console.warn(`hitsound load failed: ${name}`, url, error);
+
       return false;
     }
   }
 
+  setTimelineRate(value) {
+    const rate = Number(value);
 
-  setTimelineRate(
-    value
-  ){
-    const rate =
-      Number(value);
-
-    if(
-      !Number.isFinite(rate) ||
-      rate <= 0
-    ){
+    if (!Number.isFinite(rate) || rate <= 0) {
       return false;
     }
 
-    this.timelineRate =
-      rate;
+    this.timelineRate = rate;
 
     return true;
   }
 
-
-  start(
-    hitEvents,
-    countdownTimes_us,
-    startTime_us
-  ){
-  
+  start(hitEvents, countdownTimes_us, startTime_us) {
     this.stopScheduled();
-  
-  
-    const safeStartTime_us =
-      Number.isFinite(
-        Number(
-          startTime_us
-        )
-      )
-        ? Number(
-            startTime_us
-          )
-        : 0;
-  
-  
+
+    const safeStartTime_us = Number.isFinite(Number(startTime_us))
+      ? Number(startTime_us)
+      : 0;
+
     /* =========================
        일반 Hitsound Events
     ========================= */
-  
+
     /*
       time_us가 정상인 이벤트만 유지.
   
@@ -4526,329 +2577,158 @@ class HitSoundSystem {
         ...
       }
     */
-    this.hitEvents =
-      (
-        Array.isArray(
-          hitEvents
-        )
-          ? hitEvents
-          : []
-      )
-      .filter(
-        event =>
-          event &&
-          Number.isFinite(
-            Number(
-              event.time_us
-            )
-          )
-      )
-      .sort(
-        (a, b) =>
-          Number(a.time_us) -
-          Number(b.time_us)
-      );
-  
-  
+    this.hitEvents = (Array.isArray(hitEvents) ? hitEvents : [])
+      .filter((event) => event && Number.isFinite(Number(event.time_us)))
+      .sort((a, b) => Number(a.time_us) - Number(b.time_us));
+
     /* =========================
        Countdown Times
     ========================= */
-  
-    this.countdownTimes_us =
-      (
-        Array.isArray(
-          countdownTimes_us
-        )
-          ? countdownTimes_us
-          : []
-      )
-      .map(
-        value =>
-          Number(
-            value
-          )
-      )
-      .filter(
-        value =>
-          Number.isFinite(
-            value
-          )
-      )
-      .sort(
-        (a, b) =>
-          a - b
-      );
-  
-  
+
+    this.countdownTimes_us = (
+      Array.isArray(countdownTimes_us) ? countdownTimes_us : []
+    )
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+
     /* =========================
        Binary Search
     ========================= */
-  
-    const findEventStartIndex =
-      array => {
-  
-        let low =
-          0;
-  
-        let high =
-          array.length;
-  
-  
-        while(
-          low < high
-        ){
-  
-          const mid =
-            Math.floor(
-              (low + high) /
-              2
-            );
-  
-  
-          if(
-            Number(
-              array[mid].time_us
-            ) <
-            safeStartTime_us
-          ){
-  
-            low =
-              mid + 1;
-          }
-          else{
-  
-            high =
-              mid;
-          }
+
+    const findEventStartIndex = (array) => {
+      let low = 0;
+
+      let high = array.length;
+
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+
+        if (Number(array[mid].time_us) < safeStartTime_us) {
+          low = mid + 1;
+        } else {
+          high = mid;
         }
-  
-  
-        return low;
-      };
-  
-  
-    const findTimeStartIndex =
-      array => {
-  
-        let low =
-          0;
-  
-        let high =
-          array.length;
-  
-  
-        while(
-          low < high
-        ){
-  
-          const mid =
-            Math.floor(
-              (low + high) /
-              2
-            );
-  
-  
-          if(
-            array[mid] <
-            safeStartTime_us
-          ){
-  
-            low =
-              mid + 1;
-          }
-          else{
-  
-            high =
-              mid;
-          }
+      }
+
+      return low;
+    };
+
+    const findTimeStartIndex = (array) => {
+      let low = 0;
+
+      let high = array.length;
+
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+
+        if (array[mid] < safeStartTime_us) {
+          low = mid + 1;
+        } else {
+          high = mid;
         }
-  
-  
-        return low;
-      };
-  
-  
-    this.nextIndex =
-      findEventStartIndex(
-        this.hitEvents
-      );
-  
-  
-    this.nextCountdownIndex =
-      findTimeStartIndex(
-        this.countdownTimes_us
-      );
-  
-  
-    this.lastScheduledHit_us =
-      null;
-  
-  
-    this.lastScheduledCountdown_us =
-      null;
+      }
+
+      return low;
+    };
+
+    this.nextIndex = findEventStartIndex(this.hitEvents);
+
+    this.nextCountdownIndex = findTimeStartIndex(this.countdownTimes_us);
+
+    this.lastScheduledHit_us = null;
+
+    this.lastScheduledCountdown_us = null;
   }
 
+  update(t_us) {
+    if (!this.enabled) {
+      return;
+    }
 
-  update(
-    t_us
-  ){
-  
-    if(!this.enabled){
+    if (!this.ctx) {
       return;
     }
-  
-  
-    if(!this.ctx){
+
+    if (this.ctx.state !== "running") {
       return;
     }
-  
-  
-    if(
-      this.ctx.state !==
-      "running"
-    ){
-      return;
-    }
-  
-  
+
     /*
       현재 재생 시간 자체가
       비정상이면 스케줄링하지 않는다.
     */
-    const currentTime_us =
-      Number(
-        t_us
-      );
-  
-  
-    if(
-      !Number.isFinite(
-        currentTime_us
-      )
-    ){
+    const currentTime_us = Number(t_us);
+
+    if (!Number.isFinite(currentTime_us)) {
       return;
     }
-  
-  
-    const scheduleUntil_us =
-      currentTime_us +
-      this.lookAhead_us;
-  
-  
-    let scheduledCount =
-      0;
-  
-  
-    while(
-      scheduledCount <
-      this.maxSchedulePerUpdate
-    ){
-  
+
+    const scheduleUntil_us = currentTime_us + this.lookAhead_us;
+
+    let scheduledCount = 0;
+
+    while (scheduledCount < this.maxSchedulePerUpdate) {
       /* =========================
          다음 일반 Hitsound
       ========================= */
-  
+
       const nextHitEvent =
-        this.nextIndex <
-        this.hitEvents.length
-  
-          ? this.hitEvents[
-              this.nextIndex
-            ]
-  
+        this.nextIndex < this.hitEvents.length
+          ? this.hitEvents[this.nextIndex]
           : null;
-  
-  
-      let nextHitTime_us =
-        nextHitEvent
-          ? Number(
-              nextHitEvent.time_us
-            )
-          : Infinity;
-  
-  
+
+      let nextHitTime_us = nextHitEvent
+        ? Number(nextHitEvent.time_us)
+        : Infinity;
+
       /*
         잘못된 SoundEvent가 있다면
         그냥 버리고 다음 이벤트로 이동.
       */
-      if(
-        nextHitEvent &&
-        !Number.isFinite(
-          nextHitTime_us
-        )
-      ){
-  
-        console.warn(
-          "Invalid hitsound event:",
-          nextHitEvent
-        );
-  
-  
+      if (nextHitEvent && !Number.isFinite(nextHitTime_us)) {
+        console.warn("Invalid hitsound event:", nextHitEvent);
+
         this.nextIndex++;
-  
+
         continue;
       }
-  
-  
+
       /* =========================
          다음 Countdown
       ========================= */
-  
+
       let nextCountdownTime_us =
-        this.nextCountdownIndex <
-        this.countdownTimes_us.length
-  
-          ? Number(
-              this.countdownTimes_us[
-                this.nextCountdownIndex
-              ]
-            )
-  
+        this.nextCountdownIndex < this.countdownTimes_us.length
+          ? Number(this.countdownTimes_us[this.nextCountdownIndex])
           : Infinity;
-  
-  
+
       /*
         잘못된 Countdown timestamp도
         버리고 다음 것으로 이동.
       */
-      if(
-        nextCountdownTime_us !==
-          Infinity
-        &&
-        !Number.isFinite(
-          nextCountdownTime_us
-        )
-      ){
-  
+      if (
+        nextCountdownTime_us !== Infinity &&
+        !Number.isFinite(nextCountdownTime_us)
+      ) {
         console.warn(
           "Invalid countdown time:",
-          this.countdownTimes_us[
-            this.nextCountdownIndex
-          ]
+          this.countdownTimes_us[this.nextCountdownIndex],
         );
-  
-  
+
         this.nextCountdownIndex++;
-  
+
         continue;
       }
-  
-  
+
       /* =========================
          전부 끝남
       ========================= */
-  
-      if(
-        nextHitTime_us ===
-          Infinity
-        &&
-        nextCountdownTime_us ===
-          Infinity
-      ){
+
+      if (nextHitTime_us === Infinity && nextCountdownTime_us === Infinity) {
         break;
       }
-  
-  
+
       /*
         시간이 더 빠른 소리를 선택.
   
@@ -4856,214 +2736,124 @@ class HitSoundSystem {
         일반 Hitsound를 먼저 예약하고
         다음 반복에서 Countdown도 예약됨.
       */
-      const isCountdown =
-        nextCountdownTime_us <
-        nextHitTime_us;
-  
-  
-      const soundTime_us =
-        isCountdown
-          ? nextCountdownTime_us
-          : nextHitTime_us;
-  
-  
+      const isCountdown = nextCountdownTime_us < nextHitTime_us;
+
+      const soundTime_us = isCountdown ? nextCountdownTime_us : nextHitTime_us;
+
       /*
         아직 look-ahead 범위 밖이면
         다음 frame까지 기다린다.
       */
-      if(
-        soundTime_us >
-        scheduleUntil_us
-      ){
+      if (soundTime_us > scheduleUntil_us) {
         break;
       }
-  
-  
+
       /* =========================
          AudioNode 폭증 방지
       ========================= */
-  
-      if(
-        this.scheduledSources.size >=
-        this.maxActiveSources
-      ){
-  
-        if(isCountdown){
-  
+
+      if (this.scheduledSources.size >= this.maxActiveSources) {
+        if (isCountdown) {
           this.nextCountdownIndex++;
-        }
-        else{
-  
+        } else {
           this.nextIndex++;
         }
-  
-  
+
         continue;
       }
-  
-  
+
       /* =========================
          중복 timestamp 방지
       ========================= */
-  
-      if(isCountdown){
-  
-        if(
-          soundTime_us ===
-          this.lastScheduledCountdown_us
-        ){
-  
+
+      if (isCountdown) {
+        if (soundTime_us === this.lastScheduledCountdown_us) {
           this.nextCountdownIndex++;
-  
+
           continue;
         }
-      }
-      else{
-  
-        if(
-          soundTime_us ===
-          this.lastScheduledHit_us
-        ){
-  
+      } else {
+        if (soundTime_us === this.lastScheduledHit_us) {
           this.nextIndex++;
-  
+
           continue;
         }
       }
-  
-  
+
       /* =========================
          WebAudio 시간으로 변환
       ========================= */
-  
-      const delta_us =
-        soundTime_us -
-        currentTime_us;
-  
-  
+
+      const delta_us = soundTime_us - currentTime_us;
+
       const safeTimelineRate =
-        Number.isFinite(
-          this.timelineRate
-        ) &&
-        this.timelineRate > 0
+        Number.isFinite(this.timelineRate) && this.timelineRate > 0
           ? this.timelineRate
           : 1;
 
+      const delaySec = Math.max(0.003, delta_us / (1000000 * safeTimelineRate));
 
-      const delaySec =
-        Math.max(
-          0.003,
-          delta_us /
-          (
-            1000000 *
-            safeTimelineRate
-          )
-        );
-  
-  
-      const when =
-        this.ctx.currentTime +
-        delaySec;
-  
-  
+      const when = this.ctx.currentTime + delaySec;
+
       /*
         source.start()에
         NaN / Infinity가 절대 들어가지 않도록
         마지막 방어선.
       */
-      if(
-        !Number.isFinite(
-          when
-        )
-      ){
-  
-        console.warn(
-          "Invalid audio schedule time:",
-          {
-            soundTime_us,
-            currentTime_us,
-            delta_us,
-            when
-          }
-        );
-  
-  
-        if(isCountdown){
-  
+      if (!Number.isFinite(when)) {
+        console.warn("Invalid audio schedule time:", {
+          soundTime_us,
+          currentTime_us,
+          delta_us,
+          when,
+        });
+
+        if (isCountdown) {
           this.nextCountdownIndex++;
-        }
-        else{
-  
+        } else {
           this.nextIndex++;
         }
-  
-  
+
         continue;
       }
-  
-  
+
       /* =========================
          실제 재생
       ========================= */
-  
-      if(isCountdown){
-  
-        this.playCountdownAt(
-          when
-        );
-  
-  
-        this.lastScheduledCountdown_us =
-          soundTime_us;
-  
-  
+
+      if (isCountdown) {
+        this.playCountdownAt(when);
+
+        this.lastScheduledCountdown_us = soundTime_us;
+
         this.nextCountdownIndex++;
-      }
-      else{
-  
-        this.playSoundEventAt(
-          nextHitEvent,
-          when
-        );
-  
-  
-        this.lastScheduledHit_us =
-          soundTime_us;
-  
-  
+      } else {
+        this.playSoundEventAt(nextHitEvent, when);
+
+        this.lastScheduledHit_us = soundTime_us;
+
         this.nextIndex++;
       }
-  
-  
+
       scheduledCount++;
     }
   }
 
-
-  playAt(when){
-    if(!this.ctx) return;
-
+  playAt(when) {
+    if (!this.ctx) return;
 
     // hitsound.mp3가 존재하면 파일 재생
-    if(this.buffer){
-
-      const source =
-        this.ctx.createBufferSource();
+    if (this.buffer) {
+      const source = this.ctx.createBufferSource();
 
       source.buffer = this.buffer;
 
-      source.connect(
-        this.masterGain
-      );
+      source.connect(this.masterGain);
 
-      this.scheduledSources.add(
-        source
-      );
+      this.scheduledSources.add(source);
 
       source.onended = () => {
-        this.scheduledSources.delete(
-          source
-        );
+        this.scheduledSources.delete(source);
       };
 
       source.start(when);
@@ -5071,461 +2861,220 @@ class HitSoundSystem {
       return;
     }
 
-
     // 파일이 없으면 임시 비프음
     this.playBeepAt(when);
   }
-  
-  playCountdownAt(
-    when
-  ){
-  
-    if(!this.ctx){
+
+  playCountdownAt(when) {
+    if (!this.ctx) {
       return;
     }
-  
-  
-    if(
-      !Number.isFinite(
-        Number(
-          when
-        )
-      )
-    ){
-  
-      console.warn(
-        "playCountdownAt: invalid when",
-        when
-      );
-  
-  
+
+    if (!Number.isFinite(Number(when))) {
+      console.warn("playCountdownAt: invalid when", when);
+
       return;
     }
-  
-  
-    if(
-      !this.countdownBuffer
-    ){
-    
+
+    if (!this.countdownBuffer) {
       /*
         Countdown 사운드 로딩 실패 시
         기존 비프음으로 대체
       */
-      this.playBeepAt(
-        when,
-        100,
-        100
-      );
-    
-    
+      this.playBeepAt(when, 100, 100);
+
       return;
     }
-  
-  
-    const source =
-      this.ctx.createBufferSource();
-  
-  
-    source.buffer =
-      this.countdownBuffer;
-  
-  
-    source.connect(
-      this.masterGain
-    );
-  
-  
-    this.scheduledSources.add(
-      source
-    );
-  
-  
-    source.onended =
-      () => {
-  
-        this.scheduledSources.delete(
-          source
-        );
-      };
-  
-  
-    source.start(
-      when
-    );
+
+    const source = this.ctx.createBufferSource();
+
+    source.buffer = this.countdownBuffer;
+
+    source.connect(this.masterGain);
+
+    this.scheduledSources.add(source);
+
+    source.onended = () => {
+      this.scheduledSources.delete(source);
+    };
+
+    source.start(when);
   }
 
+  playBeepAt(when, volumePercent = 100, pitchPercent = 100) {
+    if (!this.ctx) {
+      return false;
+    }
 
-  playBeepAt(
-    when,
-    volumePercent = 100,
-    pitchPercent = 100
-  ){
-  
-    if(!this.ctx){
+    const safeWhen = Number(when);
+
+    if (!Number.isFinite(safeWhen)) {
       return false;
     }
-  
-  
-    const safeWhen =
-      Number(
-        when
-      );
-  
-  
-    if(
-      !Number.isFinite(
-        safeWhen
-      )
-    ){
-      return false;
-    }
-  
-  
-    const volume =
-      Number.isFinite(
-        Number(
-          volumePercent
-        )
-      )
-        ? Math.max(
-            0,
-            Number(
-              volumePercent
-            )
-          )
-        : 100;
-  
-  
-    const pitch =
-      Number.isFinite(
-        Number(
-          pitchPercent
-        )
-      )
-        ? Math.max(
-            1,
-            Number(
-              pitchPercent
-            )
-          )
-        : 100;
-  
-  
-    const osc =
-      this.ctx.createOscillator();
-  
-  
-    const gain =
-      this.ctx.createGain();
-  
-  
-    osc.type =
-      "square";
-  
-  
+
+    const volume = Number.isFinite(Number(volumePercent))
+      ? Math.max(0, Number(volumePercent))
+      : 100;
+
+    const pitch = Number.isFinite(Number(pitchPercent))
+      ? Math.max(1, Number(pitchPercent))
+      : 100;
+
+    const osc = this.ctx.createOscillator();
+
+    const gain = this.ctx.createGain();
+
+    osc.type = "square";
+
     /*
       기존 비프음:
       pitch 100 = 900Hz
     */
-    osc.frequency.value =
-      900 *
-      (
-        pitch /
-        100
-      );
-  
-  
+    osc.frequency.value = 900 * (pitch / 100);
+
     /*
       기존 최대 음량 0.18에
       이벤트 볼륨을 반영한다.
     */
-    const peakGain =
-      0.18 *
-      (
-        volume /
-        100
-      );
-  
-  
-    gain.gain.setValueAtTime(
-      0,
-      safeWhen
-    );
-  
-  
+    const peakGain = 0.18 * (volume / 100);
+
+    gain.gain.setValueAtTime(0, safeWhen);
+
     gain.gain.linearRampToValueAtTime(
-      Math.max(
-        0.0001,
-        peakGain
-      ),
-      safeWhen + 0.002
+      Math.max(0.0001, peakGain),
+      safeWhen + 0.002,
     );
-  
-  
-    gain.gain.exponentialRampToValueAtTime(
-      0.001,
-      safeWhen + 0.04
-    );
-  
-  
-    osc.connect(
-      gain
-    );
-  
-  
-    gain.connect(
-      this.masterGain
-    );
-  
-  
-    this.scheduledSources.add(
-      osc
-    );
-  
-  
-    osc.onended =
-      () => {
-  
-        this.scheduledSources.delete(
-          osc
-        );
-  
-  
-        try{
-  
-          osc.disconnect();
-  
-          gain.disconnect();
-        }
-        catch{
-        }
-      };
-  
-  
-    osc.start(
-      safeWhen
-    );
-  
-  
-    osc.stop(
-      safeWhen +
-      0.045
-    );
-  
-  
+
+    gain.gain.exponentialRampToValueAtTime(0.001, safeWhen + 0.04);
+
+    osc.connect(gain);
+
+    gain.connect(this.masterGain);
+
+    this.scheduledSources.add(osc);
+
+    osc.onended = () => {
+      this.scheduledSources.delete(osc);
+
+      try {
+        osc.disconnect();
+
+        gain.disconnect();
+      } catch {}
+    };
+
+    osc.start(safeWhen);
+
+    osc.stop(safeWhen + 0.045);
+
     return true;
   }
 
-  playSoundEventAt(
-    soundEvent,
-    when
-  ){
-  
-    if(!this.ctx){
+  playSoundEventAt(soundEvent, when) {
+    if (!this.ctx) {
       return false;
     }
-  
-  
-    if(!soundEvent){
+
+    if (!soundEvent) {
       return false;
     }
-  
-  
+
     /*
       AudioBufferSourceNode.start()
       에 NaN/Infinity가 절대 들어가지 않도록 한다.
     */
-    if(
-      !Number.isFinite(
-        Number(
-          when
-        )
-      )
-    ){
-  
-      console.warn(
-        "playSoundEventAt: invalid when",
-        when,
-        soundEvent
-      );
-  
-  
+    if (!Number.isFinite(Number(when))) {
+      console.warn("playSoundEventAt: invalid when", when, soundEvent);
+
       return false;
     }
-  
-  
-    const hitsound =
-      String(
-        soundEvent.hitsound ??
-        "Kick"
-      );
-  
-  
+
+    const hitsound = String(soundEvent.hitsound ?? "Kick");
+
     /*
       file:null means intentional silence.
     */
-    if(
-      this.isSilentHitsound(
-        hitsound
-      )
-    ){
+    if (this.isSilentHitsound(hitsound)) {
       return true;
     }
 
+    const buffer = this.getBufferForHitsound(hitsound);
 
-    const buffer =
-      this.getBufferForHitsound(
-        hitsound
-      );
+    if (!buffer) {
+      if (!this.missingSoundWarnings.has(hitsound)) {
+        this.missingSoundWarnings.add(hitsound);
 
-
-    if(!buffer){
-
-      if(
-        !this.missingSoundWarnings
-          .has(
-            hitsound
-          )
-      ){
-    
-        this.missingSoundWarnings
-          .add(
-            hitsound
-          );
-    
-    
         console.warn(
-          `Unknown or unloaded hitsound: ${hitsound}. Using beep fallback.`
+          `Unknown or unloaded hitsound: ${hitsound}. Using beep fallback.`,
         );
       }
-    
-    
+
       /*
         파일을 못 찾은 경우에도
         이벤트 자체는 사라지지 않고
         비프음으로 대체한다.
       */
       this.playBeepAt(
-    
         when,
-    
-        soundEvent.volume ??
-          100,
-    
-        soundEvent.pitch ??
-          100
+
+        soundEvent.volume ?? 100,
+
+        soundEvent.pitch ?? 100,
       );
-    
-    
+
       return true;
     }
-  
-  
-    const source =
-      this.ctx
-        .createBufferSource();
-  
-  
-    source.buffer =
-      buffer;
-  
-  
+
+    const source = this.ctx.createBufferSource();
+
+    source.buffer = buffer;
+
     /* =========================
        Pitch
     ========================= */
-  
-    const pitch =
-      Number(
-        soundEvent.pitch ??
-        100
-      );
-  
-  
-    source.playbackRate.value =
-      Number.isFinite(pitch)
-        ? Math.max(
-            0.01,
-            pitch / 100
-          )
-        : 1;
-  
-  
+
+    const pitch = Number(soundEvent.pitch ?? 100);
+
+    source.playbackRate.value = Number.isFinite(pitch)
+      ? Math.max(0.01, pitch / 100)
+      : 1;
+
     /* =========================
        Volume
     ========================= */
-  
-    const gain =
-      this.ctx
-        .createGain();
-  
-  
-    const volume =
-      Number(
-        soundEvent.volume ??
-        100
-      );
-  
-  
-    gain.gain.value =
-      Number.isFinite(volume)
-        ? Math.max(
-            0,
-            volume / 100
-          )
-        : 1;
-  
-  
-    source.connect(
-      gain
-    );
-  
-  
-    gain.connect(
-      this.masterGain
-    );
-  
-  
-    this.scheduledSources.add(
-      source
-    );
-  
-  
-    source.onended =
-      () => {
-  
-        this.scheduledSources.delete(
-          source
-        );
-  
-  
-        try{
-  
-          source.disconnect();
-  
-          gain.disconnect();
-        }
-        catch{
-        }
-      };
-  
-  
-    source.start(
-      when
-    );
-  
-  
+
+    const gain = this.ctx.createGain();
+
+    const volume = Number(soundEvent.volume ?? 100);
+
+    gain.gain.value = Number.isFinite(volume) ? Math.max(0, volume / 100) : 1;
+
+    source.connect(gain);
+
+    gain.connect(this.masterGain);
+
+    this.scheduledSources.add(source);
+
+    source.onended = () => {
+      this.scheduledSources.delete(source);
+
+      try {
+        source.disconnect();
+
+        gain.disconnect();
+      } catch {}
+    };
+
+    source.start(when);
+
     return true;
   }
 
-  stopScheduled(){
-    for(
-      const source
-      of this.scheduledSources
-    ){
-      try{
+  stopScheduled() {
+    for (const source of this.scheduledSources) {
+      try {
         source.stop();
-      }
-      catch{
+      } catch {
         // 이미 끝난 source면 무시
       }
     }
@@ -5533,47 +3082,31 @@ class HitSoundSystem {
     this.scheduledSources.clear();
   }
 
-
-  stop(){
-
+  stop() {
     this.stopScheduled();
-  
-  
-    this.hitEvents =
-      [];
-  
-  
-    this.countdownTimes_us =
-      [];
-  
-  
-    this.nextIndex =
-      0;
-  
-  
-    this.nextCountdownIndex =
-      0;
-  
-  
-    this.lastScheduledHit_us =
-      null;
-  
-  
-    this.lastScheduledCountdown_us =
-      null;
+
+    this.hitEvents = [];
+
+    this.countdownTimes_us = [];
+
+    this.nextIndex = 0;
+
+    this.nextCountdownIndex = 0;
+
+    this.lastScheduledHit_us = null;
+
+    this.lastScheduledCountdown_us = null;
   }
 
+  setVolume(value) {
+    if (!this.masterGain) return;
 
-  setVolume(value){
-    if(!this.masterGain) return;
-
-    this.masterGain.gain.value =
-      Math.max(0, value);
+    this.masterGain.gain.value = Math.max(0, value);
   }
 }
 
 class SongSystem {
-  constructor(){
+  constructor() {
     this.ctx = null;
 
     this.buffer = null;
@@ -5586,21 +3119,18 @@ class SongSystem {
     this.playbackRate = 1;
   }
 
-
-  async init(audioContext, url){
+  async init(audioContext, url) {
     this.ctx = audioContext;
 
     /*
       곡을 다시 선택하거나 다른 레벨을 열어도
       GainNode를 계속 새로 만들지 않는다.
     */
-    if(!this.gain){
+    if (!this.gain) {
       this.gain = this.ctx.createGain();
       this.gain.gain.value = 0.5;
 
-      this.gain.connect(
-        this.ctx.destination
-      );
+      this.gain.connect(this.ctx.destination);
     }
 
     this.stop();
@@ -5608,42 +3138,27 @@ class SongSystem {
     this.url = url ?? null;
     this.buffer = null;
 
-    if(!url){
+    if (!url) {
       console.warn("songFilename is missing.");
       return false;
     }
 
-    try{
+    try {
       const res = await fetch(url);
 
-      if(!res.ok){
-        throw new Error(
-          `song load failed: ${res.status}`
-        );
+      if (!res.ok) {
+        throw new Error(`song load failed: ${res.status}`);
       }
 
-      const arrayBuffer =
-        await res.arrayBuffer();
+      const arrayBuffer = await res.arrayBuffer();
 
-      this.buffer =
-        await this.ctx.decodeAudioData(
-          arrayBuffer
-        );
+      this.buffer = await this.ctx.decodeAudioData(arrayBuffer);
 
-      console.log(
-        "song loaded:",
-        url,
-        this.buffer.duration,
-        "sec"
-      );
+      console.log("song loaded:", url, this.buffer.duration, "sec");
 
       return true;
-    }
-    catch(err){
-      console.warn(
-        "Failed to load song.",
-        err
-      );
+    } catch (err) {
+      console.warn("Failed to load song.", err);
 
       this.buffer = null;
 
@@ -5651,52 +3166,32 @@ class SongSystem {
     }
   }
 
+  setPlaybackRate(value) {
+    const rate = Number(value);
 
-  setPlaybackRate(
-    value
-  ){
-    const rate =
-      Number(value);
-
-    if(
-      !Number.isFinite(rate) ||
-      rate <= 0
-    ){
+    if (!Number.isFinite(rate) || rate <= 0) {
       return false;
     }
 
-    this.playbackRate =
-      rate;
+    this.playbackRate = rate;
 
-    if(this.source){
-
-      try{
-        this.source.playbackRate.setValueAtTime(
-          rate,
-          this.ctx.currentTime
-        );
-      }
-      catch{
-        this.source.playbackRate.value =
-          rate;
+    if (this.source) {
+      try {
+        this.source.playbackRate.setValueAtTime(rate, this.ctx.currentTime);
+      } catch {
+        this.source.playbackRate.value = rate;
       }
     }
 
     return true;
   }
 
-
-  playFromLevelTime(
-    levelTime_us,
-    ctxStartTime,
-    globalOffset_us = 0
-  ){
+  playFromLevelTime(levelTime_us, ctxStartTime, globalOffset_us = 0) {
     this.stop();
 
-    if(!this.ctx || !this.buffer){
+    if (!this.ctx || !this.buffer) {
       return false;
     }
-
 
     /*
       + globalOffset이면 음악이 늦게 들림.
@@ -5707,19 +3202,11 @@ class SongSystem {
 
       song = 9.950 sec
     */
-    let songTime_sec =
-      (
-        levelTime_us -
-        globalOffset_us
-      ) / 1000000;
+    let songTime_sec = (levelTime_us - globalOffset_us) / 1000000;
 
+    let when = ctxStartTime;
 
-    let when =
-      ctxStartTime;
-
-    let offset =
-      songTime_sec;
-
+    let offset = songTime_sec;
 
     /*
       곡 시작 전 시간이라면
@@ -5729,101 +3216,69 @@ class SongSystem {
       → 지금 곡을 -0.5초부터 틀 수 없으므로
       → 0.5초 뒤에 song 0초부터 시작
     */
-    if(songTime_sec < 0){
-
+    if (songTime_sec < 0) {
       const safeRate =
-        Number.isFinite(
-          this.playbackRate
-        ) &&
-        this.playbackRate > 0
+        Number.isFinite(this.playbackRate) && this.playbackRate > 0
           ? this.playbackRate
           : 1;
 
-      when +=
-        -songTime_sec /
-        safeRate;
+      when += -songTime_sec / safeRate;
 
       offset = 0;
     }
 
-
     // 이미 곡 끝을 넘어갔다면 재생하지 않음
-    if(offset >= this.buffer.duration){
+    if (offset >= this.buffer.duration) {
       return false;
     }
 
+    const source = this.ctx.createBufferSource();
 
-    const source =
-      this.ctx.createBufferSource();
-
-    source.buffer =
-      this.buffer;
+    source.buffer = this.buffer;
 
     source.playbackRate.value =
-      Number.isFinite(
-        this.playbackRate
-      ) &&
-      this.playbackRate > 0
+      Number.isFinite(this.playbackRate) && this.playbackRate > 0
         ? this.playbackRate
         : 1;
 
-    source.connect(
-      this.gain
-    );
-
+    source.connect(this.gain);
 
     source.onended = () => {
-
-      if(this.source === source){
+      if (this.source === source) {
         this.source = null;
       }
     };
 
+    source.start(when, offset);
 
-    source.start(
-      when,
-      offset
-    );
-
-    this.source =
-      source;
+    this.source = source;
 
     return true;
   }
 
-
-  stop(){
-
-    if(!this.source){
+  stop() {
+    if (!this.source) {
       return;
     }
-  
-  
-    try{
-  
+
+    try {
       this.source.stop();
-    }
-    catch{
-  
+    } catch {
       // 이미 종료된 source면 무시
     }
-  
-  
-    this.source =
-      null;
+
+    this.source = null;
   }
 
+  setVolume(value) {
+    if (!this.gain) return;
 
-  setVolume(value){
-    if(!this.gain) return;
-
-    this.gain.gain.value =
-      Math.max(0, value);
+    this.gain.gain.value = Math.max(0, value);
   }
 }
 
-class Clock{
-  constructor(){
+class Clock {
+  constructor() {
     this.time_us = 0;
 
     this.startOffset_us = 0;
@@ -5838,245 +3293,164 @@ class Clock{
     this.running = false;
   }
 
-
-  setAudioContext(ctx){
+  setAudioContext(ctx) {
     this.audioContext = ctx;
   }
 
-
-  _now(){
-    if(this.audioContext){
+  _now() {
+    if (this.audioContext) {
       return this.audioContext.currentTime;
     }
 
     return performance.now() / 1000;
   }
 
+  startAt(time_us, startTime_sec = null) {
+    this.startOffset_us = time_us;
 
-  startAt(
-    time_us,
-    startTime_sec = null
-  ){
-    this.startOffset_us =
-      time_us;
+    this.startTime_sec = startTime_sec ?? this._now();
 
-    this.startTime_sec =
-      startTime_sec ??
-      this._now();
+    this.time_us = time_us;
 
-    this.time_us =
-      time_us;
-
-    this.running =
-      true;
+    this.running = true;
   }
 
+  setPlaybackRate(value) {
+    const rate = Number(value);
 
-  setPlaybackRate(
-    value
-  ){
-    const rate =
-      Number(value);
-
-    if(
-      !Number.isFinite(rate) ||
-      rate <= 0
-    ){
+    if (!Number.isFinite(rate) || rate <= 0) {
       return false;
     }
 
-    if(this.running){
+    if (this.running) {
+      const now_sec = this._now();
 
-      const now_sec =
-        this._now();
+      const dt_sec = now_sec - this.startTime_sec;
 
-      const dt_sec =
-        now_sec -
-        this.startTime_sec;
+      this.time_us = this.startOffset_us + dt_sec * 1000000 * this.playbackRate;
 
-      this.time_us =
-        this.startOffset_us +
-        dt_sec *
-        1000000 *
-        this.playbackRate;
+      this.startOffset_us = this.time_us;
 
-      this.startOffset_us =
-        this.time_us;
-
-      this.startTime_sec =
-        now_sec;
+      this.startTime_sec = now_sec;
     }
 
-    this.playbackRate =
-      rate;
+    this.playbackRate = rate;
 
     return true;
   }
 
-
-  update(){
-    if(!this.running){
+  update() {
+    if (!this.running) {
       return;
     }
 
-    const now_sec =
-      this._now();
+    const now_sec = this._now();
 
-    const dt_sec =
-      now_sec -
-      this.startTime_sec;
+    const dt_sec = now_sec - this.startTime_sec;
 
-    this.time_us =
-      this.startOffset_us +
-      dt_sec *
-      1000000 *
-      this.playbackRate;
+    this.time_us = this.startOffset_us + dt_sec * 1000000 * this.playbackRate;
   }
 
-
-  stop(){
+  stop() {
     this.startOffset_us = 0;
     this.time_us = 0;
     this.startTime_sec = 0;
     this.running = false;
   }
 
-
-  getTime_us(){
+  getTime_us() {
     return this.time_us;
   }
 }
 
-
 //직접적으로 에디터에 사용가능하고 수정 삭제따위에 용이한 문서 클래스
 class Document {
-  constructor(){
-    this.ids = [];    // ["f_0","f_1",...]
+  constructor() {
+    this.ids = []; // ["f_0","f_1",...]
     this.angles = []; // [0, 30, 999, ...]  (원본 그대로 보관)
     this.nextId = 0;
     this.actions = [];
     this.settings = null;
   }
-  
-  removeAction(
-    action
-  ){
-  
-    const index =
-      this.actions.indexOf(
-        action
-      );
-  
-  
-    if(index < 0){
+
+  removeAction(action) {
+    const index = this.actions.indexOf(action);
+
+    if (index < 0) {
       return false;
     }
-  
-  
-    this.actions.splice(
-      index,
-      1
-    );
-  
-  
+
+    this.actions.splice(index, 1);
+
     return true;
   }
-  
-  getActionsByFloorId(
-    floorId
-  ){
-    return this.actions.filter(
-      action =>
-        action.floorId === floorId
-    );
+
+  getActionsByFloorId(floorId) {
+    return this.actions.filter((action) => action.floorId === floorId);
   }
-  
-  indexOfId(id){ return this.ids.indexOf(id); }
+
+  indexOfId(id) {
+    return this.ids.indexOf(id);
+  }
 
   //새 각도 추가
-  insertAfter(afterId, angle){
+  insertAfter(afterId, angle) {
     const i = this.indexOfId(afterId);
-    const idx = (i < 0) ? this.ids.length : i + 1;
+    const idx = i < 0 ? this.ids.length : i + 1;
     this.ids.splice(idx, 0, this.newId());
     this.angles.splice(idx, 0, angle);
     return this.ids[idx]; // 새로 만든 id 반환
   }
 
   //해당 아이디 삭제
-  removeById(id){
+  removeById(id) {
     const i = this.indexOfId(id);
-  
-    if(i < 0) return false;
-  
-    this.actions = this.actions.filter(action => {
+
+    if (i < 0) return false;
+
+    this.actions = this.actions.filter((action) => {
       return action.floorId !== id;
     });
-  
+
     this.ids.splice(i, 1);
     this.angles.splice(i, 1);
-  
+
     return true;
   }
-  
-  updateAction(
-    action,
-    patch
-  ){
-  
-    const index =
-      this.actions.indexOf(
-        action
-      );
-  
-  
-    if(index < 0){
+
+  updateAction(action, patch) {
+    const index = this.actions.indexOf(action);
+
+    if (index < 0) {
       return false;
     }
-  
-  
-    Object.assign(
-      this.actions[index],
-      patch
-    );
-  
-  
+
+    Object.assign(this.actions[index], patch);
+
     return true;
   }
-  
+
   //해당 아이디의 앵글 바꿈
-  setAngle(id, angle){
+  setAngle(id, angle) {
     const i = this.indexOfId(id);
-    if(i < 0) return false;
+    if (i < 0) return false;
     this.angles[i] = angle;
     return true;
   }
-  
-  newId(){
-    return "f_" + (this.nextId++);
+
+  newId() {
+    return "f_" + this.nextId++;
   }
 
-  canAddAction(
-    floorId,
-    eventType
-  ){
-
+  canAddAction(floorId, eventType) {
     /*
       유효한 타일인지
     */
-    if(
-      this.indexOfId(
-        floorId
-      ) < 0
-    ){
+    if (this.indexOfId(floorId) < 0) {
       return false;
     }
 
-
-    const def =
-      getEventDefinition(
-        eventType
-      );
-
+    const def = getEventDefinition(eventType);
 
     /*
       이 에디터가 지원하지 않는 이벤트는
@@ -6085,203 +3459,128 @@ class Document {
       기존 파일에 들어있는 이벤트는
       그대로 보존만 한다.
     */
-    if(!def){
+    if (!def) {
       return false;
     }
-
 
     /*
       복수 설치 허용 이벤트
     */
-    if(
-      def.allowMultiple
-    ){
+    if (def.allowMultiple) {
       return true;
     }
-
 
     /*
       단일 이벤트라면
       같은 floor + 같은 eventType이
       이미 존재하는지 검사한다.
     */
-    const alreadyExists =
-      this.actions.some(
-        action =>
-          action.floorId ===
-            floorId
-          &&
-          action.eventType ===
-            eventType
-      );
-
+    const alreadyExists = this.actions.some(
+      (action) => action.floorId === floorId && action.eventType === eventType,
+    );
 
     return !alreadyExists;
   }
 
-  addAction(
-    floorId,
-    eventType,
-    data = {}
-  ){
-
-    if(
-      !this.canAddAction(
-        floorId,
-        eventType
-      )
-    ){
+  addAction(floorId, eventType, data = {}) {
+    if (!this.canAddAction(floorId, eventType)) {
       return null;
     }
 
-
-    const def =
-      getEventDefinition(
-        eventType
-      );
-
+    const def = getEventDefinition(eventType);
 
     const action = {
-
       eventType,
 
-      ...structuredClone(
-        def.defaultData ??
-        {}
-      ),
+      ...structuredClone(def.defaultData ?? {}),
 
       ...data,
 
-      floorId
+      floorId,
     };
 
-
-    this.actions.push(
-      action
-    );
-
+    this.actions.push(action);
 
     return action;
   }
 }
 
-class DocumentBuilder{
-  constructor(){
-    
-  }
-  
+class DocumentBuilder {
+  constructor() {}
+
   //newId(){ return "f_" + (this._id++); }
 
-  
-  fromProject(project){
+  fromProject(project) {
     const doc = new Document();
-  
+
     const angles = [0, ...project.json.angleData];
-    const settings =
-      structuredClone(
-        project.json.settings ??
-        {}
-      );
-  
-    for(const a of angles){
+    const settings = structuredClone(project.json.settings ?? {});
+
+    for (const a of angles) {
       doc.ids.push(doc.newId());
       doc.angles.push(a);
     }
-  
-    doc.actions =
-      (project.json.actions ?? [])
-      .map(action => {
-    
-        const { floor, ...rest } = action;
-    
-        return {
-          ...rest,
-          floorId:
-            doc.ids[floor] ?? null
-        };
-      });
-  
+
+    doc.actions = (project.json.actions ?? []).map((action) => {
+      const { floor, ...rest } = action;
+
+      return {
+        ...rest,
+        floorId: doc.ids[floor] ?? null,
+      };
+    });
+
     doc.settings = {
+      songFilename: "",
 
-      songFilename:
-        "",
+      bpm: 100,
 
-      bpm:
-        100,
+      volume: 100,
 
-      volume:
-        100,
+      offset: 0,
 
-      offset:
-        0,
+      pitch: 100,
 
-      pitch:
-        100,
+      hitsound: "Kick",
 
-      hitsound:
-        "Kick",
+      hitsoundVolume: 100,
 
-      hitsoundVolume:
-        100,
+      artist: "Artist",
 
-      artist:
-        "Artist",
+      song: "Song",
 
-      song:
-        "Song",
+      author: "",
 
-      author:
-        "",
-    
-      ...settings
+      ...settings,
     };
-  
+
     return doc;
   }
 }
 
-
 //json 전처리
-class Compiler{ 
-  constructor(){
-    
-  }
-  
+class Compiler {
+  constructor() {}
+
   //project가 아닌 document를 받는 새로운 compile 함수
-  compile(doc){
+  compile(doc) {
+    const EMPTY_ACTIONS = Object.freeze([]);
 
-    const EMPTY_ACTIONS =
-      Object.freeze([]);
+    const floorIndexById = new Map();
 
-    
-
-    const floorIndexById =
-      new Map();
-
-
-    for(
-      let i = 0;
-      i < doc.ids.length;
-      i++
-    ){
-
-      floorIndexById.set(
-        doc.ids[i],
-        i
-      );
+    for (let i = 0; i < doc.ids.length; i++) {
+      floorIndexById.set(doc.ids[i], i);
     }
     //console.log(doc)
     //this.doc = doc //document 클래스를 저장
     const compiled = new CompiledProject();
-    
-    //const actionsIdx = 0;
-    
-    /* 타일 시작 */
-    const angleData =
-      doc.angles;
 
-    const actions =
-      doc.actions;
+    //const actionsIdx = 0;
+
+    /* 타일 시작 */
+    const angleData = doc.angles;
+
+    const actions = doc.actions;
 
     /*
       이벤트가 없는 타일은 null.
@@ -6289,191 +3588,104 @@ class Compiler{
       이벤트가 실제로 존재하는 타일에서만
       Array를 생성한다.
     */
-    const actionsByFloor =
-      new Array(
-        angleData.length
-      ).fill(
-        null
-      );
+    const actionsByFloor = new Array(angleData.length).fill(null);
 
+    for (const action of actions) {
+      const floorIndex = floorIndexById.get(action.floorId);
 
-    for(
-      const action
-      of actions
-    ){
-
-      const floorIndex =
-        floorIndexById.get(
-          action.floorId
-        );
-
-
-      if(
-        floorIndex ===
-        undefined
-      ){
+      if (floorIndex === undefined) {
         continue;
       }
 
+      let floorActions = actionsByFloor[floorIndex];
 
-      let floorActions =
-        actionsByFloor[
-          floorIndex
-        ];
+      if (!floorActions) {
+        floorActions = [];
 
-
-      if(!floorActions){
-
-        floorActions =
-          [];
-
-        actionsByFloor[
-          floorIndex
-        ] =
-          floorActions;
+        actionsByFloor[floorIndex] = floorActions;
       }
 
-
-      floorActions.push(
-        action
-      );
+      floorActions.push(action);
     }
-    
+
     /*
       렌더링용 이벤트 표시와
       이후 이벤트 UI에서도 활용하기 좋도록
     
       타일별 전체 action도 따로 묶는다.
     */
-    
+
     const floorLength = 1; //얼불춤은 내부적으로 타일당 1.5유닛의 크기를 가짐, 다만 에디터에선 타일 크기가 1이므로 1로 통일
     let x = 0; //타일 시작 x위치
     let y = 0; //타일 시작 y위치
     let prev_x = 0; //이전 타일 시작 x위치
     let prev_y = 0; //이전 타일 시작 y위치
-    
+
     //새로운 for문; 이전 for문은 현재 각도와 이전 각도를 가져와 타일을 만들었지만 마지막타일은 안만들어지며 무엇보다 시스템적으로 어울리지 않은 형태
     //얼불춤의 앵글데이터는 가장 먼저 생성되는 0도짜리 첫번째 타일 다음것부터 저장하며, 예컨대 [0, 90, 0]일 경우 0도 타일은 다음 90도 타일에 따라 그 모양이 L모양 따위로 결정되므로, 시스템적으론 다음 각도를 참조하는게 더 옳은 형태
     //박자 계산에 대해 : 얼불춤은 음수 각도와 상관없이 모든 각도를 0부터 360 사이로 정규화시켜서 계산함. 이때 서로 반대방향의 각도가 있으면 360도 타일로, 999라는 특수 각도는 미드스핀으로 계산함
     //변경 : rawAngle을 nowAngle로 변경, 더러웠던 코드 싹 정리하고 깔끔하게 정의
-    
+
     let prevAngle = 0; //이전 앵글 저장
     let midspinCount = 0; //미드스핀이 얼마나 나왔는지
     let isTwirled = false; //지금 뒤집어진 상태인지
-    let currentBpm =
-      Number(
-        doc.settings?.bpm
-      );
-    
-    
+    let currentBpm = Number(doc.settings?.bpm);
+
     /*
       BPM이 없거나 0 이하라면
       안전한 기본값 사용.
     */
-    if(
-      !Number.isFinite(
-        currentBpm
-      )
-      ||
-      currentBpm <= 0
-    ){
-    
-      currentBpm =
-        100;
+    if (!Number.isFinite(currentBpm) || currentBpm <= 0) {
+      currentBpm = 100;
     }
-    
-    
-    const rawOffset =
-      Number(
-        doc.settings?.offset
-      );
-    
-    
-    const offset_us =
-      Number.isFinite(
-        rawOffset
-      )
-        ? rawOffset * 1000
-        : 0;
-    
-    
-    let t_us =
-      -Math.round(
-        60000000 /
-        currentBpm
-      )
-      +
-      offset_us;
-    
+
+    const rawOffset = Number(doc.settings?.offset);
+
+    const offset_us = Number.isFinite(rawOffset) ? rawOffset * 1000 : 0;
+
+    let t_us = -Math.round(60000000 / currentBpm) + offset_us;
+
     //카메라 이펙트 정조 전면 삭제
-    
+
     const floors = []; //앵글데이터를 통해 나온 타일 클래스를 저장할 배열
-    const angles = [] //타일 각도 저장
-    const beats = [] //타일 박자 저장
-    const bpms = [] //그 타일 인덱스의 bpm 저장
-    const floorStarts_us = [] //us단위 타일 시작시간
-    const floorDurations_us = [] //us단위 타일 기간
-    
+    const angles = []; //타일 각도 저장
+    const beats = []; //타일 박자 저장
+    const bpms = []; //그 타일 인덱스의 bpm 저장
+    const floorStarts_us = []; //us단위 타일 시작시간
+    const floorDurations_us = []; //us단위 타일 기간
+
     const countdownHitTimes_us = [];
-    
+
     const playerCameraPositions = []; //플레이어 카메라 벡터값 배열
     const eventMarkers = [];
     //const cameraActionsArr = [];
-    
+
     /* =========================================================
        Hitsound state
     ========================================================= */
-    
-    let currentHitsound =
-      String(
-        doc.settings?.hitsound ??
-        "Kick"
-      );
-    
-    
-    let currentHitsoundVolume =
-      Number(
-        doc.settings
-          ?.hitsoundVolume ??
-        100
-      );
-    
-    
-    if(
-      !Number.isFinite(
-        currentHitsoundVolume
-      )
-    ){
-    
-      currentHitsoundVolume =
-        100;
+
+    let currentHitsound = String(doc.settings?.hitsound ?? "Kick");
+
+    let currentHitsoundVolume = Number(doc.settings?.hitsoundVolume ?? 100);
+
+    if (!Number.isFinite(currentHitsoundVolume)) {
+      currentHitsoundVolume = 100;
     }
-    
-    
-    const hitSoundEvents =
-      [];
-    
-    
-    
+
+    const hitSoundEvents = [];
 
     /*
       MID tiles follow the regular Hitsound channel until
       gameSound:"Midspin" creates a dedicated override.
     */
-    let currentMidspinHitsound =
-      currentHitsound;
+    let currentMidspinHitsound = currentHitsound;
 
-    let currentMidspinHitsoundVolume =
-      currentHitsoundVolume;
+    let currentMidspinHitsoundVolume = currentHitsoundVolume;
 
-    let hasMidspinHitsoundOverride =
-      false;
+    let hasMidspinHitsoundOverride = false;
 
+    const playSoundActions = [];
 
-    const playSoundActions =
-      [];
-    
-    
     //floorStarts_us[0] = Math.round(-1*60000000/currentBpm);
     floorStarts_us[0] = t_us;
     //playerCameraPositions[0] = null;
@@ -6487,22 +3699,21 @@ class Compiler{
       to_y: 0,
       dx: 0,
       dy: 0,
-    }
-    
-    for(let i = 0; i < angleData.length; i++){
-      
-      const floorActions =
-        actionsByFloor[i] ??
-        EMPTY_ACTIONS;
+    };
+
+    for (let i = 0; i < angleData.length; i++) {
+      const floorActions = actionsByFloor[i] ?? EMPTY_ACTIONS;
       //현재 각도, 0~359사이로 정규화
-      let nowAngle = angleData[i] == 999 ? angleData[i] : normalizeAngle(angleData[i]);
-      
+      let nowAngle =
+        angleData[i] == 999 ? angleData[i] : normalizeAngle(angleData[i]);
+
       //다음 인덱스, i+1은 배열 최대 인덱스를 벗어나지 않음
-      let j = Math.min((i + 1), angleData.length-1);
-      let nextAngle = angleData[j] == 999 ? angleData[j] : normalizeAngle(angleData[j]); //다음각도, 999일땐 냄김
-      
+      let j = Math.min(i + 1, angleData.length - 1);
+      let nextAngle =
+        angleData[j] == 999 ? angleData[j] : normalizeAngle(angleData[j]); //다음각도, 999일땐 냄김
+
       //floor의 option을 위한 변수
-      let option = {isTwirled : false, isFullspin : false, isMidspin : false};
+      let option = { isTwirled: false, isFullspin: false, isMidspin: false };
       let isUpdatePrev = true;
 
       /* =========================
@@ -6515,58 +3726,42 @@ class Compiler{
         Twirl을 만날 때마다 교차한다.
       ========================= */
 
-      let twirlCount =
-        0;
+      let twirlCount = 0;
 
-
-      for(
-        const action
-        of floorActions
-      ){
-
-        if(
-          action.eventType ===
-          "Twirl"
-        ){
-
+      for (const action of floorActions) {
+        if (action.eventType === "Twirl") {
           twirlCount++;
         }
       }
 
-
-      if(
-        twirlCount % 2 === 1
-      ){
-
-        isTwirled =
-          !isTwirled;
+      if (twirlCount % 2 === 1) {
+        isTwirled = !isTwirled;
       }
 
+      option.isTwirled = isTwirled;
 
-      option.isTwirled =
-        isTwirled;
-      
       //twirl이 고려된 타일 각도
-      let angle = 0
-      const setAngle = (now, next) => {return normalizeAngle(now - next + 180)}
-      
+      let angle = 0;
+      const setAngle = (now, next) => {
+        return normalizeAngle(now - next + 180);
+      };
+
       //다음 각도가 999면 => 현재 타일은 미드스핀
-      if(nextAngle === 999 && nowAngle != 999){
+      if (nextAngle === 999 && nowAngle != 999) {
         option.isMidspin = true;
         angle = 0;
         nextAngle = reverseAngle(nowAngle);
-        midspinCount ++;
+        midspinCount++;
       }
       //다음 각도가 999고 현재도 999면 (미드스핀이 연속으로 나오면)
-      else if(nextAngle === 999 && nowAngle === 999){
+      else if (nextAngle === 999 && nowAngle === 999) {
         option.isMidspin = true;
         angle = 0;
-        nowAngle = midspinCount%2==0 ? prevAngle : reverseAngle(prevAngle);
-        nextAngle = midspinCount%2==0 ? reverseAngle(prevAngle) : prevAngle;
+        nowAngle = midspinCount % 2 == 0 ? prevAngle : reverseAngle(prevAngle);
+        nextAngle = midspinCount % 2 == 0 ? reverseAngle(prevAngle) : prevAngle;
         isUpdatePrev = false;
-        midspinCount++
-      }
-      else{
+        midspinCount++;
+      } else {
         // 현재 각도가 999면 => 연속 MID 개수의 홀짝에 따라
         // 실제 절대각을 복원한다.
         //
@@ -6577,37 +3772,40 @@ class Compiler{
         //
         // 기존 코드는 MID run을 빠져나올 때 항상 reverse(prevAngle)을
         // 사용해서, 999가 짝수 개 연속된 경우 시작 방향이 180° 뒤집혔다.
-        if(nowAngle === 999){
+        if (nowAngle === 999) {
           nowAngle =
-            midspinCount % 2 === 0
-              ? prevAngle
-              : reverseAngle(prevAngle);
+            midspinCount % 2 === 0 ? prevAngle : reverseAngle(prevAngle);
         }
         //각도 구하기
         angle = setAngle(nowAngle, nextAngle);
-        
-        
-        
+
         //소용돌이 적용 상태면
-        if(isTwirled){
+        if (isTwirled) {
           //각도 뒤집기
-          angle = normalizeAngle(360 - angle)
+          angle = normalizeAngle(360 - angle);
           option.isTwirled = true;
         }
-        
+
         //박자가 0이면 => 360도
-        if(angle == 0){
+        if (angle == 0) {
           angle = 360;
           option.isFullspin = true;
         }
-        
+
         //미드스핀이 없으므로 미드스핀카운트를 0으로
         midspinCount = 0;
       }
-      
-      let floor = new Floor(doc.ids[i], x, y, reverseAngle(nowAngle), nextAngle, option) // 타일 생성
+
+      let floor = new Floor(
+        doc.ids[i],
+        x,
+        y,
+        reverseAngle(nowAngle),
+        nextAngle,
+        option,
+      ); // 타일 생성
       floors.push(floor); //타일 추가
-      
+
       /*
         현재 타일의 이벤트 표시.
       
@@ -6616,146 +3814,68 @@ class Compiler{
         따라서 증가/감소 여부를 제대로 판정할 수 있다.
       */
       eventMarkers.push(
-        createEventMarkerInfo(
-          floorActions,
-          currentBpm,
-          isTwirled,
-          {
-            /*
+        createEventMarkerInfo(floorActions, currentBpm, isTwirled, {
+          /*
               angle은 이미 현재 타일의 Twirl 상태가
               적용된 뒤의 유효 이동각이다.
 
               nextAngle은 999/MID도 위에서
               실제 절대각으로 해석한 값이다.
             */
-            effectiveAngle:
-              angle,
+          effectiveAngle: angle,
 
-            nextAbsoluteAngle:
-              normalizeAngle(
-                nextAngle
-              )
-          }
-        )
+          nextAbsoluteAngle: normalizeAngle(nextAngle),
+        }),
       );
-      
+
       // bpm설정
-      for(
-        const action
-        of floorActions
-      ){
-        
-        if(
-          action.eventType !==
-          "SetSpeed"
-        ){
+      for (const action of floorActions) {
+        if (action.eventType !== "SetSpeed") {
           continue;
         }
-      
-        const speedType =
-          String(
-            action.speedType ??
-            "Bpm"
-          ).toLowerCase();
-      
-      
-        if(
-          speedType === "bpm"
-        ){
-      
-          const value =
-            Number(
-              action.beatsPerMinute
-            );
-      
-      
-          if(
-            Number.isFinite(value)
-          ){
-            currentBpm =
-              value;
+
+        const speedType = String(action.speedType ?? "Bpm").toLowerCase();
+
+        if (speedType === "bpm") {
+          const value = Number(action.beatsPerMinute);
+
+          if (Number.isFinite(value)) {
+            currentBpm = value;
           }
-        }
-      
-        else if(
-          speedType ===
-          "multiplier"
-        ){
-      
-          const multiplier =
-            Number(
-              action.bpmMultiplier
-            );
-      
-      
-          if(
-            Number.isFinite(
-              multiplier
-            )
-          ){
-      
-            currentBpm *=
-              multiplier;
+        } else if (speedType === "multiplier") {
+          const multiplier = Number(action.bpmMultiplier);
+
+          if (Number.isFinite(multiplier)) {
+            currentBpm *= multiplier;
           }
         }
       }
-      
+
       // 시각적인 타일 각도는
       // Pause와 관계없이 원래 값 유지
-      angles.push(
-        angle
-      );
-      
-      
+      angles.push(angle);
+
       // 현재 타일 BPM
-      bpms.push(
-        currentBpm
-      );
-      
-    
-      
-    
-    
-    /* =========================
+      bpms.push(currentBpm);
+
+      /* =========================
        Pause
     ========================= */
-    
-    
-    
-    let pauseBeat =
-      0;
-    
-    
-    for(
-      const pauseAction
-      of floorActions
-    ){
-    
-      if(
-        pauseAction.eventType !==
-        "Pause"
-      ){
-        continue;
-      }
-    
-    
-      const pauseDuration =
-        Number(
-          pauseAction.duration
-        );
-    
-    
-      if(
-        !Number.isFinite(
-          pauseDuration
-        ) ||
-        pauseDuration <= 0
-      ){
-        continue;
-      }
-    
-    
-      /*
+
+      let pauseBeat = 0;
+
+      for (const pauseAction of floorActions) {
+        if (pauseAction.eventType !== "Pause") {
+          continue;
+        }
+
+        const pauseDuration = Number(pauseAction.duration);
+
+        if (!Number.isFinite(pauseDuration) || pauseDuration <= 0) {
+          continue;
+        }
+
+        /*
         Duration 자체는
         타일 종류와 관계없이 동일하게 적용.
     
@@ -6765,10 +3885,9 @@ class Compiler{
         MID에서 무시되는 것은
         countdownTicks뿐이다.
       */
-      pauseBeat +=
-        pauseDuration;
-    }
-      
+        pauseBeat += pauseDuration;
+      }
+
       /*
         일반 타일 박자
       
@@ -6776,10 +3895,8 @@ class Compiler{
         angle 90°  = 0.5박
         angle 360° = 2박
       */
-      const normalBeat =
-        angle / 180;
-      
-      
+      const normalBeat = angle / 180;
+
       /*
         Pause는
       
@@ -6794,46 +3911,32 @@ class Compiler{
           = angle / 180
           + pauseDuration
       */
-      const beat =
-        normalBeat +
-        pauseBeat;
-      
-      
-      beats.push(
-        beat
-      );
-      
-      
+      const beat = normalBeat + pauseBeat;
+
+      beats.push(beat);
+
       /*
         현재 BPM을 기준으로
         실제 체류시간 계산
       */
-      const duration =
-        Math.round(
-          beat *
-          60000000 /
-          currentBpm
-        );
-      
-      
-      floorDurations_us.push(
-        duration
-      );
-      
+      const duration = Math.round((beat * 60000000) / currentBpm);
+
+      floorDurations_us.push(duration);
+
       //타일 시작 지점 (마이크로초 단위)
-      if(i > 0){
+      if (i > 0) {
         /*
         t_us = t_us + Math.round(
           beats[i-1] * 60000000 / currentBpm
         );
         */
         t_us += floorDurations_us[i - 1];
-      
+
         floorStarts_us.push(t_us);
-        
+
         /* 플레이어 카메라 이동을 위한 변수 */
         //현재 bpm의 두 박자
-        let twoBeats_us = Math.round(2 * 60000000 / currentBpm);
+        let twoBeats_us = Math.round((2 * 60000000) / currentBpm);
         //방향
         let dirAngle = nowAngle;
         //전 타일 기준 dirAngle 방향으로 floorLength만큼 갔을때의 위치
@@ -6841,87 +3944,55 @@ class Compiler{
         let cam_y = prev_y + floorLength * Math.sin(degToRad(dirAngle));
         //전체 종합
         let cameraPosition = {
-          start_us : t_us,
-          duration_us : twoBeats_us,
-          end_us : t_us + twoBeats_us,
-          from_x : prev_x,
-          from_y : prev_y,
-          to_x : cam_x,
-          to_y : cam_y,
-          dx : cam_x - prev_x,
-          dy : cam_y - prev_y,
-        }
+          start_us: t_us,
+          duration_us: twoBeats_us,
+          end_us: t_us + twoBeats_us,
+          from_x: prev_x,
+          from_y: prev_y,
+          to_x: cam_x,
+          to_y: cam_y,
+          dx: cam_x - prev_x,
+          dy: cam_y - prev_y,
+        };
         playerCameraPositions.push(cameraPosition);
       }
-      
+
       //카메라 이벤트 설정
       //*전면삭제
-      
-      prev_x = x
-      prev_y = y
-      
+
+      prev_x = x;
+      prev_y = y;
+
       let reg = degToRad(nextAngle);
       x = x + floorLength * Math.cos(reg); //타일 중심 (타일이 꺾이는 부분)으로부터 다음 타일 x위치
       y = y + floorLength * Math.sin(reg); //타일 중심 (타일이 꺾이는 부분)으로부터 다음 타일 y위치
-      
+
       //미드스핀이 아닐 경우에만 prevAngle 최신화
-      if(isUpdatePrev) prevAngle = nowAngle
+      if (isUpdatePrev) prevAngle = nowAngle;
     }
-    
+
     /* =========================================================
        Compile Hitsound Events
     ========================================================= */
 
-    currentHitsound =
-      String(
-        doc.settings?.hitsound ??
-        "Kick"
-      );
+    currentHitsound = String(doc.settings?.hitsound ?? "Kick");
 
+    currentHitsoundVolume = Number(doc.settings?.hitsoundVolume ?? 100);
 
-    currentHitsoundVolume =
-      Number(
-        doc.settings
-          ?.hitsoundVolume ??
-        100
-      );
-
-
-    if(
-      !Number.isFinite(
-        currentHitsoundVolume
-      )
-    ){
-
-      currentHitsoundVolume =
-        100;
+    if (!Number.isFinite(currentHitsoundVolume)) {
+      currentHitsoundVolume = 100;
     }
 
+    currentMidspinHitsound = currentHitsound;
 
-    currentMidspinHitsound =
-      currentHitsound;
+    currentMidspinHitsoundVolume = currentHitsoundVolume;
 
-    currentMidspinHitsoundVolume =
-      currentHitsoundVolume;
+    hasMidspinHitsoundOverride = false;
 
-    hasMidspinHitsoundOverride =
-      false;
+    for (let i = 0; i < floors.length; i++) {
+      const floor = floors[i];
 
-
-    for(
-      let i = 0;
-      i < floors.length;
-      i++
-    ){
-
-      const floor =
-        floors[i];
-
-
-      const floorActions =
-        actionsByFloor[i] ??
-        EMPTY_ACTIONS;
-
+      const floorActions = actionsByFloor[i] ?? EMPTY_ACTIONS;
 
       /*
         SetHitsound applies from its own tile.
@@ -6929,220 +4000,100 @@ class Compiler{
         floor N has SetHitsound(Hat)
         -> floor N itself already uses Hat.
       */
-      for(
-        const action
-        of floorActions
-      ){
-
-        if(
-          action.eventType !==
-          "SetHitsound"
-        ){
+      for (const action of floorActions) {
+        if (action.eventType !== "SetHitsound") {
           continue;
         }
 
-
-        const gameSound =
-          String(
-            action.gameSound ??
-            "Hitsound"
-          )
+        const gameSound = String(action.gameSound ?? "Hitsound")
           .trim()
           .toLowerCase();
 
-
         const nextHitsound =
-          action.hitsound != null
-            ? String(
-                action.hitsound
-              )
-            : null;
+          action.hitsound != null ? String(action.hitsound) : null;
 
+        const nextVolume = Number(action.hitsoundVolume);
 
-        const nextVolume =
-          Number(
-            action.hitsoundVolume
-          );
-
-
-        if(
-          gameSound ===
-          "hitsound"
-        ){
-
-          if(
-            nextHitsound !==
-            null
-          ){
-
-            currentHitsound =
-              nextHitsound;
+        if (gameSound === "hitsound") {
+          if (nextHitsound !== null) {
+            currentHitsound = nextHitsound;
           }
 
-
-          if(
-            Number.isFinite(
-              nextVolume
-            )
-          ){
-
-            currentHitsoundVolume =
-              nextVolume;
+          if (Number.isFinite(nextVolume)) {
+            currentHitsoundVolume = nextVolume;
           }
-
 
           continue;
         }
 
+        if (gameSound === "midspin") {
+          hasMidspinHitsoundOverride = true;
 
-        if(
-          gameSound ===
-          "midspin"
-        ){
-
-          hasMidspinHitsoundOverride =
-            true;
-
-
-          if(
-            nextHitsound !==
-            null
-          ){
-
-            currentMidspinHitsound =
-              nextHitsound;
+          if (nextHitsound !== null) {
+            currentMidspinHitsound = nextHitsound;
           }
 
-
-          if(
-            Number.isFinite(
-              nextVolume
-            )
-          ){
-
-            currentMidspinHitsoundVolume =
-              nextVolume;
+          if (Number.isFinite(nextVolume)) {
+            currentMidspinHitsoundVolume = nextVolume;
           }
         }
       }
 
+      const isMidspin = Boolean(floor?.option?.isMidspin);
 
-      const isMidspin =
-        Boolean(
-          floor?.option?.isMidspin
-        );
-
-
-      const useMidspinChannel =
-        isMidspin &&
-        hasMidspinHitsoundOverride;
-
+      const useMidspinChannel = isMidspin && hasMidspinHitsoundOverride;
 
       hitSoundEvents.push({
+        time_us: floorStarts_us[i],
 
-        time_us:
-          floorStarts_us[i],
+        hitsound: useMidspinChannel ? currentMidspinHitsound : currentHitsound,
 
-        hitsound:
-          useMidspinChannel
-            ? currentMidspinHitsound
-            : currentHitsound,
+        volume: useMidspinChannel
+          ? currentMidspinHitsoundVolume
+          : currentHitsoundVolume,
 
-        volume:
-          useMidspinChannel
-            ? currentMidspinHitsoundVolume
-            : currentHitsoundVolume,
+        pitch: 100,
 
-        pitch:
-          100,
+        kind: "tile",
 
-        kind:
-          "tile",
-
-        gameSound:
-          useMidspinChannel
-            ? "Midspin"
-            : "Hitsound",
+        gameSound: useMidspinChannel ? "Midspin" : "Hitsound",
 
         isMidspin,
 
-        floorIndex:
-          i,
+        floorIndex: i,
 
-        floorId:
-          doc.ids[i]
+        floorId: doc.ids[i],
       });
-
 
       /*
         PlaySound is intentionally not played yet.
         Keep its source data for future support.
       */
-      for(
-        const action
-        of floorActions
-      ){
-
-        if(
-          action.eventType !==
-          "PlaySound"
-        ){
+      for (const action of floorActions) {
+        if (action.eventType !== "PlaySound") {
           continue;
         }
 
-
         playSoundActions.push({
+          floorIndex: i,
 
-          floorIndex:
-            i,
+          floorId: doc.ids[i],
 
-          floorId:
-            doc.ids[i],
+          floorStart_us: floorStarts_us[i],
 
-          floorStart_us:
-            floorStarts_us[i],
+          hitsound: String(action.hitsound ?? "Kick"),
 
-          hitsound:
-            String(
-              action.hitsound ??
-              "Kick"
-            ),
+          offset: Number(action.offset ?? 0),
 
-          offset:
-            Number(
-              action.offset ??
-              0
-            ),
+          playDuration: Number(action.playDuration ?? 0),
 
-          playDuration:
-            Number(
-              action.playDuration ??
-              0
-            ),
+          pitch: Number(action.pitch ?? 100),
 
-          pitch:
-            Number(
-              action.pitch ??
-              100
-            ),
+          volume: Number(action.hitsoundVolume ?? 100),
 
-          volume:
-            Number(
-              action.hitsoundVolume ??
-              100
-            ),
+          angleOffset: Number(action.angleOffset ?? 0),
 
-          angleOffset:
-            Number(
-              action.angleOffset ??
-              0
-            ),
-
-          eventTag:
-            String(
-              action.eventTag ??
-              ""
-            )
+          eventTag: String(action.eventTag ?? ""),
         });
       }
     }
@@ -7150,230 +4101,132 @@ class Compiler{
     /* =========================================================
      Countdown playback
   ========================================================= */
-  
-  for(
-    let i = 0;
-    i < floors.length;
-    i++
-  ){
-  
-    const floor =
-      floors[i];
-  
-  
-    /*
+
+    for (let i = 0; i < floors.length; i++) {
+      const floor = floors[i];
+
+      /*
       MID는 countdown을 완전히 무시.
   
       현재 Compiler에서
       next angle이 999인 타일이
       isMidspin = true가 된다.
     */
-    if(
-      floor?.option?.isMidspin
-    ){
-      continue;
-    }
-  
-  
-    const floorActions =
-      actionsByFloor[i] ??
-      EMPTY_ACTIONS;
-  
-  
-    let rawCountdownTicks =
-      0;
-  
-  
-    /*
+      if (floor?.option?.isMidspin) {
+        continue;
+      }
+
+      const floorActions = actionsByFloor[i] ?? EMPTY_ACTIONS;
+
+      let rawCountdownTicks = 0;
+
+      /*
       현재는 Pause를 하나만 허용하지만
       외부 파일의 비정상 중복까지 고려해서
       가장 큰 countdown 값을 사용.
     */
-    for(
-      const action
-      of floorActions
-    ){
-  
-      if(
-        action.eventType !==
-        "Pause"
-      ){
+      for (const action of floorActions) {
+        if (action.eventType !== "Pause") {
+          continue;
+        }
+
+        const ticks = Math.max(
+          0,
+          Math.trunc(Number(action.countdownTicks) || 0),
+        );
+
+        rawCountdownTicks = Math.max(rawCountdownTicks, ticks);
+      }
+
+      const effectiveCountdownTicks = rawCountdownTicks;
+
+      if (effectiveCountdownTicks <= 0) {
         continue;
       }
-  
-  
-      const ticks =
-        Math.max(
-          0,
-          Math.trunc(
-            Number(
-              action.countdownTicks
-            ) || 0
-          )
-        );
-  
-  
-      rawCountdownTicks =
-        Math.max(
-          rawCountdownTicks,
-          ticks
-        );
-    }
-  
-  
-    const effectiveCountdownTicks = rawCountdownTicks;
-  
-  
-    if(
-      effectiveCountdownTicks <= 0
-    ){
-      continue;
-    }
-  
-  
-    const bpm =
-      Number(
-        bpms[i]
-      );
-  
-  
-    if(
-      !Number.isFinite(bpm) ||
-      bpm <= 0
-    ){
-      continue;
-    }
-  
-  
-    const beat_us =
-      60000000 /
-      bpm;
-  
-  
-    const floorStart_us =
-      floorStarts_us[i];
-  
-  
-    const floorEnd_us =
-      floorStart_us +
-      floorDurations_us[i];
-  
-  
 
-  
-    /*
+      const bpm = Number(bpms[i]);
+
+      if (!Number.isFinite(bpm) || bpm <= 0) {
+        continue;
+      }
+
+      const beat_us = 60000000 / bpm;
+
+      const floorStart_us = floorStarts_us[i];
+
+      const floorEnd_us = floorStart_us + floorDurations_us[i];
+
+      /*
       countdown은 다음 타일 직전부터
       1박 간격으로 역산한다.
     */
-    for(
-      let tick =
-        effectiveCountdownTicks;
-  
-      tick >= 1;
-  
-      tick--
-    ){
-  
-      const hit_us =
-        Math.round(
-          floorEnd_us -
-          tick *
-          beat_us
-        );
-  
-  
-      countdownHitTimes_us.push(
-        hit_us
-      );
+      for (let tick = effectiveCountdownTicks; tick >= 1; tick--) {
+        const hit_us = Math.round(floorEnd_us - tick * beat_us);
+
+        countdownHitTimes_us.push(hit_us);
+      }
     }
-  }
-  
-  countdownHitTimes_us.sort(
-    (a, b) =>
-      a - b
-  );
-  
-  const uniqueCountdownHitTimes_us =
-    countdownHitTimes_us.filter(
-      (
-        time,
-        index,
-        array
-      ) =>
-  
-        index === 0 ||
-        time !==
-          array[index - 1]
+
+    countdownHitTimes_us.sort((a, b) => a - b);
+
+    const uniqueCountdownHitTimes_us = countdownHitTimes_us.filter(
+      (time, index, array) => index === 0 || time !== array[index - 1],
     );
-  
 
     /*
       Do not log full compiler arrays in production. Real-world levels
       can contain thousands of floors/events, and DevTools retaining
       those arrays on every rebuild causes a large memory/performance hit.
     */
-    
-    
+
     compiled.floors = floors;
     compiled.bpms = bpms;
     compiled.relativeAngles = angles;
     compiled.beats = beats;
-    compiled.floorStarts_us =
-      floorStarts_us;
-    
-    compiled.floorDurations_us =
-      floorDurations_us;
-    
-    
-    compiled.countdownHitTimes_us =
-      uniqueCountdownHitTimes_us;
-    
-    
-    
-    
-    compiled.playerCameraPositions =
-      playerCameraPositions;
+    compiled.floorStarts_us = floorStarts_us;
+
+    compiled.floorDurations_us = floorDurations_us;
+
+    compiled.countdownHitTimes_us = uniqueCountdownHitTimes_us;
+
+    compiled.playerCameraPositions = playerCameraPositions;
     compiled.eventMarkers = eventMarkers;
-    
-    compiled.hitSoundEvents =
-      hitSoundEvents;
-    
-    
-    compiled.playSoundActions =
-      playSoundActions;
-    
+
+    compiled.hitSoundEvents = hitSoundEvents;
+
+    compiled.playSoundActions = playSoundActions;
+
     //console.log(twirlActions);
     //console.log(floors)
     return compiled;
   }
-  
 }
 
 //파일을 저장할 프로젝트
-class Project{
-  constructor(){
+class Project {
+  constructor() {
     this.json = null; //불러온 json 자체가 이곳에 저장
   }
 }
 
 //앱
-class EditorApp{
-  constructor(){
-    this.project = null
+class EditorApp {
+  constructor() {
+    this.project = null;
     this.doc = null;
-    
+
     this.builder = new DocumentBuilder();
     this.compiler = new Compiler();
-    
+
     this.runtime = new RuntimeScene(THREE);
     this.cameraSystem = new CameraSystem(THREE);
-    this.renderEngine = null
+    this.renderEngine = null;
     this.input = null;
     this.state = new EditorState();
-    
+
     this.modifierKeys = new ModifierKeyController();
     this.playButton = new PlayButtonController();
-    
+
     this.prevFloorButton = null;
     this.nextFloorButton = null;
 
@@ -7390,7 +4243,7 @@ class EditorApp{
     this.historyLimit = 120;
     this.historyRestoring = false;
     this.historyInitialized = false;
-    
+
     /* =========================
        Internal Clipboards
     ========================= */
@@ -7403,28 +4256,26 @@ class EditorApp{
 
     this.editorUI = new TileEditorUI();
     this.settingsController = new EditorSettingsController(this);
-    
+
     this.resizeObserver = null;
-    
+
     this.resizeRaf = null;
-    
-    
 
     this.pendingViewportSize = {
       width: 0,
-      height: 0
+      height: 0,
     };
-    
+
     this.viewportSize = {
       width: 0,
-      height: 0
+      height: 0,
     };
-    
+
     this.evaluator = new Evaluator();
     this.clock = new Clock();
-    
+
     this.hitSound = new HitSoundSystem();
-    
+
     this.song = new SongSystem();
 
     /*
@@ -7447,9 +4298,9 @@ class EditorApp{
       accidentally separate music from the hitsound timeline.
     */
     this.editorGlobalOffset_ms = 0;
-    
+
     this.playbackFloorIndex = null;
-    
+
     this.playTargetIndex = null;
 
     this.playTarget_us = null;
@@ -7458,56 +4309,42 @@ class EditorApp{
        Project settings / local files
     ========================= */
 
-    this.projectSettingsInitialized =
-      false;
+    this.projectSettingsInitialized = false;
 
-    this.levelLoadHelpInitialized =
-      false;
+    this.levelLoadHelpInitialized = false;
 
-    this.editorSettingsInitialized =
-      false;
+    this.editorSettingsInitialized = false;
 
-    this.editorInfoVisible =
-      true;
+    this.editorInfoVisible = true;
 
-    this.editorInfoElement =
-      null;
+    this.editorInfoElement = null;
 
-    this.currentLevelSource =
-      null;
+    this.currentLevelSource = null;
 
-    this.localSongObjectUrl =
-      null;
+    this.localSongObjectUrl = null;
 
     this.songLoadState = {
       loaded: false,
-      message: ""
+      message: "",
     };
 
     /* =========================
        Autosave / restore
     ========================= */
 
-    this.autosaveStorageKey =
-      "adofai-editor-autosave-v1";
+    this.autosaveStorageKey = "adofai-editor-autosave-v1";
 
-    this.autosaveSongCacheKey =
-      null;
+    this.autosaveSongCacheKey = null;
 
-    this.autosaveInitialized =
-      false;
+    this.autosaveInitialized = false;
 
-    this.autosaveTimer =
-      null;
+    this.autosaveTimer = null;
 
-    this.autosaveInterval =
-      null;
+    this.autosaveInterval = null;
 
-    this.autosaveDelay_ms =
-      900;
+    this.autosaveDelay_ms = 900;
 
-    this.autosaveInterval_ms =
-      15000;
+    this.autosaveInterval_ms = 15000;
 
     /*
       Clear Cache suppresses background writes until the user makes
@@ -7529,201 +4366,115 @@ class EditorApp{
      Diagnostics / user-facing notifications
   ========================================================= */
 
-  initDiagnostics(){
-    if(this.diagnosticsInitialized){
+  initDiagnostics() {
+    if (this.diagnosticsInitialized) {
       return;
     }
 
     this.logger.installConsoleCapture();
 
-    window.addEventListener(
-      "error",
-      event => {
-        const error =
-          event.error ??
-          new Error(
-            event.message ||
-            "Unknown window error"
-          );
+    window.addEventListener("error", (event) => {
+      const error =
+        event.error ?? new Error(event.message || "Unknown window error");
 
-        this.reportError(
-          error,
-          "Unhandled error"
-        );
-      }
-    );
+      this.reportError(error, "Unhandled error");
+    });
 
-    window.addEventListener(
-      "unhandledrejection",
-      event => {
-        const reason =
-          event.reason instanceof Error
-            ? event.reason
-            : new Error(
-                this.logger.formatValue(
-                  event.reason
-                )
-              );
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason =
+        event.reason instanceof Error
+          ? event.reason
+          : new Error(this.logger.formatValue(event.reason));
 
-        this.reportError(
-          reason,
-          "Unhandled promise rejection"
-        );
-      }
-    );
+      this.reportError(reason, "Unhandled promise rejection");
+    });
 
     this.diagnosticsInitialized = true;
 
-    this.logger.info(
-      "Editor session started",
-      {
-        viewport: `${window.innerWidth}x${window.innerHeight}`,
-        dpr: window.devicePixelRatio || 1
-      }
-    );
+    this.logger.info("Editor session started", {
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      dpr: window.devicePixelRatio || 1,
+    });
   }
 
-  showToast(
-    message,
-    type = "info",
-    duration_ms = 3200
-  ){
-    const container =
-      document.getElementById(
-        "editor-toast-container"
-      );
+  showToast(message, type = "info", duration_ms = 3200) {
+    const container = document.getElementById("editor-toast-container");
 
-    if(!container){
+    if (!container) {
       return false;
     }
 
-    const toast =
-      document.createElement(
-        "div"
-      );
+    const toast = document.createElement("div");
 
-    toast.className =
-      `editor-toast ${type}`;
+    toast.className = `editor-toast ${type}`;
 
-    toast.textContent =
-      String(message ?? "");
+    toast.textContent = String(message ?? "");
 
     container.appendChild(toast);
 
     const remove = () => {
-      toast.classList.add(
-        "leaving"
-      );
+      toast.classList.add("leaving");
 
-      window.setTimeout(
-        () => toast.remove(),
-        220
-      );
+      window.setTimeout(() => toast.remove(), 220);
     };
 
-    window.setTimeout(
-      remove,
-      Math.max(1000, duration_ms)
-    );
+    window.setTimeout(remove, Math.max(1000, duration_ms));
 
     return true;
   }
 
-  readEditorPreference(
-    key,
-    fallback = null
-  ){
-    try{
-      const value =
-        localStorage.getItem(key);
+  readEditorPreference(key, fallback = null) {
+    try {
+      const value = localStorage.getItem(key);
 
-      return value === null
-        ? fallback
-        : value;
-    }
-    catch(error){
-      this.logger.warn(
-        "Could not read editor preference",
-        key,
-        error
-      );
+      return value === null ? fallback : value;
+    } catch (error) {
+      this.logger.warn("Could not read editor preference", key, error);
       return fallback;
     }
   }
 
-  writeEditorPreference(
-    key,
-    value
-  ){
-    try{
-      localStorage.setItem(
-        key,
-        String(value)
-      );
+  writeEditorPreference(key, value) {
+    try {
+      localStorage.setItem(key, String(value));
       return true;
-    }
-    catch(error){
-      this.logger.warn(
-        "Could not save editor preference",
-        key,
-        error
-      );
+    } catch (error) {
+      this.logger.warn("Could not save editor preference", key, error);
       return false;
     }
   }
 
-  reportError(
-    error,
-    context = "Editor error",
-    { toast = true } = {}
-  ){
+  reportError(error, context = "Editor error", { toast = true } = {}) {
     const normalized =
       error instanceof Error
         ? error
-        : new Error(
-            String(error ?? "Unknown error")
-          );
+        : new Error(String(error ?? "Unknown error"));
 
-    this.logger.error(
-      context,
-      normalized
-    );
+    this.logger.error(context, normalized);
 
-    if(toast){
-      this.showToast(
-        `${context}. Open Debug Logs for details.`,
-        "error",
-        5000
-      );
+    if (toast) {
+      this.showToast(`${context}. Open Debug Logs for details.`, "error", 5000);
     }
 
     return normalized;
   }
 
-  refreshDebugLogView(){
-    const output =
-      document.getElementById(
-        "editor-log-output"
-      );
+  refreshDebugLogView() {
+    const output = document.getElementById("editor-log-output");
 
-    if(!output){
+    if (!output) {
       return;
     }
 
-    output.textContent =
-      this.logger.toText();
+    output.textContent = this.logger.toText();
 
-    output.scrollTop =
-      output.scrollHeight;
+    output.scrollTop = output.scrollHeight;
   }
 
-  openDebugLogs(){
-    const overlay =
-      document.getElementById(
-        "editor-log-overlay"
-      );
+  openDebugLogs() {
+    const overlay = document.getElementById("editor-log-overlay");
 
-    if(!overlay){
+    if (!overlay) {
       return false;
     }
 
@@ -7732,181 +4483,122 @@ class EditorApp{
     return true;
   }
 
-  closeDebugLogs(){
-    const overlay =
-      document.getElementById(
-        "editor-log-overlay"
-      );
+  closeDebugLogs() {
+    const overlay = document.getElementById("editor-log-overlay");
 
-    if(overlay){
+    if (overlay) {
       overlay.hidden = true;
     }
   }
 
-  async copyDebugLogs(){
-    const text =
-      this.logger.toText();
+  async copyDebugLogs() {
+    const text = this.logger.toText();
 
-    try{
-      if(
-        navigator.clipboard &&
-        window.isSecureContext
-      ){
-        await navigator.clipboard
-          .writeText(text);
-      }
-      else{
-        const textarea =
-          document.createElement(
-            "textarea"
-          );
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
 
         textarea.value = text;
-        textarea.style.position =
-          "fixed";
-        textarea.style.opacity =
-          "0";
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
 
-        document.body.appendChild(
-          textarea
-        );
+        document.body.appendChild(textarea);
 
         textarea.select();
-        document.execCommand(
-          "copy"
-        );
+        document.execCommand("copy");
         textarea.remove();
       }
 
-      this.showToast(
-        "Debug logs copied.",
-        "success"
-      );
+      this.showToast("Debug logs copied.", "success");
 
       return true;
-    }
-    catch(error){
-      this.reportError(
-        error,
-        "Could not copy debug logs"
-      );
+    } catch (error) {
+      this.reportError(error, "Could not copy debug logs");
       return false;
     }
   }
 
-  formatPlaybackTime(seconds){
-    const value =
-      Number(seconds);
+  formatPlaybackTime(seconds) {
+    const value = Number(seconds);
 
-    if(!Number.isFinite(value)){
+    if (!Number.isFinite(value)) {
       return "--:--.---";
     }
 
-    const safe =
-      Math.max(0, value);
+    const safe = Math.max(0, value);
 
-    const minutes =
-      Math.floor(safe / 60);
+    const minutes = Math.floor(safe / 60);
 
-    const secs =
-      safe - minutes * 60;
+    const secs = safe - minutes * 60;
 
     return (
-      String(minutes).padStart(2, "0") +
-      ":" +
-      secs.toFixed(3).padStart(6, "0")
+      String(minutes).padStart(2, "0") + ":" + secs.toFixed(3).padStart(6, "0")
     );
   }
 
-  async deleteAutosaveDatabase(){
-    if(!window.indexedDB){
+  async deleteAutosaveDatabase() {
+    if (!window.indexedDB) {
       return true;
     }
 
-    return await new Promise(
-      (resolve, reject) => {
-        const request =
-          indexedDB.deleteDatabase(
-            "adofai-web-editor"
-          );
+    return await new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase("adofai-web-editor");
 
-        request.onsuccess =
-          () => resolve(true);
+      request.onsuccess = () => resolve(true);
 
-        request.onerror =
-          () => reject(
-            request.error ??
-            new Error(
-              "IndexedDB delete failed."
-            )
-          );
+      request.onerror = () =>
+        reject(request.error ?? new Error("IndexedDB delete failed."));
 
-        request.onblocked =
-          () => reject(
-            new Error(
-              "IndexedDB delete was blocked."
-            )
-          );
-      }
-    );
+      request.onblocked = () =>
+        reject(new Error("IndexedDB delete was blocked."));
+    });
   }
 
-  async clearAllEditorCache(){
+  async clearAllEditorCache() {
     /* Stop timers from recreating the just-deleted autosave. */
     this.autosaveSuppressed = true;
 
-    if(this.autosaveTimer !== null){
-      clearTimeout(
-        this.autosaveTimer
-      );
+    if (this.autosaveTimer !== null) {
+      clearTimeout(this.autosaveTimer);
       this.autosaveTimer = null;
     }
 
-    try{
+    try {
       const localKeys = [];
 
-      for(let i = 0; i < localStorage.length; i++){
+      for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if(
-          key &&
-          key.startsWith(
-            "adofai-editor-"
-          )
-        ){
+        if (key && key.startsWith("adofai-editor-")) {
           localKeys.push(key);
         }
       }
 
-      for(const key of localKeys){
+      for (const key of localKeys) {
         localStorage.removeItem(key);
       }
 
       const sessionKeys = [];
 
-      for(let i = 0; i < sessionStorage.length; i++){
+      for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if(
-          key &&
-          key.startsWith(
-            "adofai-editor-"
-          )
-        ){
+        if (key && key.startsWith("adofai-editor-")) {
           sessionKeys.push(key);
         }
       }
 
-      for(const key of sessionKeys){
+      for (const key of sessionKeys) {
         sessionStorage.removeItem(key);
       }
 
       await this.deleteAutosaveDatabase();
 
-      if("caches" in window){
-        const cacheNames =
-          await caches.keys();
+      if ("caches" in window) {
+        const cacheNames = await caches.keys();
 
-        for(const name of cacheNames){
-          if(/adofai/i.test(name)){
+        for (const name of cacheNames) {
+          if (/adofai/i.test(name)) {
             await caches.delete(name);
           }
         }
@@ -7919,64 +4611,42 @@ class EditorApp{
         in memory only until the user makes another real edit.
       */
       this.logger.clear({
-        persist: false
+        persist: false,
       });
-      this.logger.setPersistenceEnabled(
-        false
-      );
+      this.logger.setPersistenceEnabled(false);
 
-      const gridInput =
-        document.getElementById(
-          "editor-setting-grid"
-        );
+      const gridInput = document.getElementById("editor-setting-grid");
 
-      const infoInput =
-        document.getElementById(
-          "editor-setting-info"
-        );
+      const infoInput = document.getElementById("editor-setting-info");
 
-      const offsetInput =
-        document.getElementById(
-          "editor-setting-offset"
-        );
+      const offsetInput = document.getElementById("editor-setting-offset");
 
-      if(gridInput){
+      if (gridInput) {
         gridInput.checked = true;
       }
 
-      if(infoInput){
+      if (infoInput) {
         infoInput.checked = true;
       }
 
-      if(offsetInput){
+      if (offsetInput) {
         offsetInput.value = "0";
       }
 
-      this.setEditorOffset(
-        0,
-        {
-          persist: false,
-          log: false
-        }
-      );
+      this.setEditorOffset(0, {
+        persist: false,
+        log: false,
+      });
 
       this.runtime.setGridVisible(true);
       this.setEditorInfoVisible(true);
       this.refreshDebugLogView();
 
-      this.showToast(
-        "All editor cache has been deleted.",
-        "success",
-        4200
-      );
+      this.showToast("All editor cache has been deleted.", "success", 4200);
 
       return true;
-    }
-    catch(error){
-      this.reportError(
-        error,
-        "Could not clear all editor cache"
-      );
+    } catch (error) {
+      this.reportError(error, "Could not clear all editor cache");
       return false;
     }
   }
@@ -7991,78 +4661,56 @@ class EditorApp{
      normal song file can easily exceed localStorage's quota.
   ========================================================= */
 
-  readAutosaveRecord(){
+  readAutosaveRecord() {
+    try {
+      const text = localStorage.getItem(this.autosaveStorageKey);
 
-    try{
-
-      const text =
-        localStorage.getItem(
-          this.autosaveStorageKey
-        );
-
-      if(!text){
+      if (!text) {
         return null;
       }
 
-      const record =
-        JSON.parse(text);
+      const record = JSON.parse(text);
 
-      if(
-        !record ||
-        record.version !== 1 ||
-        !record.project
-      ){
+      if (!record || record.version !== 1 || !record.project) {
         return null;
       }
 
       return record;
-    }
-    catch(error){
-
-      console.warn(
-        "Could not read editor autosave.",
-        error
-      );
+    } catch (error) {
+      console.warn("Could not read editor autosave.", error);
 
       return null;
     }
   }
 
-  getAutosaveSource(){
+  getAutosaveSource() {
+    const source = this.currentLevelSource;
 
-    const source =
-      this.currentLevelSource;
-
-    if(!source){
+    if (!source) {
       return null;
     }
 
     return {
-      type:
-        source.type ?? null,
+      type: source.type ?? null,
 
-      name:
-        source.name ?? null,
+      name: source.name ?? null,
 
-      url:
-        source.url ?? null
+      url: source.url ?? null,
     };
   }
 
-  saveAutosaveNow(){
-
-    if(this.autosaveSuppressed){
+  saveAutosaveNow() {
+    if (this.autosaveSuppressed) {
       return false;
     }
 
-    if(!this.doc){
+    if (!this.doc) {
       return false;
     }
 
-    const project =
-      this.createDownloadProjectJson();
+    const project = this.createDownloadProjectJson();
 
-    if(!project){
+    if (!project) {
       return false;
     }
 
@@ -8071,550 +4719,338 @@ class EditorApp{
       savedAt: Date.now(),
       project,
       source: this.getAutosaveSource(),
-      songCacheKey:
-        this.autosaveSongCacheKey ?? null
+      songCacheKey: this.autosaveSongCacheKey ?? null,
     };
 
-    try{
-
-      localStorage.setItem(
-        this.autosaveStorageKey,
-        JSON.stringify(record)
-      );
+    try {
+      localStorage.setItem(this.autosaveStorageKey, JSON.stringify(record));
 
       return true;
-    }
-    catch(error){
-
+    } catch (error) {
       /*
         A very large level may exceed localStorage quota.
         Editing continues normally; only autosave is skipped.
       */
       console.warn(
         "Editor autosave failed. The level may be too large for localStorage.",
-        error
+        error,
       );
 
       return false;
     }
   }
 
-  scheduleAutosave(
-    delay_ms = this.autosaveDelay_ms
-  ){
-
-    if(
-      this.autosaveSuppressed ||
-      !this.autosaveInitialized
-    ){
+  scheduleAutosave(delay_ms = this.autosaveDelay_ms) {
+    if (this.autosaveSuppressed || !this.autosaveInitialized) {
       return;
     }
 
-    if(this.autosaveTimer !== null){
-      clearTimeout(
-        this.autosaveTimer
-      );
+    if (this.autosaveTimer !== null) {
+      clearTimeout(this.autosaveTimer);
     }
 
-    this.autosaveTimer =
-      setTimeout(
-        () => {
-          this.autosaveTimer = null;
-          this.saveAutosaveNow();
-        },
-        Math.max(0, delay_ms)
-      );
+    this.autosaveTimer = setTimeout(
+      () => {
+        this.autosaveTimer = null;
+        this.saveAutosaveNow();
+      },
+      Math.max(0, delay_ms),
+    );
   }
 
-  initAutosave(){
-
-    if(this.autosaveInitialized){
+  initAutosave() {
+    if (this.autosaveInitialized) {
       return;
     }
 
-    this.autosaveInitialized =
-      true;
+    this.autosaveInitialized = true;
 
-    const flush =
-      () => {
-        this.saveAutosaveNow();
-      };
+    const flush = () => {
+      this.saveAutosaveNow();
+    };
 
     /*
       pagehide works better than beforeunload on mobile browsers.
     */
-    window.addEventListener(
-      "pagehide",
-      flush
-    );
+    window.addEventListener("pagehide", flush);
 
-    window.addEventListener(
-      "beforeunload",
-      flush
-    );
+    window.addEventListener("beforeunload", flush);
 
-    document.addEventListener(
-      "visibilitychange",
-      () => {
-        if(
-          document.visibilityState ===
-          "hidden"
-        ){
-          flush();
-        }
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flush();
       }
-    );
+    });
 
-    this.autosaveInterval =
-      setInterval(
-        flush,
-        this.autosaveInterval_ms
-      );
+    this.autosaveInterval = setInterval(flush, this.autosaveInterval_ms);
   }
 
-  openAutosaveDatabase(){
-
-    return new Promise(
-      (resolve, reject) => {
-
-        if(!window.indexedDB){
-          reject(
-            new Error(
-              "IndexedDB is unavailable."
-            )
-          );
-          return;
-        }
-
-        const request =
-          indexedDB.open(
-            "adofai-web-editor",
-            1
-          );
-
-        request.onupgradeneeded =
-          () => {
-
-            const db =
-              request.result;
-
-            if(
-              !db.objectStoreNames
-                .contains("assets")
-            ){
-              db.createObjectStore(
-                "assets"
-              );
-            }
-          };
-
-        request.onsuccess =
-          () => resolve(
-            request.result
-          );
-
-        request.onerror =
-          () => reject(
-            request.error ??
-            new Error(
-              "IndexedDB open failed."
-            )
-          );
+  openAutosaveDatabase() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error("IndexedDB is unavailable."));
+        return;
       }
-    );
+
+      const request = indexedDB.open("adofai-web-editor", 1);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+
+        if (!db.objectStoreNames.contains("assets")) {
+          db.createObjectStore("assets");
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+
+      request.onerror = () =>
+        reject(request.error ?? new Error("IndexedDB open failed."));
+    });
   }
 
-  async writeAutosaveAsset(
-    key,
-    value
-  ){
-
+  async writeAutosaveAsset(key, value) {
     let db = null;
 
-    try{
+    try {
+      db = await this.openAutosaveDatabase();
 
-      db =
-        await this.openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction("assets", "readwrite");
 
-      await new Promise(
-        (resolve, reject) => {
+        transaction.objectStore("assets").put(value, key);
 
-          const transaction =
-            db.transaction(
-              "assets",
-              "readwrite"
-            );
+        transaction.oncomplete = () => resolve();
 
-          transaction.objectStore(
-            "assets"
-          ).put(
-            value,
-            key
-          );
-
-          transaction.oncomplete =
-            () => resolve();
-
-          transaction.onerror =
-            () => reject(
-              transaction.error
-            );
-        }
-      );
+        transaction.onerror = () => reject(transaction.error);
+      });
 
       return true;
-    }
-    catch(error){
-
-      console.warn(
-        "Could not cache local song.",
-        error
-      );
+    } catch (error) {
+      console.warn("Could not cache local song.", error);
 
       return false;
-    }
-    finally{
+    } finally {
       db?.close();
     }
   }
 
-  async readAutosaveAsset(
-    key
-  ){
-
-    if(!key){
+  async readAutosaveAsset(key) {
+    if (!key) {
       return null;
     }
 
     let db = null;
 
-    try{
+    try {
+      db = await this.openAutosaveDatabase();
 
-      db =
-        await this.openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        const transaction = db.transaction("assets", "readonly");
 
-      return await new Promise(
-        (resolve, reject) => {
+        const request = transaction.objectStore("assets").get(key);
 
-          const transaction =
-            db.transaction(
-              "assets",
-              "readonly"
-            );
+        request.onsuccess = () => resolve(request.result ?? null);
 
-          const request =
-            transaction.objectStore(
-              "assets"
-            ).get(key);
-
-          request.onsuccess =
-            () => resolve(
-              request.result ?? null
-            );
-
-          request.onerror =
-            () => reject(
-              request.error
-            );
-        }
-      );
-    }
-    catch(error){
-
-      console.warn(
-        "Could not restore cached local song.",
-        error
-      );
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.warn("Could not restore cached local song.", error);
 
       return null;
-    }
-    finally{
+    } finally {
       db?.close();
     }
   }
 
-  async cacheLocalSongForAutosave(
-    file
-  ){
-
-    if(!file){
+  async cacheLocalSongForAutosave(file) {
+    if (!file) {
       return false;
     }
 
-    const key =
-      "last-local-song-v1";
+    const key = "last-local-song-v1";
 
-    const saved =
-      await this.writeAutosaveAsset(
-        key,
-        {
-          blob: file,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          lastModified:
-            file.lastModified ?? 0,
-          savedAt: Date.now()
-        }
-      );
+    const saved = await this.writeAutosaveAsset(key, {
+      blob: file,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified ?? 0,
+      savedAt: Date.now(),
+    });
 
-    if(saved){
-      this.autosaveSongCacheKey =
-        key;
+    if (saved) {
+      this.autosaveSongCacheKey = key;
     }
 
     return saved;
   }
 
-  async restoreAutosavedSong(){
+  async restoreAutosavedSong() {
+    const key = this.autosaveSongCacheKey;
 
-    const key =
-      this.autosaveSongCacheKey;
-
-    if(!key || !this.hitSound.ctx){
+    if (!key || !this.hitSound.ctx) {
       return false;
     }
 
-    const record =
-      await this.readAutosaveAsset(
-        key
-      );
+    const record = await this.readAutosaveAsset(key);
 
-    if(!record?.blob){
+    if (!record?.blob) {
       return false;
     }
 
-    const expectedName =
-      String(
-        this.doc?.settings
-          ?.songFilename ??
-        ""
-      ).trim();
+    const expectedName = String(this.doc?.settings?.songFilename ?? "").trim();
 
     /*
       Never attach an old cached song to a different level just
       because the browser still has the Blob in IndexedDB.
     */
-    if(
-      expectedName &&
-      record.name &&
-      expectedName !== record.name
-    ){
+    if (expectedName && record.name && expectedName !== record.name) {
       return false;
     }
 
-    if(this.localSongObjectUrl){
-      URL.revokeObjectURL(
-        this.localSongObjectUrl
-      );
+    if (this.localSongObjectUrl) {
+      URL.revokeObjectURL(this.localSongObjectUrl);
     }
 
-    this.localSongObjectUrl =
-      URL.createObjectURL(
-        record.blob
-      );
+    this.localSongObjectUrl = URL.createObjectURL(record.blob);
 
-    const loaded =
-      await this.song.init(
-        this.hitSound.ctx,
-        this.localSongObjectUrl
-      );
+    const loaded = await this.song.init(
+      this.hitSound.ctx,
+      this.localSongObjectUrl,
+    );
 
-    if(!loaded){
+    if (!loaded) {
       return false;
     }
 
-    const volume =
-      Number(
-        this.doc?.settings?.volume ??
-        100
-      );
+    const volume = Number(this.doc?.settings?.volume ?? 100);
 
     this.song.setVolume(
-      Number.isFinite(volume)
-        ? Math.max(0, volume) / 100
-        : 1
+      Number.isFinite(volume) ? Math.max(0, volume) / 100 : 1,
     );
 
     this.songLoadState = {
       loaded: true,
-      message:
-        `Song restored from this browser: ${record.name ?? expectedName ?? "song"}`
+      message: `Song restored from this browser: ${record.name ?? expectedName ?? "song"}`,
     };
 
     return true;
   }
-  
-  async loadProject(path){ //일단 level.adofai만 가져오는걸로
 
-    this.logger.info(
-      "Loading initial project",
-      path
-    );
+  async loadProject(path) {
+    //일단 level.adofai만 가져오는걸로
 
-    this.setLevelLoading(
-      true,
-      "loading..."
-    );
+    this.logger.info("Loading initial project", path);
+
+    this.setLevelLoading(true, "loading...");
 
     /*
       Initial page load prefers the last autosaved level.
       If no autosave exists, fall back to ./level.adofai as before.
     */
-    const autosaveRecord =
-      this.readAutosaveRecord();
+    const autosaveRecord = this.readAutosaveRecord();
 
     let json = null;
-    let restoredFromAutosave =
-      false;
+    let restoredFromAutosave = false;
 
-    if(autosaveRecord?.project){
+    if (autosaveRecord?.project) {
+      json = autosaveRecord.project;
 
-      json =
-        autosaveRecord.project;
+      restoredFromAutosave = true;
 
-      restoredFromAutosave =
-        true;
+      this.autosaveSongCacheKey = autosaveRecord.songCacheKey ?? null;
+    } else {
+      const res = await fetch(path);
 
-      this.autosaveSongCacheKey =
-        autosaveRecord.songCacheKey ??
-        null;
-    }
-    else{
-
-      const res =
-        await fetch(path);
-
-      if(!res.ok){
-        throw new Error(
-          "level load failed!"
-        );
+      if (!res.ok) {
+        throw new Error("level load failed!");
       }
 
-      const text =
-        (await res.text())
-          .replace(/\r/g, "")
-          .replace(/\n/g, "");
+      const text = (await res.text()).replace(/\r/g, "").replace(/\n/g, "");
 
-      json =
-        JSON5.parse(text);
+      json = JSON5.parse(text);
     }
-    
+
     //console.log(json)
-    
-    this.project = new Project(); 
+
+    this.project = new Project();
     this.project.json = json;
-    
+
     //document를 project로부터 생성
     this.doc = this.builder.fromProject(this.project);
-    
+
     this.updateProjectTitle();
-    
+
     this.runtime.init(); //초기 셋팅
     //init을 통해 renderer를 만들어준 후 인풋 추가
-    
+
     this.cameraSystem.init(this.runtime.renderer.domElement);
     this.input = new InputController(this.runtime, this.cameraSystem);
-    
-    this.renderEngine = new RenderEngine(this.runtime, this.cameraSystem, this.clock);
 
-    this.renderEngine.afterFrame =
-      () => {
-        this.updateEditorInfo();
-      };
+    this.renderEngine = new RenderEngine(
+      this.runtime,
+      this.cameraSystem,
+      this.clock,
+    );
+
+    this.renderEngine.afterFrame = () => {
+      this.updateEditorInfo();
+    };
 
     this.modifierKeys.init();
-    
-    this.playButton.init(
-      () => {
-        this.togglePlayback();
-      }
-    );
-    
+
+    this.playButton.init(() => {
+      this.togglePlayback();
+    });
+
     this.initFloorNavigation();
 
     this.initHistoryControls();
     this.resetHistory();
 
     this.initClipboardControls();
-    
-    
+
     this.editorUI.init({
-
-      onAddAngle: (
-        angle,
-        options = {}
-      ) => {
-
-        this.addFloorAfterSelected(
-          angle,
-          options
-        );
+      onAddAngle: (angle, options = {}) => {
+        this.addFloorAfterSelected(angle, options);
       },
-    
-    
+
       onAddFullspin: () => {
-    
         this.addFullspinAfterSelected();
       },
-    
-    
+
       onAddMidspin: () => {
-    
         this.addMidspinAfterSelected();
       },
-    
-    
+
       onDeleteFloor: () => {
-    
         this.deleteSelectedFloor();
       },
-    
-    
+
       onDeleteSelected: () => {
-    
         this.removeSelectedFloors();
       },
-      
-      onUpdateEvent: (
-        action,
-        patch
-      ) => {
-      
-        this.updateEventAction(
-          action,
-          patch
-        );
+
+      onUpdateEvent: (action, patch) => {
+        this.updateEventAction(action, patch);
       },
 
-      onAddEvent:
-        eventType => {
+      onAddEvent: (eventType) => {
+        return this.addEventToSelected(eventType);
+      },
 
-          return this.addEventToSelected(
-            eventType
-          );
-        },
-      
-      onDeleteEvent:
-        action => {
-      
-          return this.deleteEventAction(
-            action
-          );
-        },
+      onDeleteEvent: (action) => {
+        return this.deleteEventAction(action);
+      },
 
-      onCopyEvent:
-        action => {
-          return this.copyEventAction(
-            action
-          );
-        },
+      onCopyEvent: (action) => {
+        return this.copyEventAction(action);
+      },
 
-      onPasteEvent:
-        () => {
-          return this.pasteEventToSelected();
-        },
-    
+      onPasteEvent: () => {
+        return this.pasteEventToSelected();
+      },
     });
 
     this.settingsController.initProjectSettingsUI();
@@ -8627,171 +5063,106 @@ class EditorApp{
 
     this.initResponsiveViewport();
 
-
     // 선택 callback 먼저
-    this.input.callback.onSelectFloor =
-      floorId => {
-        this.selectFloor(floorId);
-      };
-    
-    
+    this.input.callback.onSelectFloor = (floorId) => {
+      this.selectFloor(floorId);
+    };
+
     // ==========================
     // 화면은 즉시 실행
     // ==========================
 
-    requestAnimationFrame(
-      () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.setLevelLoading(false);
+      });
+    });
 
-        requestAnimationFrame(
-          () => {
-
-            this.setLevelLoading(
-              false
-            );
-
-          }
-        );
-
-      }
-    );
-    
     this.rebuild();
-    
+
     this.setEdit();
-    
+
     this.renderEngine.start();
-    
-    
+
     // ==========================
     // 오디오는 이후 로딩
     // ==========================
-    
+
     await this.hitSound.init();
 
     this.refreshHitsoundSettingOptions();
     this.updateEditorUI();
-        
-    
-    this.clock.setAudioContext(
-      this.hitSound.ctx
-    );
-    
-    
-    if(restoredFromAutosave){
 
-      const savedSource =
-        autosaveRecord?.source ??
-        null;
+    this.clock.setAudioContext(this.hitSound.ctx);
+
+    if (restoredFromAutosave) {
+      const savedSource = autosaveRecord?.source ?? null;
 
       this.currentLevelSource = {
         type: "autosave",
-        name:
-          savedSource?.name ??
-          "Autosaved Level",
-        url:
-          savedSource?.url ??
-          null
+        name: savedSource?.name ?? "Autosaved Level",
+        url: savedSource?.url ?? null,
       };
-    }
-    else{
-
+    } else {
       this.currentLevelSource = {
         type: "url",
-        name:
-          String(path).split("/").pop() ||
-          String(path),
-        url:
-          new URL(
-            path,
-            window.location.href
-          ).href
+        name: String(path).split("/").pop() || String(path),
+        url: new URL(path, window.location.href).href,
       };
     }
 
+    let songLoaded = false;
 
-    let songLoaded =
-      false;
-
-
-    if(restoredFromAutosave){
-
+    if (restoredFromAutosave) {
       /*
         Local user-selected songs are restored from IndexedDB.
       */
-      songLoaded =
-        await this.restoreAutosavedSong();
-
+      songLoaded = await this.restoreAutosavedSong();
 
       /*
         URL-based levels do not need to duplicate the whole song
         in browser storage. If the original URL is still reachable,
         load songFilename relative to it.
       */
-      if(
-        !songLoaded &&
-        autosaveRecord?.source?.url
-      ){
-        songLoaded =
-          await this.loadSongFromProjectUrl(
-            autosaveRecord.source.url
-          );
+      if (!songLoaded && autosaveRecord?.source?.url) {
+        songLoaded = await this.loadSongFromProjectUrl(
+          autosaveRecord.source.url,
+        );
       }
 
+      if (!songLoaded) {
+        await this.song.init(this.hitSound.ctx, null);
 
-      if(!songLoaded){
-
-        await this.song.init(
-          this.hitSound.ctx,
-          null
-        );
-
-        const expectedSong =
-          String(
-            this.doc?.settings
-              ?.songFilename ??
-            ""
-          ).trim();
+        const expectedSong = String(
+          this.doc?.settings?.songFilename ?? "",
+        ).trim();
 
         this.songLoadState = {
           loaded: false,
-          message:
-            expectedSong
-              ? `Level restored. Please choose ${expectedSong} again if the cached song is unavailable.`
-              : "Level restored. No song is assigned."
+          message: expectedSong
+            ? `Level restored. Please choose ${expectedSong} again if the cached song is unavailable.`
+            : "Level restored. No song is assigned.",
         };
       }
+    } else {
+      songLoaded = await this.loadSongFromProjectUrl(path);
     }
-    else{
-
-      songLoaded =
-        await this.loadSongFromProjectUrl(
-          path
-        );
-    }
-
 
     this.initAutosave();
 
     /*
       Establish a fresh snapshot after startup as well.
     */
-    this.scheduleAutosave(
-      0
-    );
-
+    this.scheduleAutosave(0);
 
     this.refreshProjectSettingsUI();
 
-    this.logger.info(
-      "Initial project ready",
-      {
-        restoredFromAutosave,
-        tiles: this.doc?.ids?.length ?? 0,
-        events: this.doc?.actions?.length ?? 0,
-        songLoaded
-      }
-    );
-
+    this.logger.info("Initial project ready", {
+      restoredFromAutosave,
+      tiles: this.doc?.ids?.length ?? 0,
+      events: this.doc?.actions?.length ?? 0,
+      songLoaded,
+    });
 
     /*
       Do not open Level Settings automatically on the first page load.
@@ -8799,50 +5170,32 @@ class EditorApp{
       Level Settings manually.
     */
   }
-  
+
   /* =========================================================
      First-launch notice
   ========================================================= */
 
-  initWelcomeNotice(){
+  initWelcomeNotice() {
+    const overlay = document.getElementById("editor-welcome-overlay");
 
-    const overlay =
-      document.getElementById(
-        "editor-welcome-overlay"
-      );
+    const closeButton = document.getElementById("editor-welcome-continue");
 
-    const closeButton =
-      document.getElementById(
-        "editor-welcome-continue"
-      );
+    const neverInput = document.getElementById("editor-welcome-never");
 
-    const neverInput =
-      document.getElementById(
-        "editor-welcome-never"
-      );
-
-    if(!overlay || !closeButton || !neverInput){
+    if (!overlay || !closeButton || !neverInput) {
       return;
     }
 
-    const preferenceKey =
-      "adofai-editor-hide-welcome-v1";
+    const preferenceKey = "adofai-editor-hide-welcome-v1";
 
     const syncCheckboxState = () => {
-      const hidden =
-        this.readEditorPreference(
-          preferenceKey,
-          "0"
-        ) === "1";
+      const hidden = this.readEditorPreference(preferenceKey, "0") === "1";
 
       neverInput.checked = hidden;
     };
 
     const savePreference = () => {
-      this.writeEditorPreference(
-        preferenceKey,
-        neverInput.checked ? "1" : "0"
-      );
+      this.writeEditorPreference(preferenceKey, neverInput.checked ? "1" : "0");
     };
 
     const closeWelcomeNotice = () => {
@@ -8850,14 +5203,11 @@ class EditorApp{
       overlay.hidden = true;
     };
 
-    overlay.addEventListener(
-      "pointerdown",
-      e => {
-        if(e.target === overlay){
-          closeWelcomeNotice();
-        }
+    overlay.addEventListener("pointerdown", (e) => {
+      if (e.target === overlay) {
+        closeWelcomeNotice();
       }
-    );
+    });
 
     closeButton.onclick = () => {
       closeWelcomeNotice();
@@ -8865,7 +5215,7 @@ class EditorApp{
 
     syncCheckboxState();
 
-    if(this.readEditorPreference(preferenceKey, "0") === "1"){
+    if (this.readEditorPreference(preferenceKey, "0") === "1") {
       overlay.hidden = true;
       return;
     }
@@ -8873,47 +5223,29 @@ class EditorApp{
     overlay.hidden = false;
   }
 
-  openWelcomeNotice(){
-    const overlay =
-      document.getElementById(
-        "editor-welcome-overlay"
-      );
+  openWelcomeNotice() {
+    const overlay = document.getElementById("editor-welcome-overlay");
 
-    const continueButton =
-      document.getElementById(
-        "editor-welcome-continue"
-      );
+    const continueButton = document.getElementById("editor-welcome-continue");
 
-    const neverInput =
-      document.getElementById(
-        "editor-welcome-never"
-      );
+    const neverInput = document.getElementById("editor-welcome-never");
 
-    if(!overlay || !continueButton || !neverInput){
+    if (!overlay || !continueButton || !neverInput) {
       return false;
     }
 
-    const preferenceKey =
-      "adofai-editor-hide-welcome-v1";
+    const preferenceKey = "adofai-editor-hide-welcome-v1";
 
-    neverInput.checked =
-      this.readEditorPreference(
-        preferenceKey,
-        "0"
-      ) === "1";
+    neverInput.checked = this.readEditorPreference(preferenceKey, "0") === "1";
 
     continueButton.onclick = () => {
-      this.writeEditorPreference(
-        preferenceKey,
-        neverInput.checked ? "1" : "0"
-      );
+      this.writeEditorPreference(preferenceKey, neverInput.checked ? "1" : "0");
       overlay.hidden = true;
     };
 
     overlay.hidden = false;
     return true;
   }
-
 
   /* =========================================================
      Editor Settings UI
@@ -8922,95 +5254,48 @@ class EditorApp{
      intentionally kept out of the .adofai project data.
   ========================================================= */
 
-  initEditorSettingsUI(){
-
-    if(
-      this.editorSettingsInitialized
-    ){
+  initEditorSettingsUI() {
+    if (this.editorSettingsInitialized) {
       return;
     }
 
-    const button =
-      document.getElementById(
-        "editor-settings-button"
-      );
+    const button = document.getElementById("editor-settings-button");
 
-    const overlay =
-      document.getElementById(
-        "editor-settings-overlay"
-      );
+    const overlay = document.getElementById("editor-settings-overlay");
 
-    const sheet =
-      document.getElementById(
-        "editor-settings-sheet"
-      );
+    const sheet = document.getElementById("editor-settings-sheet");
 
-    const closeButton =
-      document.getElementById(
-        "editor-settings-close"
-      );
+    const closeButton = document.getElementById("editor-settings-close");
 
-    const gridInput =
-      document.getElementById(
-        "editor-setting-grid"
-      );
+    const gridInput = document.getElementById("editor-setting-grid");
 
-    const infoInput =
-      document.getElementById(
-        "editor-setting-info"
-      );
+    const infoInput = document.getElementById("editor-setting-info");
 
-    const offsetInput =
-      document.getElementById(
-        "editor-setting-offset"
-      );
+    const offsetInput = document.getElementById("editor-setting-offset");
 
-    const openWelcomeButton =
-      document.getElementById(
-        "editor-open-welcome-button"
-      );
+    const openWelcomeButton = document.getElementById(
+      "editor-open-welcome-button",
+    );
 
-    const openLogsButton =
-      document.getElementById(
-        "editor-open-logs-button"
-      );
+    const openLogsButton = document.getElementById("editor-open-logs-button");
 
-    const clearCacheButton =
-      document.getElementById(
-        "editor-clear-cache-button"
-      );
+    const clearCacheButton = document.getElementById(
+      "editor-clear-cache-button",
+    );
 
-    const logOverlay =
-      document.getElementById(
-        "editor-log-overlay"
-      );
+    const logOverlay = document.getElementById("editor-log-overlay");
 
-    const logSheet =
-      document.getElementById(
-        "editor-log-sheet"
-      );
+    const logSheet = document.getElementById("editor-log-sheet");
 
-    const logCloseButton =
-      document.getElementById(
-        "editor-log-close"
-      );
+    const logCloseButton = document.getElementById("editor-log-close");
 
-    const logCopyButton =
-      document.getElementById(
-        "editor-log-copy"
-      );
+    const logCopyButton = document.getElementById("editor-log-copy");
 
-    const logClearButton =
-      document.getElementById(
-        "editor-log-clear"
-      );
+    const logClearButton = document.getElementById("editor-log-clear");
 
-    this.editorInfoElement =
-      document.getElementById(
-        "editor-info"
-      );
+    this.editorInfoElement = document.getElementById("editor-info");
 
-    if(
+    if (
       !button ||
       !overlay ||
       !sheet ||
@@ -9027,855 +5312,463 @@ class EditorApp{
       !logCopyButton ||
       !logClearButton ||
       !this.editorInfoElement
-    ){
-      throw new Error(
-        "editor settings UI element not found"
-      );
+    ) {
+      throw new Error("editor settings UI element not found");
     }
-
 
     /*
       Settings panels should never appear automatically
       when the editor first opens.
     */
-    overlay.hidden =
-      true;
+    overlay.hidden = true;
 
+    const savedGrid = this.readEditorPreference("adofai-editor-grid", null);
 
-    const savedGrid =
-      this.readEditorPreference(
-        "adofai-editor-grid",
-        null
-      );
+    const showGrid = savedGrid !== "false";
 
-    const showGrid =
-      savedGrid !== "false";
+    gridInput.checked = showGrid;
 
-    gridInput.checked =
-      showGrid;
+    this.runtime.setGridVisible(showGrid);
 
-    this.runtime.setGridVisible(
-      showGrid
+    const savedInfo = this.readEditorPreference("adofai-editor-info", null);
+
+    const showInfo = savedInfo !== "false";
+
+    infoInput.checked = showInfo;
+
+    this.setEditorInfoVisible(showInfo);
+
+    const savedOffset = Number(
+      this.readEditorPreference("adofai-editor-offset-ms", "0"),
     );
 
-    const savedInfo =
-      this.readEditorPreference(
-        "adofai-editor-info",
-        null
-      );
+    const editorOffset = Number.isFinite(savedOffset) ? savedOffset : 0;
 
-    const showInfo =
-      savedInfo !== "false";
+    this.setEditorOffset(editorOffset, {
+      persist: false,
+      log: false,
+    });
 
-    infoInput.checked =
-      showInfo;
+    offsetInput.value = String(editorOffset);
 
-    this.setEditorInfoVisible(
-      showInfo
-    );
+    button.addEventListener("click", () => {
+      overlay.hidden = false;
+    });
 
-    const savedOffset =
-      Number(
-        this.readEditorPreference(
-          "adofai-editor-offset-ms",
-          "0"
-        )
-      );
+    closeButton.addEventListener("click", () => {
+      overlay.hidden = true;
+    });
 
-    const editorOffset =
-      Number.isFinite(savedOffset)
-        ? savedOffset
-        : 0;
-
-    this.setEditorOffset(
-      editorOffset,
-      {
-        persist: false,
-        log: false
-      }
-    );
-
-    offsetInput.value =
-      String(editorOffset);
-
-    button.addEventListener(
-      "click",
-      () => {
-        overlay.hidden = false;
-      }
-    );
-
-    closeButton.addEventListener(
-      "click",
-      () => {
+    overlay.addEventListener("pointerdown", (e) => {
+      if (e.target === overlay) {
         overlay.hidden = true;
       }
-    );
+    });
 
-    overlay.addEventListener(
-      "pointerdown",
-      e => {
-        if(e.target === overlay){
-          overlay.hidden = true;
-        }
+    sheet.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") {
+        return;
       }
-    );
 
-    sheet.addEventListener(
-      "pointerdown",
-      e => {
-        e.stopPropagation();
+      if (!logOverlay.hidden) {
+        this.closeDebugLogs();
+        return;
       }
-    );
 
-    window.addEventListener(
-      "keydown",
-      e => {
-        if(e.key !== "Escape"){
-          return;
-        }
-
-        if(!logOverlay.hidden){
-          this.closeDebugLogs();
-          return;
-        }
-
-        if(!overlay.hidden){
-          overlay.hidden = true;
-        }
+      if (!overlay.hidden) {
+        overlay.hidden = true;
       }
-    );
+    });
 
-    gridInput.addEventListener(
-      "change",
-      () => {
+    gridInput.addEventListener("change", () => {
+      const visible = gridInput.checked;
 
-        const visible =
-          gridInput.checked;
+      this.runtime.setGridVisible(visible);
 
-        this.runtime.setGridVisible(
-          visible
-        );
+      this.writeEditorPreference("adofai-editor-grid", visible);
+    });
 
-        this.writeEditorPreference(
-          "adofai-editor-grid",
-          visible
-        );
+    infoInput.addEventListener("change", () => {
+      const visible = infoInput.checked;
+
+      this.setEditorInfoVisible(visible);
+
+      this.writeEditorPreference("adofai-editor-info", visible);
+    });
+
+    const commitEditorOffset = () => {
+      const value = Number(offsetInput.value);
+
+      if (!Number.isFinite(value)) {
+        offsetInput.value = String(this.editorVisualOffset_ms);
+        return;
       }
-    );
 
-    infoInput.addEventListener(
-      "change",
-      () => {
+      this.setEditorOffset(value);
 
-        const visible =
-          infoInput.checked;
+      offsetInput.value = String(this.editorVisualOffset_ms);
+    };
 
-        this.setEditorInfoVisible(
-          visible
-        );
+    offsetInput.addEventListener("change", commitEditorOffset);
 
-        this.writeEditorPreference(
-          "adofai-editor-info",
-          visible
-        );
+    offsetInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitEditorOffset();
+        offsetInput.blur();
       }
-    );
+    });
 
-    const commitEditorOffset =
-      () => {
+    openWelcomeButton.addEventListener("click", () => {
+      this.openWelcomeNotice();
+    });
 
-        const value =
-          Number(offsetInput.value);
+    openLogsButton.addEventListener("click", () => {
+      this.openDebugLogs();
+    });
 
-        if(!Number.isFinite(value)){
-          offsetInput.value =
-            String(this.editorVisualOffset_ms);
-          return;
-        }
+    clearCacheButton.addEventListener("click", async () => {
+      await this.clearAllEditorCache();
+    });
 
-        this.setEditorOffset(value);
+    logCloseButton.addEventListener("click", () => {
+      this.closeDebugLogs();
+    });
 
-        offsetInput.value =
-          String(this.editorVisualOffset_ms);
-      };
-
-    offsetInput.addEventListener(
-      "change",
-      commitEditorOffset
-    );
-
-    offsetInput.addEventListener(
-      "keydown",
-      e => {
-        if(e.key === "Enter"){
-          e.preventDefault();
-          commitEditorOffset();
-          offsetInput.blur();
-        }
-      }
-    );
-
-    openWelcomeButton.addEventListener(
-      "click",
-      () => {
-        this.openWelcomeNotice();
-      }
-    );
-
-    openLogsButton.addEventListener(
-      "click",
-      () => {
-        this.openDebugLogs();
-      }
-    );
-
-    clearCacheButton.addEventListener(
-      "click",
-      async () => {
-        await this.clearAllEditorCache();
-      }
-    );
-
-    logCloseButton.addEventListener(
-      "click",
-      () => {
+    logOverlay.addEventListener("pointerdown", (e) => {
+      if (e.target === logOverlay) {
         this.closeDebugLogs();
       }
-    );
+    });
 
-    logOverlay.addEventListener(
-      "pointerdown",
-      e => {
-        if(e.target === logOverlay){
-          this.closeDebugLogs();
-        }
-      }
-    );
+    logSheet.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+    });
 
-    logSheet.addEventListener(
-      "pointerdown",
-      e => {
-        e.stopPropagation();
-      }
-    );
+    logCopyButton.addEventListener("click", async () => {
+      await this.copyDebugLogs();
+    });
 
-    logCopyButton.addEventListener(
-      "click",
-      async () => {
-        await this.copyDebugLogs();
-      }
-    );
+    logClearButton.addEventListener("click", () => {
+      this.logger.clear();
+      this.refreshDebugLogView();
+      this.showToast("Debug logs cleared.", "success");
+    });
 
-    logClearButton.addEventListener(
-      "click",
-      () => {
-        this.logger.clear();
+    this.logUnsubscribe = this.logger.subscribe(() => {
+      if (!logOverlay.hidden) {
         this.refreshDebugLogView();
-        this.showToast(
-          "Debug logs cleared.",
-          "success"
-        );
       }
-    );
-
-    this.logUnsubscribe =
-      this.logger.subscribe(
-        () => {
-          if(!logOverlay.hidden){
-            this.refreshDebugLogView();
-          }
-        }
-      );
+    });
 
     this.refreshDebugLogView();
 
-    this.editorSettingsInitialized =
-      true;
+    this.editorSettingsInitialized = true;
   }
 
   /* =========================================================
      Project Settings UI
   ========================================================= */
 
-  initProjectSettingsUI(){
-
-    if(
-      this.projectSettingsInitialized
-    ){
+  initProjectSettingsUI() {
+    if (this.projectSettingsInitialized) {
       return;
     }
 
+    const settingsButton = document.getElementById("project-settings-button");
 
-    const settingsButton =
-      document.getElementById(
-        "project-settings-button"
-      );
+    const overlay = document.getElementById("project-settings-overlay");
 
-    const overlay =
-      document.getElementById(
-        "project-settings-overlay"
-      );
+    const sheet = document.getElementById("project-settings-sheet");
 
-    const sheet =
-      document.getElementById(
-        "project-settings-sheet"
-      );
+    const closeButton = document.getElementById("project-settings-close");
 
-    const closeButton =
-      document.getElementById(
-        "project-settings-close"
-      );
+    const levelInput = document.getElementById("level-file-input");
 
-    const levelInput =
-      document.getElementById(
-        "level-file-input"
-      );
+    const songInput = document.getElementById("song-file-input");
 
-    const songInput =
-      document.getElementById(
-        "song-file-input"
-      );
+    const loadLevelButton = document.getElementById("load-level-file-button");
 
-    const loadLevelButton =
-      document.getElementById(
-        "load-level-file-button"
-      );
+    const newLevelButton = document.getElementById("new-level-button");
 
-    const newLevelButton =
-      document.getElementById(
-        "new-level-button"
-      );
+    const downloadLevelButton = document.getElementById(
+      "download-level-button",
+    );
 
-    const downloadLevelButton =
-      document.getElementById(
-        "download-level-button"
-      );
+    const chooseSongButton = document.getElementById("choose-song-file-button");
 
-    const chooseSongButton =
-      document.getElementById(
-        "choose-song-file-button"
-      );
-
-
-    if(
+    if (
       !settingsButton ||
       !overlay ||
       !sheet ||
       !closeButton ||
       !levelInput ||
       !songInput
-    ){
-      throw new Error(
-        "project settings UI element not found"
-      );
+    ) {
+      throw new Error("project settings UI element not found");
     }
-
 
     /*
       Level Settings is opened only by an explicit user action.
     */
-    overlay.hidden =
-      true;
+    overlay.hidden = true;
 
+    settingsButton.addEventListener("click", () => {
+      this.openProjectSettings();
+    });
 
-    settingsButton.addEventListener(
-      "click",
-      () => {
-        this.openProjectSettings();
-      }
-    );
+    closeButton.addEventListener("click", () => {
+      this.closeProjectSettings();
+    });
 
-
-    closeButton.addEventListener(
-      "click",
-      () => {
+    overlay.addEventListener("pointerdown", (e) => {
+      if (e.target === overlay) {
         this.closeProjectSettings();
       }
-    );
+    });
 
+    sheet.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+    });
 
-    overlay.addEventListener(
-      "pointerdown",
-      e => {
-
-        if(e.target === overlay){
-          this.closeProjectSettings();
-        }
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !overlay.hidden) {
+        this.closeProjectSettings();
       }
-    );
+    });
 
+    loadLevelButton?.addEventListener("click", () => {
+      this.openLevelLoadHelp();
+    });
 
-    sheet.addEventListener(
-      "pointerdown",
-      e => {
-        e.stopPropagation();
+    newLevelButton?.addEventListener("click", async () => {
+      await this.createNewLevel();
+    });
+
+    downloadLevelButton?.addEventListener("click", () => {
+      this.downloadLevel();
+    });
+
+    chooseSongButton?.addEventListener("click", () => {
+      songInput.click();
+    });
+
+    levelInput.addEventListener("change", async () => {
+      const files = Array.from(levelInput.files ?? []);
+
+      levelInput.value = "";
+
+      if (!files.length) {
+        return;
       }
-    );
 
+      const file =
+        files.find((item) => /\.adofai$/i.test(item.name)) ?? files[0];
 
-    window.addEventListener(
-      "keydown",
-      e => {
+      await this.loadProjectFromFile(file, files);
+    });
 
-        if(
-          e.key === "Escape" &&
-          !overlay.hidden
-        ){
-          this.closeProjectSettings();
-        }
+    songInput.addEventListener("change", async () => {
+      const file = songInput.files?.[0];
+
+      songInput.value = "";
+
+      if (!file) {
+        return;
       }
-    );
 
+      await this.selectSongFile(file);
+    });
 
-    loadLevelButton?.addEventListener(
-      "click",
-      () => {
-        this.openLevelLoadHelp();
-      }
-    );
+    const bindText = (id, key) => {
+      const input = document.getElementById(id);
 
+      input?.addEventListener("change", () => {
+        this.applyProjectSetting(key, input.value);
+      });
+    };
 
-    newLevelButton?.addEventListener(
-      "click",
-      async () => {
-        await this.createNewLevel();
-      }
-    );
+    const bindNumber = (id, key, { min = null, max = null } = {}) => {
+      const input = document.getElementById(id);
 
+      input?.addEventListener("change", () => {
+        let value = Number(input.value);
 
-    downloadLevelButton?.addEventListener(
-      "click",
-      () => {
-        this.downloadLevel();
-      }
-    );
-
-
-    chooseSongButton?.addEventListener(
-      "click",
-      () => {
-        songInput.click();
-      }
-    );
-
-
-    levelInput.addEventListener(
-      "change",
-      async () => {
-
-        const files =
-          Array.from(
-            levelInput.files ?? []
-          );
-
-        levelInput.value = "";
-
-        if(!files.length){
+        if (!Number.isFinite(value)) {
+          this.refreshProjectSettingsUI();
           return;
         }
 
-        const file =
-          files.find(
-            item =>
-              /\.adofai$/i.test(item.name)
-          ) ?? files[0];
-
-        await this.loadProjectFromFile(
-          file,
-          files
-        );
-      }
-    );
-
-
-    songInput.addEventListener(
-      "change",
-      async () => {
-
-        const file =
-          songInput.files?.[0];
-
-        songInput.value = "";
-
-        if(!file){
-          return;
+        if (min !== null) {
+          value = Math.max(min, value);
         }
 
-        await this.selectSongFile(
-          file
-        );
-      }
-    );
-
-
-    const bindText = (
-      id,
-      key
-    ) => {
-
-      const input =
-        document.getElementById(id);
-
-      input?.addEventListener(
-        "change",
-        () => {
-          this.applyProjectSetting(
-            key,
-            input.value
-          );
+        if (max !== null) {
+          value = Math.min(max, value);
         }
-      );
+
+        input.value = String(value);
+
+        this.applyProjectSetting(key, value);
+      });
     };
 
+    bindText("settings-artist", "artist");
 
-    const bindNumber = (
-      id,
-      key,
-      {
-        min = null,
-        max = null
-      } = {}
-    ) => {
+    bindText("settings-song", "song");
 
-      const input =
-        document.getElementById(id);
+    bindText("settings-author", "author");
 
-      input?.addEventListener(
-        "change",
-        () => {
+    bindNumber("settings-bpm", "bpm", { min: 0.001 });
 
-          let value =
-            Number(input.value);
+    bindNumber("settings-volume", "volume", {
+      min: 0,
+      max: 100,
+    });
 
+    bindNumber("settings-offset", "offset");
 
-          if(!Number.isFinite(value)){
-            this.refreshProjectSettingsUI();
-            return;
-          }
+    bindNumber("settings-pitch", "pitch", { min: 1 });
 
+    bindText("settings-hitsound", "hitsound");
 
-          if(min !== null){
-            value = Math.max(min, value);
-          }
+    bindNumber("settings-hitsound-volume", "hitsoundVolume", {
+      min: 0,
+      max: 100,
+    });
 
-          if(max !== null){
-            value = Math.min(max, value);
-          }
-
-
-          input.value =
-            String(value);
-
-
-          this.applyProjectSetting(
-            key,
-            value
-          );
-        }
-      );
-    };
-
-
-    bindText(
-      "settings-artist",
-      "artist"
-    );
-
-    bindText(
-      "settings-song",
-      "song"
-    );
-
-    bindText(
-      "settings-author",
-      "author"
-    );
-
-
-    bindNumber(
-      "settings-bpm",
-      "bpm",
-      { min: 0.001 }
-    );
-
-    bindNumber(
-      "settings-volume",
-      "volume",
-      {
-        min: 0,
-        max: 100
-      }
-    );
-
-    bindNumber(
-      "settings-offset",
-      "offset"
-    );
-
-    bindNumber(
-      "settings-pitch",
-      "pitch",
-      { min: 1 }
-    );
-
-    bindText(
-      "settings-hitsound",
-      "hitsound"
-    );
-
-    bindNumber(
-      "settings-hitsound-volume",
-      "hitsoundVolume",
-      {
-        min: 0,
-        max: 100
-      }
-    );
-
-
-    this.projectSettingsInitialized =
-      true;
+    this.projectSettingsInitialized = true;
   }
 
+  openProjectSettings() {
+    const overlay = document.getElementById("project-settings-overlay");
 
-  openProjectSettings(){
-
-    const overlay =
-      document.getElementById(
-        "project-settings-overlay"
-      );
-
-    if(!overlay){
+    if (!overlay) {
       return;
     }
 
-
     this.refreshProjectSettingsUI();
 
-    overlay.hidden =
-      false;
+    overlay.hidden = false;
   }
 
+  closeProjectSettings() {
+    const overlay = document.getElementById("project-settings-overlay");
 
-  closeProjectSettings(){
-
-    const overlay =
-      document.getElementById(
-        "project-settings-overlay"
-      );
-
-    if(overlay){
+    if (overlay) {
       overlay.hidden = true;
     }
   }
 
+  refreshHitsoundSettingOptions() {
+    const select = document.getElementById("settings-hitsound");
 
-  refreshHitsoundSettingOptions(){
-
-    const select =
-      document.getElementById(
-        "settings-hitsound"
-      );
-
-
-    if(!select){
+    if (!select) {
       return;
     }
 
+    const currentValue = String(this.doc?.settings?.hitsound ?? "Kick");
 
-    const currentValue =
-      String(
-        this.doc?.settings
-          ?.hitsound ??
-        "Kick"
-      );
+    const options = (
+      this.hitSound?.getAvailableHitsoundOptions?.() ?? [
+        {
+          value: "None",
+          label: "None",
+        },
+        {
+          value: "Kick",
+          label: "Kick",
+        },
+      ]
+    ).map((option) => ({
+      value: String(option?.value ?? option),
 
+      label: String(option?.label ?? option?.value ?? option),
+    }));
 
-    const options =
-      (
-        this.hitSound
-          ?.getAvailableHitsoundOptions?.()
-        ??
-        [
-          {
-            value: "None",
-            label: "None"
-          },
-          {
-            value: "Kick",
-            label: "Kick"
-          }
-        ]
-      )
-      .map(
-        option => ({
-          value:
-            String(
-              option?.value ??
-              option
-            ),
-
-          label:
-            String(
-              option?.label ??
-              option?.value ??
-              option
-            )
-        })
-      );
-
-
-    if(
+    if (
       currentValue &&
-      !options.some(
-        option =>
-          option.value ===
-          currentValue
-      )
-    ){
-
+      !options.some((option) => option.value === currentValue)
+    ) {
       options.push({
-        value:
-          currentValue,
+        value: currentValue,
 
-        label:
-          currentValue
+        label: currentValue,
       });
     }
 
+    select.innerHTML = "";
 
-    select.innerHTML =
-      "";
+    for (const optionInfo of options) {
+      const option = document.createElement("option");
 
+      option.value = optionInfo.value;
 
-    for(
-      const optionInfo
-      of options
-    ){
+      option.textContent = optionInfo.label;
 
-      const option =
-        document.createElement(
-          "option"
-        );
-
-
-      option.value =
-        optionInfo.value;
-
-      option.textContent =
-        optionInfo.label;
-
-      select.appendChild(
-        option
-      );
+      select.appendChild(option);
     }
 
-
-    select.value =
-      currentValue;
+    select.value = currentValue;
   }
 
-
-  initLevelLoadHelp(){
-
-    if(this.levelLoadHelpInitialized){
+  initLevelLoadHelp() {
+    if (this.levelLoadHelpInitialized) {
       return;
     }
 
+    const overlay = document.getElementById("level-load-help-overlay");
 
-    const overlay =
-      document.getElementById(
-        "level-load-help-overlay"
-      );
+    const cancelButton = document.getElementById("level-load-help-cancel");
 
-    const cancelButton =
-      document.getElementById(
-        "level-load-help-cancel"
-      );
+    const okButton = document.getElementById("level-load-help-ok");
 
-    const okButton =
-      document.getElementById(
-        "level-load-help-ok"
-      );
+    const neverInput = document.getElementById("level-load-help-never");
 
-    const neverInput =
-      document.getElementById(
-        "level-load-help-never"
-      );
+    const levelInput = document.getElementById("level-file-input");
 
-    const levelInput =
-      document.getElementById(
-        "level-file-input"
-      );
-
-    if(
-      !overlay ||
-      !cancelButton ||
-      !okButton ||
-      !neverInput ||
-      !levelInput
-    ){
+    if (!overlay || !cancelButton || !okButton || !neverInput || !levelInput) {
       return;
     }
-
 
     overlay.hidden = true;
 
-    cancelButton.addEventListener(
-      "click",
-      () => {
-        overlay.hidden = true;
+    cancelButton.addEventListener("click", () => {
+      overlay.hidden = true;
+    });
+
+    okButton.addEventListener("click", () => {
+      if (neverInput.checked) {
+        this.writeEditorPreference("adofai-editor-hide-load-help-v1", "1");
       }
-    );
 
-    okButton.addEventListener(
-      "click",
-      () => {
-
-        if(neverInput.checked){
-          this.writeEditorPreference(
-            "adofai-editor-hide-load-help-v1",
-            "1"
-          );
-        }
-
-        overlay.hidden = true;
-        levelInput.click();
-      }
-    );
+      overlay.hidden = true;
+      levelInput.click();
+    });
 
     this.levelLoadHelpInitialized = true;
   }
 
-
-  openLevelLoadHelp(){
-
+  openLevelLoadHelp() {
     const hidden =
-      this.readEditorPreference(
-        "adofai-editor-hide-load-help-v1",
-        "0"
-      ) === "1";
+      this.readEditorPreference("adofai-editor-hide-load-help-v1", "0") === "1";
 
-    const levelInput =
-      document.getElementById(
-        "level-file-input"
-      );
+    const levelInput = document.getElementById("level-file-input");
 
-    if(hidden){
+    if (hidden) {
       levelInput?.click();
       return;
     }
 
-
     this.initLevelLoadHelp();
 
-    const overlay =
-      document.getElementById(
-        "level-load-help-overlay"
-      );
+    const overlay = document.getElementById("level-load-help-overlay");
 
-    if(!overlay){
+    if (!overlay) {
       levelInput?.click();
       return;
     }
@@ -9883,510 +5776,277 @@ class EditorApp{
     overlay.hidden = false;
   }
 
-
-  refreshProjectSettingsUI(){
-
-    const settings =
-      this.doc?.settings ?? {};
-
+  refreshProjectSettingsUI() {
+    const settings = this.doc?.settings ?? {};
 
     this.refreshHitsoundSettingOptions();
 
+    const setValue = (id, value) => {
+      const element = document.getElementById(id);
 
-    const setValue = (
-      id,
-      value
-    ) => {
-
-      const element =
-        document.getElementById(id);
-
-      if(element){
-        element.value =
-          value ?? "";
+      if (element) {
+        element.value = value ?? "";
       }
     };
 
-
-    setValue(
-      "settings-song-filename",
-      settings.songFilename ?? ""
-    );
+    setValue("settings-song-filename", settings.songFilename ?? "");
 
     setValue(
       "settings-bpm",
-      Number.isFinite(
-        Number(settings.bpm)
-      )
-        ? Number(settings.bpm)
-        : 100
+      Number.isFinite(Number(settings.bpm)) ? Number(settings.bpm) : 100,
     );
 
     setValue(
       "settings-volume",
-      Number.isFinite(
-        Number(settings.volume)
-      )
-        ? Number(settings.volume)
-        : 100
+      Number.isFinite(Number(settings.volume)) ? Number(settings.volume) : 100,
     );
 
     setValue(
       "settings-offset",
-      Number.isFinite(
-        Number(settings.offset)
-      )
-        ? Number(settings.offset)
-        : 0
+      Number.isFinite(Number(settings.offset)) ? Number(settings.offset) : 0,
     );
 
     setValue(
       "settings-pitch",
-      Number.isFinite(
-        Number(settings.pitch)
-      )
-        ? Number(settings.pitch)
-        : 100
+      Number.isFinite(Number(settings.pitch)) ? Number(settings.pitch) : 100,
     );
 
-    setValue(
-      "settings-hitsound",
-      String(
-        settings.hitsound ??
-        "Kick"
-      )
-    );
+    setValue("settings-hitsound", String(settings.hitsound ?? "Kick"));
 
     setValue(
       "settings-hitsound-volume",
-      Number.isFinite(
-        Number(
-          settings.hitsoundVolume
-        )
-      )
-        ? Number(
-            settings.hitsoundVolume
-          )
-        : 100
+      Number.isFinite(Number(settings.hitsoundVolume))
+        ? Number(settings.hitsoundVolume)
+        : 100,
     );
 
-    setValue(
-      "settings-artist",
-      settings.artist ?? ""
-    );
+    setValue("settings-artist", settings.artist ?? "");
 
-    setValue(
-      "settings-song",
-      settings.song ?? ""
-    );
+    setValue("settings-song", settings.song ?? "");
 
-    setValue(
-      "settings-author",
-      settings.author ?? ""
-    );
+    setValue("settings-author", settings.author ?? "");
 
+    const levelName = document.getElementById("settings-level-file-name");
 
-    const levelName =
-      document.getElementById(
-        "settings-level-file-name"
-      );
-
-    if(levelName){
-      levelName.textContent =
-        this.currentLevelSource?.name ??
-        "New Level";
+    if (levelName) {
+      levelName.textContent = this.currentLevelSource?.name ?? "New Level";
     }
 
+    const songStatus = document.getElementById("settings-song-status");
 
-    const songStatus =
-      document.getElementById(
-        "settings-song-status"
-      );
+    if (songStatus) {
+      songStatus.textContent = this.songLoadState.message ?? "";
 
-    if(songStatus){
+      songStatus.classList.remove("ok", "warning", "error");
 
-      songStatus.textContent =
-        this.songLoadState.message ?? "";
-
-      songStatus.classList.remove(
-        "ok",
-        "warning",
-        "error"
-      );
-
-      if(this.songLoadState.loaded){
+      if (this.songLoadState.loaded) {
         songStatus.classList.add("ok");
-      }
-      else if(settings.songFilename){
+      } else if (settings.songFilename) {
         songStatus.classList.add("warning");
       }
     }
   }
 
-
-  syncSettingsToProject(){
-
-    if(!this.project?.json){
+  syncSettingsToProject() {
+    if (!this.project?.json) {
       return;
     }
 
-
-    if(!this.project.json.settings){
+    if (!this.project.json.settings) {
       this.project.json.settings = {};
     }
 
-
-    Object.assign(
-      this.project.json.settings,
-      this.doc?.settings ?? {}
-    );
+    Object.assign(this.project.json.settings, this.doc?.settings ?? {});
   }
 
-
-  applyProjectSetting(
-    key,
-    value
-  ){
-
-    if(!this.doc?.settings){
+  applyProjectSetting(key, value) {
+    if (!this.doc?.settings) {
       return false;
     }
 
-
-    if(
-      Object.is(
-        this.doc.settings[key],
-        value
-      )
-    ){
+    if (Object.is(this.doc.settings[key], value)) {
       return true;
     }
 
-
     this.recordHistoryBeforeEdit();
 
-
-    this.doc.settings[key] =
-      value;
+    this.doc.settings[key] = value;
 
     this.syncSettingsToProject();
 
-
-    if(
-      key === "artist" ||
-      key === "song"
-    ){
+    if (key === "artist" || key === "song") {
       this.updateProjectTitle();
     }
 
-
-    if(key === "volume"){
-
-      const volume =
-        Number(value);
+    if (key === "volume") {
+      const volume = Number(value);
 
       this.song.setVolume(
-        Number.isFinite(volume)
-          ? Math.max(0, volume) / 100
-          : 1
+        Number.isFinite(volume) ? Math.max(0, volume) / 100 : 1,
       );
     }
 
-
-    if(key === "pitch"){
-
-      const pitch =
-        Number(value);
+    if (key === "pitch") {
+      const pitch = Number(value);
 
       const playbackRate =
-        Number.isFinite(pitch) &&
-        pitch > 0
-          ? pitch / 100
-          : 1;
+        Number.isFinite(pitch) && pitch > 0 ? pitch / 100 : 1;
 
-      this.clock.setPlaybackRate(
-        playbackRate
-      );
+      this.clock.setPlaybackRate(playbackRate);
 
-      this.song.setPlaybackRate(
-        playbackRate
-      );
+      this.song.setPlaybackRate(playbackRate);
 
-      this.hitSound.setTimelineRate(
-        playbackRate
-      );
+      this.hitSound.setTimelineRate(playbackRate);
 
       /*
         Re-index scheduled hitsounds if pitch is changed
         during playback. Their actual audio pitch stays intact.
       */
-      if(
-        this.state.mode === "play" &&
-        this.levelStarted
-      ){
-
-        const currentTime_us =
-          this.clock.getTime_us();
+      if (this.state.mode === "play" && this.levelStarted) {
+        const currentTime_us = this.clock.getTime_us();
 
         this.hitSound.start(
           this.compiled.hitSoundEvents,
           this.compiled.countdownHitTimes_us,
-          currentTime_us
+          currentTime_us,
         );
       }
     }
 
-
-    if(
+    if (
       key === "bpm" ||
       key === "offset" ||
       key === "hitsound" ||
       key === "hitsoundVolume"
-    ){
+    ) {
       this.rebuild();
     }
-
 
     this.refreshProjectSettingsUI();
 
     this.scheduleAutosave();
 
-    this.logger.info(
-      "Level setting changed",
-      key,
-      value
-    );
+    this.logger.info("Level setting changed", key, value);
 
     return true;
   }
 
+  async loadSongFromProjectUrl(projectPath) {
+    const songFilename = String(this.doc?.settings?.songFilename ?? "").trim();
 
-  async loadSongFromProjectUrl(
-    projectPath
-  ){
-
-    const songFilename =
-      String(
-        this.doc?.settings
-          ?.songFilename ??
-        ""
-      ).trim();
-
-
-    if(!songFilename){
-
-      await this.song.init(
-        this.hitSound.ctx,
-        null
-      );
+    if (!songFilename) {
+      await this.song.init(this.hitSound.ctx, null);
 
       this.songLoadState = {
         loaded: false,
-        message:
-          "No song is assigned. Please choose a song file."
+        message: "No song is assigned. Please choose a song file.",
       };
 
       return false;
     }
 
+    const projectUrl = new URL(projectPath, window.location.href);
 
-    const projectUrl =
-      new URL(
-        projectPath,
-        window.location.href
-      );
+    const songUrl = new URL(songFilename, projectUrl).href;
 
+    const loaded = await this.song.init(this.hitSound.ctx, songUrl);
 
-    const songUrl =
-      new URL(
-        songFilename,
-        projectUrl
-      ).href;
-
-
-    const loaded =
-      await this.song.init(
-        this.hitSound.ctx,
-        songUrl
-      );
-
-
-    const volume =
-      Number(
-        this.doc.settings?.volume ??
-        100
-      );
-
+    const volume = Number(this.doc.settings?.volume ?? 100);
 
     this.song.setVolume(
-      Number.isFinite(volume)
-        ? Math.max(0, volume) / 100
-        : 1
+      Number.isFinite(volume) ? Math.max(0, volume) / 100 : 1,
     );
 
-
-    this.songLoadState =
-      loaded
-        ? {
-            loaded: true,
-            message:
-              `Song loaded automatically: ${songFilename}`
-          }
-        : {
-            loaded: false,
-            message:
-              `Could not find ${songFilename} in the same path. Please choose it manually.`
-          };
-
+    this.songLoadState = loaded
+      ? {
+          loaded: true,
+          message: `Song loaded automatically: ${songFilename}`,
+        }
+      : {
+          loaded: false,
+          message: `Could not find ${songFilename} in the same path. Please choose it manually.`,
+        };
 
     return loaded;
   }
 
+  findLocalSongFile(files, songFilename) {
+    const expectedName = String(songFilename ?? "").trim();
 
-  findLocalSongFile(
-    files,
-    songFilename
-  ){
-
-    const expectedName =
-      String(
-        songFilename ?? ""
-      ).trim();
-
-    if(
-      !expectedName ||
-      !Array.isArray(files)
-    ){
+    if (!expectedName || !Array.isArray(files)) {
       return null;
     }
 
+    const normalizedExpected = expectedName.replace(/\\/g, "/");
 
-    const normalizedExpected =
-      expectedName.replace(/\\/g, "/");
+    const expectedBaseName = normalizedExpected.split("/").pop();
 
-    const expectedBaseName =
-      normalizedExpected
-        .split("/")
-        .pop();
-
-    return files.find(
-      file =>
-        file.name === expectedBaseName
-    ) ?? null;
+    return files.find((file) => file.name === expectedBaseName) ?? null;
   }
 
+  async loadSongFromLocalFiles(files) {
+    const expectedSong = String(this.doc?.settings?.songFilename ?? "").trim();
 
-  async loadSongFromLocalFiles(
-    files
-  ){
-
-    const expectedSong =
-      String(
-        this.doc?.settings
-          ?.songFilename ??
-        ""
-      ).trim();
-
-    if(!expectedSong){
-      await this.song.init(
-        this.hitSound.ctx,
-        null
-      );
+    if (!expectedSong) {
+      await this.song.init(this.hitSound.ctx, null);
 
       this.songLoadState = {
         loaded: false,
         message:
-          "No song is assigned to this level. Please choose a song file."
+          "No song is assigned to this level. Please choose a song file.",
       };
 
       return false;
     }
 
+    const songFile = this.findLocalSongFile(files, expectedSong);
 
-    const songFile =
-      this.findLocalSongFile(
-        files,
-        expectedSong
-      );
-
-    if(!songFile){
-      await this.song.init(
-        this.hitSound.ctx,
-        null
-      );
+    if (!songFile) {
+      await this.song.init(this.hitSound.ctx, null);
 
       this.songLoadState = {
         loaded: false,
-        message:
-          `음원 파일을 찾을 수 없습니다. (${expectedSong})`
+        message: `음원 파일을 찾을 수 없습니다. (${expectedSong})`,
       };
 
-      this.showToast(
-        "음원 파일을 찾을 수 없습니다.",
-        "error",
-        5000
-      );
+      this.showToast("음원 파일을 찾을 수 없습니다.", "error", 5000);
 
       return false;
     }
 
-
-    return await this.selectSongFile(
-      songFile,
-      {
-        updateSongFilename: false,
-        statusMessage:
-          `Song loaded automatically: ${songFile.name}`
-      }
-    );
+    return await this.selectSongFile(songFile, {
+      updateSongFilename: false,
+      statusMessage: `Song loaded automatically: ${songFile.name}`,
+    });
   }
-
 
   async selectSongFile(
     file,
-    {
-      updateSongFilename = true,
-      statusMessage = null
-    } = {}
-  ){
-
-    if(!file || !this.hitSound.ctx){
+    { updateSongFilename = true, statusMessage = null } = {},
+  ) {
+    if (!file || !this.hitSound.ctx) {
       return false;
     }
 
-
-    if(this.localSongObjectUrl){
-      URL.revokeObjectURL(
-        this.localSongObjectUrl
-      );
+    if (this.localSongObjectUrl) {
+      URL.revokeObjectURL(this.localSongObjectUrl);
     }
 
+    this.localSongObjectUrl = URL.createObjectURL(file);
 
-    this.localSongObjectUrl =
-      URL.createObjectURL(
-        file
-      );
+    const loaded = await this.song.init(
+      this.hitSound.ctx,
+      this.localSongObjectUrl,
+    );
 
-
-    const loaded =
-      await this.song.init(
-        this.hitSound.ctx,
-        this.localSongObjectUrl
-      );
-
-
-    if(loaded){
-
-      if(this.autosaveSuppressed){
+    if (loaded) {
+      if (this.autosaveSuppressed) {
         this.autosaveSuppressed = false;
-        this.logger.setPersistenceEnabled(
-          true
-        );
+        this.logger.setPersistenceEnabled(true);
       }
 
-      if(updateSongFilename){
-        this.doc.settings.songFilename =
-          file.name;
+      if (updateSongFilename) {
+        this.doc.settings.songFilename = file.name;
 
         this.syncSettingsToProject();
       }
@@ -10396,234 +6056,146 @@ class EditorApp{
         path after a restart, so keep the selected song Blob in
         IndexedDB.
       */
-      await this.cacheLocalSongForAutosave(
-        file
-      );
+      await this.cacheLocalSongForAutosave(file);
 
-
-      const volume =
-        Number(
-          this.doc.settings?.volume ??
-          100
-        );
+      const volume = Number(this.doc.settings?.volume ?? 100);
 
       this.song.setVolume(
-        Number.isFinite(volume)
-          ? Math.max(0, volume) / 100
-          : 1
+        Number.isFinite(volume) ? Math.max(0, volume) / 100 : 1,
       );
     }
 
-
-    this.songLoadState =
-      loaded
-        ? {
-            loaded: true,
-            message:
-              statusMessage ??
-              `Song selected: ${file.name}`
-          }
-        : {
-            loaded: false,
-            message:
-              `Failed to read song: ${file.name}`
-          };
-
+    this.songLoadState = loaded
+      ? {
+          loaded: true,
+          message: statusMessage ?? `Song selected: ${file.name}`,
+        }
+      : {
+          loaded: false,
+          message: `Failed to read song: ${file.name}`,
+        };
 
     this.refreshProjectSettingsUI();
 
-    if(loaded){
+    if (loaded) {
       this.scheduleAutosave();
-      this.logger.info(
-        "Song selected",
-        {
-          name: file.name,
-          size: file.size,
-          type: file.type || "unknown"
-        }
-      );
-    }
-    else{
-      this.showToast(
-        `Failed to read song: ${file.name}`,
-        "error"
-      );
+      this.logger.info("Song selected", {
+        name: file.name,
+        size: file.size,
+        type: file.type || "unknown",
+      });
+    } else {
+      this.showToast(`Failed to read song: ${file.name}`, "error");
     }
 
     return loaded;
   }
 
-
-  async replaceProjectJson(
-    json,
-    source = null
-  ){
-
-    if(!json){
+  async replaceProjectJson(json, source = null) {
+    if (!json) {
       return false;
     }
 
-
-    if(this.state.mode === "play"){
+    if (this.state.mode === "play") {
       this.stopPlay();
-    }
-    else{
+    } else {
       this.song.stop();
       this.hitSound.stop();
       this.clock.stop();
     }
 
+    if (this.localSongObjectUrl) {
+      URL.revokeObjectURL(this.localSongObjectUrl);
 
-    if(this.localSongObjectUrl){
-      URL.revokeObjectURL(
-        this.localSongObjectUrl
-      );
-
-      this.localSongObjectUrl =
-        null;
+      this.localSongObjectUrl = null;
     }
 
+    this.project = new Project();
 
-    this.project =
-      new Project();
+    this.project.json = json;
 
-    this.project.json =
-      json;
-
-
-    this.doc =
-      this.builder.fromProject(
-        this.project
-      );
-
+    this.doc = this.builder.fromProject(this.project);
 
     this.resetHistory();
 
-
-    this.currentLevelSource =
-      source;
+    this.currentLevelSource = source;
 
     /*
       A newly opened level must not inherit the previous level's
       cached local song association. Selecting a song establishes
       a new association.
     */
-    this.autosaveSongCacheKey =
-      null;
-
+    this.autosaveSongCacheKey = null;
 
     this.state.selectedFloorIds.clear();
     this.state.activeFloorId = null;
     this.state.selectionAnchorId = null;
 
-
     this.songLoadState = {
       loaded: false,
-      message: ""
+      message: "",
     };
-
 
     this.updateProjectTitle();
     this.rebuild();
     this.setEdit();
 
-
     this.refreshProjectSettingsUI();
 
     this.scheduleAutosave();
 
-    this.logger.info(
-      "Project replaced",
-      {
-        source: source?.name ?? source?.type ?? "unknown",
-        tiles: this.doc?.ids?.length ?? 0,
-        events: this.doc?.actions?.length ?? 0
-      }
-    );
+    this.logger.info("Project replaced", {
+      source: source?.name ?? source?.type ?? "unknown",
+      tiles: this.doc?.ids?.length ?? 0,
+      events: this.doc?.actions?.length ?? 0,
+    });
 
     return true;
   }
 
-
-  async loadProjectFromFile(
-    file,
-    files = [file]
-  ){
-
-    if(!file){
+  async loadProjectFromFile(file, files = [file]) {
+    if (!file) {
       return false;
     }
 
+    this.setLevelLoading(true, "Loading level...");
 
-    this.setLevelLoading(
-      true,
-      "Loading level..."
-    );
+    try {
+      const text = await file.text();
 
+      const json = JSON5.parse(text.replace(/\r/g, "").replace(/\n/g, ""));
 
-    try{
+      await this.replaceProjectJson(json, {
+        type: "file",
+        name: file.name,
+        file,
+      });
 
-      const text =
-        await file.text();
-
-
-      const json =
-        JSON5.parse(
-          text
-            .replace(/\r/g, "")
-            .replace(/\n/g, "")
-        );
-
-
-      await this.replaceProjectJson(
-        json,
-        {
-          type: "file",
-          name: file.name,
-          file
-        }
-      );
-
-
-      const songLoaded =
-        await this.loadSongFromLocalFiles(
-          files
-        );
+      const songLoaded = await this.loadSongFromLocalFiles(files);
 
       this.refreshProjectSettingsUI();
 
-      if(!songLoaded){
+      if (!songLoaded) {
         this.openProjectSettings();
       }
 
-      this.logger.info(
-        "Local level loaded",
-        {
-          name: file.name,
-          tiles: this.doc?.ids?.length ?? 0,
-          events: this.doc?.actions?.length ?? 0
-        }
-      );
+      this.logger.info("Local level loaded", {
+        name: file.name,
+        tiles: this.doc?.ids?.length ?? 0,
+        events: this.doc?.actions?.length ?? 0,
+      });
 
       return true;
-    }
-    catch(error){
-
-      this.reportError(
-        error,
-        "Failed to load the level file"
-      );
+    } catch (error) {
+      this.reportError(error, "Failed to load the level file");
 
       return false;
-    }
-    finally{
+    } finally {
       this.setLevelLoading(false);
     }
   }
 
-
-  async createNewLevel(){
-
+  async createNewLevel() {
     /*
       이 에디터의 "New Level"은
       빈 JSON을 즉석에서 만드는 대신,
@@ -10636,85 +6208,45 @@ class EditorApp{
       파일만 fetch한 뒤 replaceProjectJson()
       경로로 교체한다.
     */
-    const path =
-      "./level.adofai";
+    const path = "./level.adofai";
 
+    this.setLevelLoading(true, "Loading default level...");
 
-    this.setLevelLoading(
-      true,
-      "Loading default level..."
-    );
-
-
-    try{
-
-      const response =
-        await fetch(
-          path,
-          {
-            /*
+    try {
+      const response = await fetch(path, {
+        /*
               개발 중 level.adofai가 바뀌어도
               오래된 캐시가 다시 열리지 않게 함.
             */
-            cache:
-              "no-store"
-          }
-        );
+        cache: "no-store",
+      });
 
-
-      if(!response.ok){
-
-        throw new Error(
-          `default level load failed: ${response.status}`
-        );
+      if (!response.ok) {
+        throw new Error(`default level load failed: ${response.status}`);
       }
 
-
-      const text =
-        (
-          await response.text()
-        )
+      const text = (await response.text())
         .replace(/\r/g, "")
         .replace(/\n/g, "");
 
+      const json = JSON5.parse(text);
 
-      const json =
-        JSON5.parse(
-          text
-        );
+      await this.replaceProjectJson(json, {
+        type: "url",
 
+        name: "level.adofai",
 
-      await this.replaceProjectJson(
-        json,
-        {
-          type:
-            "url",
-
-          name:
-            "level.adofai",
-
-          url:
-            new URL(
-              path,
-              window.location.href
-            ).href
-        }
-      );
-
+        url: new URL(path, window.location.href).href,
+      });
 
       /*
         기본 level.adofai에 songFilename이 있다면
         처음 실행할 때와 똑같이
         level.adofai 기준 상대 경로에서 곡을 찾는다.
       */
-      const songLoaded =
-        await this.loadSongFromProjectUrl(
-          path
-        );
-
+      const songLoaded = await this.loadSongFromProjectUrl(path);
 
       this.refreshProjectSettingsUI();
-
 
       /*
         설정창 안에서 "New Level"을 눌렀으므로
@@ -10722,234 +6254,117 @@ class EditorApp{
         곡이 없거나 찾지 못한 경우에도
         사용자가 바로 곡을 지정할 수 있다.
       */
-      if(!songLoaded){
-
+      if (!songLoaded) {
         this.openProjectSettings();
       }
 
-      this.logger.info(
-        "New level loaded",
-        { songLoaded }
-      );
+      this.logger.info("New level loaded", { songLoaded });
 
       return true;
-    }
-    catch(error){
-
-      this.reportError(
-        error,
-        "Failed to load the default level.adofai file"
-      );
-
+    } catch (error) {
+      this.reportError(error, "Failed to load the default level.adofai file");
 
       return false;
-    }
-    finally{
-
-      this.setLevelLoading(
-        false
-      );
+    } finally {
+      this.setLevelLoading(false);
     }
   }
 
-
-  createDownloadProjectJson(){
-
-    if(
-      !this.doc
-    ){
+  createDownloadProjectJson() {
+    if (!this.doc) {
       return null;
     }
-
 
     /*
       원본 JSON의 알 수 없는 설정/필드는
       최대한 보존한다.
       그 위에 현재 Document 상태만 덮어쓴다.
     */
-    const json =
-      structuredClone(
-        this.project?.json ??
-        {}
-      );
-
+    const json = structuredClone(this.project?.json ?? {});
 
     /*
       Document의 index 0은
       ADOFAI의 시작 타일이므로
       angleData에는 포함하지 않는다.
     */
-    json.angleData =
-      this.doc.angles.slice(
-        1
-      );
-
+    json.angleData = this.doc.angles.slice(1);
 
     json.settings = {
+      ...(json.settings ?? {}),
 
-      ...(
-        json.settings ??
-        {}
-      ),
-
-      ...structuredClone(
-        this.doc.settings ??
-        {}
-      )
+      ...structuredClone(this.doc.settings ?? {}),
     };
 
+    const floorIndexById = new Map();
 
-    const floorIndexById =
-      new Map();
-
-
-    for(
-      let i = 0;
-      i < this.doc.ids.length;
-      i++
-    ){
-
-      floorIndexById.set(
-        this.doc.ids[i],
-        i
-      );
+    for (let i = 0; i < this.doc.ids.length; i++) {
+      floorIndexById.set(this.doc.ids[i], i);
     }
-
 
     /*
       편집용 floorId를
       실제 .adofai의 floor 숫자로 되돌린다.
     */
-    json.actions =
-      [];
+    json.actions = [];
 
-
-    for(
-      const action
-      of this.doc.actions
-    ){
-
-      const floor =
-        floorIndexById.get(
-          action.floorId
-        );
-
+    for (const action of this.doc.actions) {
+      const floor = floorIndexById.get(action.floorId);
 
       /*
         존재하지 않는 타일을 가리키는
         비정상 action은 내보내지 않는다.
       */
-      if(
-        floor ===
-        undefined
-      ){
+      if (floor === undefined) {
         continue;
       }
 
-
-      const cloned =
-        structuredClone(
-          action
-        );
-
+      const cloned = structuredClone(action);
 
       delete cloned.floorId;
 
-
       json.actions.push({
-
         floor,
 
-        ...cloned
+        ...cloned,
       });
     }
-
 
     return json;
   }
 
+  getDownloadLevelFilename() {
+    const artist = String(this.doc?.settings?.artist ?? "").trim() || "Artist";
 
-  getDownloadLevelFilename(){
-
-    const artist =
-      String(
-        this.doc?.settings
-          ?.artist ??
-        ""
-      ).trim()
-      ||
-      "Artist";
-
-
-    const song =
-      String(
-        this.doc?.settings
-          ?.song ??
-        ""
-      ).trim()
-      ||
-      "Song";
-
+    const song = String(this.doc?.settings?.song ?? "").trim() || "Song";
 
     /*
       Windows / Android 등에서
       파일명으로 사용할 수 없는 문자를 치환.
     */
-    const rawBaseName =
-      `${artist} - ${song}`;
+    const rawBaseName = `${artist} - ${song}`;
 
-    const parsedTitle =
-      this.parseLevelTitleMarkup(
-        rawBaseName
-      );
+    const parsedTitle = this.parseLevelTitleMarkup(rawBaseName);
 
-    let baseName =
-      (
-        parsedTitle.valid
-          ? parsedTitle.plainText
-          : rawBaseName
-      )
-      .replace(
-        /[<>:"/\\|?*\u0000-\u001F]/g,
-        "_"
-      )
-      .replace(
-        /[. ]+$/g,
-        ""
-      )
+    let baseName = (parsedTitle.valid ? parsedTitle.plainText : rawBaseName)
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+      .replace(/[. ]+$/g, "")
       .trim();
 
-
-    if(!baseName){
-
-      baseName =
-        "Artist - Song";
+    if (!baseName) {
+      baseName = "Artist - Song";
     }
 
-
-    return (
-      baseName +
-      ".adofai"
-    );
+    return baseName + ".adofai";
   }
 
+  downloadLevel() {
+    const json = this.createDownloadProjectJson();
 
-  downloadLevel(){
-
-    const json =
-      this.createDownloadProjectJson();
-
-
-    if(!json){
-
-      this.showToast(
-        "There is no level to download.",
-        "warning"
-      );
+    if (!json) {
+      this.showToast("There is no level to download.", "warning");
 
       return false;
     }
-
 
     /*
       현재 settings도 project 쪽에
@@ -10957,20 +6372,10 @@ class EditorApp{
     */
     this.syncSettingsToProject();
 
+    const text = JSON.stringify(json, null, 2);
 
-    const text =
-      JSON.stringify(
-        json,
-        null,
-        2
-      );
-
-
-    const blob =
-      new Blob(
-        [text],
-        {
-          /*
+    const blob = new Blob([text], {
+      /*
             .adofai는 내용상 JSON이지만
             다운로드 MIME을 JSON으로 선언하면
             일부 모바일 브라우저가
@@ -10979,46 +6384,24 @@ class EditorApp{
             일반 바이너리 파일로 취급해서
             download 속성의 .adofai를 그대로 유지.
           */
-          type:
-            "application/octet-stream"
-        }
-      );
+      type: "application/octet-stream",
+    });
 
+    const url = URL.createObjectURL(blob);
 
-    const url =
-      URL.createObjectURL(
-        blob
-      );
+    const link = document.createElement("a");
 
+    link.href = url;
 
-    const link =
-      document.createElement(
-        "a"
-      );
+    link.download = this.getDownloadLevelFilename();
 
+    link.style.display = "none";
 
-    link.href =
-      url;
-
-
-    link.download =
-      this.getDownloadLevelFilename();
-
-
-    link.style.display =
-      "none";
-
-
-    document.body.appendChild(
-      link
-    );
-
+    document.body.appendChild(link);
 
     link.click();
 
-
     link.remove();
-
 
     /*
       click 직후 바로 revoke하면
@@ -11026,75 +6409,41 @@ class EditorApp{
       다운로드가 시작되기 전에 URL이 사라질 수 있어
       약간 뒤에 해제한다.
     */
-    window.setTimeout(
-      () => {
-
-        URL.revokeObjectURL(
-          url
-        );
-      },
-      1000
-    );
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
 
     this.logger.info(
       "Level download requested",
-      this.getDownloadLevelFilename()
+      this.getDownloadLevelFilename(),
     );
 
-    this.showToast(
-      "Level download started.",
-      "success",
-      2200
-    );
+    this.showToast("Level download started.", "success", 2200);
 
     return true;
   }
 
-
-  updateEventAction(
-    action,
-    patch
-  ){
-  
-    if(
-      this.state.mode !== "edit"
-    ){
+  updateEventAction(action, patch) {
+    if (this.state.mode !== "edit") {
       return false;
     }
-  
-  
-    const hasChange =
-      Object.entries(
-        patch ?? {}
-      ).some(
-        ([key, value]) =>
-          !Object.is(
-            action?.[key],
-            value
-          )
-      );
 
+    const hasChange = Object.entries(patch ?? {}).some(
+      ([key, value]) => !Object.is(action?.[key], value),
+    );
 
-    if(!hasChange){
+    if (!hasChange) {
       return true;
     }
 
-
     this.recordHistoryBeforeEdit();
 
+    const updated = this.doc.updateAction(action, patch);
 
-    const updated =
-      this.doc.updateAction(
-        action,
-        patch
-      );
-  
-  
-    if(!updated){
+    if (!updated) {
       return false;
     }
-  
-  
+
     /*
       즉시 재컴파일
       → 타일 아이콘
@@ -11106,70 +6455,46 @@ class EditorApp{
     */
     this.rebuild();
 
-    this.logger.info(
-      "Event updated",
-      {
-        eventType: action?.eventType ?? "Unknown",
-        floorId: action?.floorId ?? null,
-        patch
-      }
-    );
-  
+    this.logger.info("Event updated", {
+      eventType: action?.eventType ?? "Unknown",
+      floorId: action?.floorId ?? null,
+      patch,
+    });
+
     return true;
   }
-  
-  deleteEventAction(
-    action
-  ){
-  
-    if(
-      this.state.mode !==
-      "edit"
-    ){
-      return false;
-    }
-  
-  
-    if(
-      !this.doc.actions.includes(
-        action
-      )
-    ){
+
+  deleteEventAction(action) {
+    if (this.state.mode !== "edit") {
       return false;
     }
 
+    if (!this.doc.actions.includes(action)) {
+      return false;
+    }
 
     this.recordHistoryBeforeEdit();
 
+    const removed = this.doc.removeAction(action);
 
-    const removed =
-      this.doc.removeAction(
-        action
-      );
-  
-  
-    if(!removed){
+    if (!removed) {
       return false;
     }
-  
-  
+
     /*
       BPM / Pause / Twirl / 아이콘
       전부 다시 계산.
     */
     this.rebuild();
 
-    this.logger.info(
-      "Event deleted",
-      {
-        eventType: action?.eventType ?? "Unknown",
-        floorId: action?.floorId ?? null
-      }
-    );
-  
+    this.logger.info("Event deleted", {
+      eventType: action?.eventType ?? "Unknown",
+      floorId: action?.floorId ?? null,
+    });
+
     return true;
   }
-  
+
   /* =========================================================
      Undo / Redo
 
@@ -11178,45 +6503,27 @@ class EditorApp{
      history, so Undo/Redo changes the level without jumping the view.
   ========================================================= */
 
-  initHistoryControls(){
-
-    if(this.historyInitialized){
+  initHistoryControls() {
+    if (this.historyInitialized) {
       this.updateHistoryButtons();
       return;
     }
 
-    this.undoButton =
-      document.getElementById(
-        "undo-button"
-      );
+    this.undoButton = document.getElementById("undo-button");
 
-    this.redoButton =
-      document.getElementById(
-        "redo-button"
-      );
+    this.redoButton = document.getElementById("redo-button");
 
-    if(
-      !this.undoButton ||
-      !this.redoButton
-    ){
-      throw new Error(
-        "history controls not found"
-      );
+    if (!this.undoButton || !this.redoButton) {
+      throw new Error("history controls not found");
     }
 
-    this.undoButton.addEventListener(
-      "click",
-      () => {
-        this.undo();
-      }
-    );
+    this.undoButton.addEventListener("click", () => {
+      this.undo();
+    });
 
-    this.redoButton.addEventListener(
-      "click",
-      () => {
-        this.redo();
-      }
-    );
+    this.redoButton.addEventListener("click", () => {
+      this.redo();
+    });
 
     /*
       Desktop convenience:
@@ -11227,146 +6534,94 @@ class EditorApp{
       When a text/number field is focused, leave the shortcut to the
       browser so normal text editing keeps its native undo behavior.
     */
-    window.addEventListener(
-      "keydown",
-      e => {
+    window.addEventListener("keydown", (e) => {
+      const target = e.target;
 
-        const target = e.target;
+      const isEditingField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable;
 
-        const isEditingField =
-          target instanceof HTMLInputElement ||
-          target instanceof HTMLTextAreaElement ||
-          target instanceof HTMLSelectElement ||
-          target?.isContentEditable;
-
-        if(isEditingField){
-          return;
-        }
-
-        const modifier =
-          e.ctrlKey ||
-          e.metaKey;
-
-        if(!modifier){
-          return;
-        }
-
-        const key =
-          String(e.key).toLowerCase();
-
-        if(key === "z"){
-
-          e.preventDefault();
-
-          if(e.shiftKey){
-            this.redo();
-          }
-          else{
-            this.undo();
-          }
-        }
-        else if(key === "y"){
-
-          e.preventDefault();
-          this.redo();
-        }
+      if (isEditingField) {
+        return;
       }
-    );
+
+      const modifier = e.ctrlKey || e.metaKey;
+
+      if (!modifier) {
+        return;
+      }
+
+      const key = String(e.key).toLowerCase();
+
+      if (key === "z") {
+        e.preventDefault();
+
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+      } else if (key === "y") {
+        e.preventDefault();
+        this.redo();
+      }
+    });
 
     this.historyInitialized = true;
     this.updateHistoryButtons();
   }
 
-
-  createHistorySnapshot(){
-
-    if(!this.doc){
+  createHistorySnapshot() {
+    if (!this.doc) {
       return null;
     }
 
     return {
-
       document: {
-        ids:
-          structuredClone(
-            this.doc.ids
-          ),
+        ids: structuredClone(this.doc.ids),
 
-        angles:
-          structuredClone(
-            this.doc.angles
-          ),
+        angles: structuredClone(this.doc.angles),
 
-        nextId:
-          this.doc.nextId,
+        nextId: this.doc.nextId,
 
-        actions:
-          structuredClone(
-            this.doc.actions
-          ),
+        actions: structuredClone(this.doc.actions),
 
-        settings:
-          structuredClone(
-            this.doc.settings ?? {}
-          )
+        settings: structuredClone(this.doc.settings ?? {}),
       },
 
       selection: {
-        ids:
-          [
-            ...this.state
-              .selectedFloorIds
-          ],
+        ids: [...this.state.selectedFloorIds],
 
-        activeFloorId:
-          this.state.activeFloorId,
+        activeFloorId: this.state.activeFloorId,
 
-        selectionAnchorId:
-          this.state.selectionAnchorId
-      }
+        selectionAnchorId: this.state.selectionAnchorId,
+      },
     };
   }
 
-
-  recordHistoryBeforeEdit(){
-
-    if(
-      this.historyRestoring ||
-      this.state.mode !== "edit"
-    ){
+  recordHistoryBeforeEdit() {
+    if (this.historyRestoring || this.state.mode !== "edit") {
       return false;
     }
 
-    if(this.autosaveSuppressed){
+    if (this.autosaveSuppressed) {
       this.autosaveSuppressed = false;
-      this.logger.setPersistenceEnabled(
-        true
-      );
-      this.logger.info(
-        "Cache writes resumed after a new edit."
-      );
+      this.logger.setPersistenceEnabled(true);
+      this.logger.info("Cache writes resumed after a new edit.");
     }
 
-    const snapshot =
-      this.createHistorySnapshot();
+    const snapshot = this.createHistorySnapshot();
 
-    if(!snapshot){
+    if (!snapshot) {
       return false;
     }
 
-    this.undoStack.push(
-      snapshot
-    );
+    this.undoStack.push(snapshot);
 
-    if(
-      this.undoStack.length >
-      this.historyLimit
-    ){
-      this.undoStack.splice(
-        0,
-        this.undoStack.length -
-        this.historyLimit
-      );
+    if (this.undoStack.length > this.historyLimit) {
+      this.undoStack.splice(0, this.undoStack.length - this.historyLimit);
     }
 
     /*
@@ -11380,110 +6635,57 @@ class EditorApp{
     return true;
   }
 
-
-  resetHistory(){
-
+  resetHistory() {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
 
     this.updateHistoryButtons();
   }
 
-
-  restoreHistorySnapshot(
-    snapshot
-  ){
-
-    if(
-      !snapshot?.document ||
-      !this.doc
-    ){
+  restoreHistorySnapshot(snapshot) {
+    if (!snapshot?.document || !this.doc) {
       return false;
     }
 
-    const data =
-      snapshot.document;
+    const data = snapshot.document;
 
-    this.doc.ids =
-      structuredClone(
-        data.ids ?? []
-      );
+    this.doc.ids = structuredClone(data.ids ?? []);
 
-    this.doc.angles =
-      structuredClone(
-        data.angles ?? []
-      );
+    this.doc.angles = structuredClone(data.angles ?? []);
 
-    this.doc.nextId =
-      Number.isFinite(
-        Number(data.nextId)
-      )
-        ? Number(data.nextId)
-        : this.doc.ids.length;
+    this.doc.nextId = Number.isFinite(Number(data.nextId))
+      ? Number(data.nextId)
+      : this.doc.ids.length;
 
-    this.doc.actions =
-      structuredClone(
-        data.actions ?? []
-      );
+    this.doc.actions = structuredClone(data.actions ?? []);
 
-    this.doc.settings =
-      structuredClone(
-        data.settings ?? {}
-      );
-
+    this.doc.settings = structuredClone(data.settings ?? {});
 
     /* =========================
        Selection restore
     ========================= */
 
-    const validIds =
-      new Set(
-        this.doc.ids
-      );
+    const validIds = new Set(this.doc.ids);
 
-    this.state
-      .selectedFloorIds
-      .clear();
+    this.state.selectedFloorIds.clear();
 
-    for(
-      const id
-      of snapshot.selection?.ids ?? []
-    ){
-
-      if(validIds.has(id)){
-        this.state
-          .selectedFloorIds
-          .add(id);
+    for (const id of snapshot.selection?.ids ?? []) {
+      if (validIds.has(id)) {
+        this.state.selectedFloorIds.add(id);
       }
     }
 
-    const requestedActive =
-      snapshot.selection
-        ?.activeFloorId ??
-      null;
+    const requestedActive = snapshot.selection?.activeFloorId ?? null;
 
-    this.state.activeFloorId =
-      validIds.has(
-        requestedActive
-      )
-        ? requestedActive
-        : [
-            ...this.state
-              .selectedFloorIds
-          ].at(-1) ?? null;
+    this.state.activeFloorId = validIds.has(requestedActive)
+      ? requestedActive
+      : ([...this.state.selectedFloorIds].at(-1) ?? null);
 
-    const requestedAnchor =
-      snapshot.selection
-        ?.selectionAnchorId ??
-      null;
+    const requestedAnchor = snapshot.selection?.selectionAnchorId ?? null;
 
-    this.state.selectionAnchorId =
-      validIds.has(
-        requestedAnchor
-      )
-        ? requestedAnchor
-        : this.state.activeFloorId;
-
+    this.state.selectionAnchorId = validIds.has(requestedAnchor)
+      ? requestedAnchor
+      : this.state.activeFloorId;
 
     /* =========================
        Setting side effects
@@ -11492,54 +6694,31 @@ class EditorApp{
     this.syncSettingsToProject();
     this.updateProjectTitle();
 
-    const volume =
-      Number(
-        this.doc.settings?.volume ??
-        100
-      );
+    const volume = Number(this.doc.settings?.volume ?? 100);
 
     this.song.setVolume(
-      Number.isFinite(volume)
-        ? Math.max(0, volume) / 100
-        : 1
+      Number.isFinite(volume) ? Math.max(0, volume) / 100 : 1,
     );
 
-    const pitch =
-      Number(
-        this.doc.settings?.pitch ??
-        100
-      );
+    const pitch = Number(this.doc.settings?.pitch ?? 100);
 
-    const playbackRate =
-      Number.isFinite(pitch) &&
-      pitch > 0
-        ? pitch / 100
-        : 1;
+    const playbackRate = Number.isFinite(pitch) && pitch > 0 ? pitch / 100 : 1;
 
-    this.clock.setPlaybackRate(
-      playbackRate
-    );
+    this.clock.setPlaybackRate(playbackRate);
 
-    this.song.setPlaybackRate(
-      playbackRate
-    );
+    this.song.setPlaybackRate(playbackRate);
 
-    this.hitSound.setTimelineRate(
-      playbackRate
-    );
-
+    this.hitSound.setTimelineRate(playbackRate);
 
     /*
       Event screens may contain references to the previous action
       objects. Returning to the tile tab guarantees the restored UI
       is rebuilt entirely from the new Document snapshot.
     */
-    if(this.editorUI){
-      this.editorUI.activeTabKey =
-        "tile";
+    if (this.editorUI) {
+      this.editorUI.activeTabKey = "tile";
 
-      this.editorUI.isAdvanced =
-        false;
+      this.editorUI.isAdvanced = false;
     }
 
     this.rebuild();
@@ -11548,177 +6727,123 @@ class EditorApp{
     return true;
   }
 
-
-  undo(){
-
-    if(
-      this.state.mode !== "edit" ||
-      this.undoStack.length === 0
-    ){
+  undo() {
+    if (this.state.mode !== "edit" || this.undoStack.length === 0) {
       return false;
     }
 
-    const previous =
-      this.undoStack.pop();
+    const previous = this.undoStack.pop();
 
-    const current =
-      this.createHistorySnapshot();
+    const current = this.createHistorySnapshot();
 
-    if(current){
-      this.redoStack.push(
-        current
-      );
+    if (current) {
+      this.redoStack.push(current);
     }
 
     this.historyRestoring = true;
 
-    try{
-      this.restoreHistorySnapshot(
-        previous
-      );
-    }
-    finally{
+    try {
+      this.restoreHistorySnapshot(previous);
+    } finally {
       this.historyRestoring = false;
     }
 
     this.updateHistoryButtons();
     this.scheduleAutosave(0);
 
-    this.logger.info(
-      "Undo",
-      {
-        undo: this.undoStack.length,
-        redo: this.redoStack.length
-      }
-    );
+    this.logger.info("Undo", {
+      undo: this.undoStack.length,
+      redo: this.redoStack.length,
+    });
 
     return true;
   }
 
-
-  redo(){
-
-    if(
-      this.state.mode !== "edit" ||
-      this.redoStack.length === 0
-    ){
+  redo() {
+    if (this.state.mode !== "edit" || this.redoStack.length === 0) {
       return false;
     }
 
-    const next =
-      this.redoStack.pop();
+    const next = this.redoStack.pop();
 
-    const current =
-      this.createHistorySnapshot();
+    const current = this.createHistorySnapshot();
 
-    if(current){
-      this.undoStack.push(
-        current
-      );
+    if (current) {
+      this.undoStack.push(current);
 
-      if(
-        this.undoStack.length >
-        this.historyLimit
-      ){
+      if (this.undoStack.length > this.historyLimit) {
         this.undoStack.shift();
       }
     }
 
     this.historyRestoring = true;
 
-    try{
-      this.restoreHistorySnapshot(
-        next
-      );
-    }
-    finally{
+    try {
+      this.restoreHistorySnapshot(next);
+    } finally {
       this.historyRestoring = false;
     }
 
     this.updateHistoryButtons();
     this.scheduleAutosave(0);
 
-    this.logger.info(
-      "Redo",
-      {
-        undo: this.undoStack.length,
-        redo: this.redoStack.length
-      }
-    );
+    this.logger.info("Redo", {
+      undo: this.undoStack.length,
+      redo: this.redoStack.length,
+    });
 
     return true;
   }
 
+  updateHistoryButtons() {
+    const editable = this.state?.mode === "edit";
 
-  updateHistoryButtons(){
-
-    const editable =
-      this.state?.mode === "edit";
-
-    if(this.undoButton){
-      this.undoButton.disabled =
-        !editable ||
-        this.undoStack.length === 0;
+    if (this.undoButton) {
+      this.undoButton.disabled = !editable || this.undoStack.length === 0;
     }
 
-    if(this.redoButton){
-      this.redoButton.disabled =
-        !editable ||
-        this.redoStack.length === 0;
+    if (this.redoButton) {
+      this.redoButton.disabled = !editable || this.redoStack.length === 0;
     }
   }
-
 
   /* =========================================================
      Tile / Event Clipboard
   ========================================================= */
 
-  initClipboardControls(){
-    if(this.clipboardInitialized){
+  initClipboardControls() {
+    if (this.clipboardInitialized) {
       this.updateClipboardButtons();
       return;
     }
 
-    this.copyTilesButton =
-      document.getElementById(
-        "copy-tiles-button"
-      );
-    this.pasteTilesButton =
-      document.getElementById(
-        "paste-tiles-button"
-      );
+    this.copyTilesButton = document.getElementById("copy-tiles-button");
+    this.pasteTilesButton = document.getElementById("paste-tiles-button");
 
-    if(!this.copyTilesButton || !this.pasteTilesButton){
-      throw new Error(
-        "tile clipboard controls not found"
-      );
+    if (!this.copyTilesButton || !this.pasteTilesButton) {
+      throw new Error("tile clipboard controls not found");
     }
 
-    this.copyTilesButton.addEventListener(
-      "click",
-      () => this.copySelectedTiles()
+    this.copyTilesButton.addEventListener("click", () =>
+      this.copySelectedTiles(),
     );
-    this.pasteTilesButton.addEventListener(
-      "click",
-      () => this.pasteTilesAfterSelected()
+    this.pasteTilesButton.addEventListener("click", () =>
+      this.pasteTilesAfterSelected(),
     );
 
     this.clipboardInitialized = true;
     this.updateClipboardButtons();
   }
 
-  updateClipboardButtons(){
-    const editable =
-      this.state?.mode === "edit";
-    const selectedCount =
-      this.state?.selectedFloorIds?.size ?? 0;
+  updateClipboardButtons() {
+    const editable = this.state?.mode === "edit";
+    const selectedCount = this.state?.selectedFloorIds?.size ?? 0;
 
-    if(this.copyTilesButton){
-      this.copyTilesButton.disabled =
-        !editable || selectedCount <= 0;
+    if (this.copyTilesButton) {
+      this.copyTilesButton.disabled = !editable || selectedCount <= 0;
     }
 
-    if(this.pasteTilesButton){
+    if (this.pasteTilesButton) {
       this.pasteTilesButton.disabled =
         !editable ||
         selectedCount !== 1 ||
@@ -11727,80 +6852,66 @@ class EditorApp{
     }
   }
 
-  copySelectedTiles(){
-    if(this.state.mode !== "edit"){
+  copySelectedTiles() {
+    if (this.state.mode !== "edit") {
       return false;
     }
 
-    const selected =
-      [...this.state.selectedFloorIds]
-      .map(id => ({
+    const selected = [...this.state.selectedFloorIds]
+      .map((id) => ({
         id,
-        index: this.doc.indexOfId(id)
+        index: this.doc.indexOfId(id),
       }))
-      .filter(item => item.index >= 0)
+      .filter((item) => item.index >= 0)
       .sort((a, b) => a.index - b.index);
 
-    if(selected.length === 0){
+    if (selected.length === 0) {
       return false;
     }
 
-    const tiles = selected.map(item => ({
-      angle: structuredClone(
-        this.doc.angles[item.index]
-      ),
-      actions:
-        this.doc.getActionsByFloorId(item.id)
-        .map(action => {
-          const cloned = structuredClone(action);
-          delete cloned.floorId;
-          return cloned;
-        })
+    const tiles = selected.map((item) => ({
+      angle: structuredClone(this.doc.angles[item.index]),
+      actions: this.doc.getActionsByFloorId(item.id).map((action) => {
+        const cloned = structuredClone(action);
+        delete cloned.floorId;
+        return cloned;
+      }),
     }));
 
     this.tileClipboard = {
       tiles,
-      copiedAt: Date.now()
+      copiedAt: Date.now(),
     };
 
     this.updateClipboardButtons();
     this.showToast(
       `${tiles.length} tile${tiles.length === 1 ? "" : "s"} copied.`,
       "success",
-      2200
+      2200,
     );
-    this.logger.info(
-      "Tiles copied",
-      {
-        count: tiles.length,
-        sourceIndices: selected.map(item => item.index)
-      }
-    );
+    this.logger.info("Tiles copied", {
+      count: tiles.length,
+      sourceIndices: selected.map((item) => item.index),
+    });
 
     return true;
   }
 
-  pasteTilesAfterSelected(){
-    if(
-      this.state.mode !== "edit" ||
-      this.state.selectedFloorIds.size !== 1
-    ){
+  pasteTilesAfterSelected() {
+    if (this.state.mode !== "edit" || this.state.selectedFloorIds.size !== 1) {
       return false;
     }
 
-    const copiedTiles =
-      this.tileClipboard?.tiles;
+    const copiedTiles = this.tileClipboard?.tiles;
 
-    if(!Array.isArray(copiedTiles) || copiedTiles.length === 0){
+    if (!Array.isArray(copiedTiles) || copiedTiles.length === 0) {
       return false;
     }
 
-    const targetId =
-      this.state.activeFloorId;
-    const targetIndex =
-      this.doc.indexOfId(targetId);
+    const targetId = this.state.activeFloorId;
+    const targetIndex = this.doc.indexOfId(targetId);
 
-    if(!targetId || targetIndex < 0){
+    if (!targetId || targetIndex < 0) {
       return false;
     }
 
@@ -11809,16 +6920,12 @@ class EditorApp{
     let afterId = targetId;
     const insertedIds = [];
 
-    for(const tile of copiedTiles){
-      const newId =
-        this.doc.insertAfter(
-          afterId,
-          structuredClone(tile.angle)
-        );
+    for (const tile of copiedTiles) {
+      const newId = this.doc.insertAfter(afterId, structuredClone(tile.angle));
 
       insertedIds.push(newId);
 
-      for(const copiedAction of tile.actions ?? []){
+      for (const copiedAction of tile.actions ?? []) {
         const action = structuredClone(copiedAction);
         action.floorId = newId;
         // Preserve all events, including unsupported ones.
@@ -11828,13 +6935,12 @@ class EditorApp{
       afterId = newId;
     }
 
-    if(insertedIds.length === 0){
+    if (insertedIds.length === 0) {
       return false;
     }
 
     // Select the last pasted tile so repeated Paste appends naturally.
-    const lastInsertedId =
-      insertedIds[insertedIds.length - 1];
+    const lastInsertedId = insertedIds[insertedIds.length - 1];
 
     this.state.selectedFloorIds.clear();
     this.state.selectedFloorIds.add(lastInsertedId);
@@ -11847,245 +6953,156 @@ class EditorApp{
       Pasting creates tiles too; follow the last pasted tile because it
       is also the new active selection and the next insertion point.
     */
-    this.focusFloorById(
-      lastInsertedId
-    );
+    this.focusFloorById(lastInsertedId);
 
     this.showToast(
       `${insertedIds.length} tile${insertedIds.length === 1 ? "" : "s"} pasted.`,
       "success",
-      2400
+      2400,
     );
-    this.logger.info(
-      "Tiles pasted",
-      {
-        afterIndex: targetIndex,
-        count: insertedIds.length
-      }
-    );
+    this.logger.info("Tiles pasted", {
+      afterIndex: targetIndex,
+      count: insertedIds.length,
+    });
 
     return true;
   }
 
-  copyEventAction(action){
-    if(
+  copyEventAction(action) {
+    if (
       this.state.mode !== "edit" ||
       !action ||
       !this.doc.actions.includes(action)
-    ){
+    ) {
       return false;
     }
 
-    const cloned =
-      structuredClone(action);
+    const cloned = structuredClone(action);
     delete cloned.floorId;
 
     this.eventClipboard = {
       action: cloned,
-      copiedAt: Date.now()
+      copiedAt: Date.now(),
     };
 
     this.updateEditorUI();
 
-    const eventType =
-      String(cloned.eventType ?? "Event");
+    const eventType = String(cloned.eventType ?? "Event");
 
-    this.showToast(
-      `${eventType} copied.`,
-      "success",
-      2200
-    );
-    this.logger.info(
-      "Event copied",
-      { eventType }
-    );
+    this.showToast(`${eventType} copied.`, "success", 2200);
+    this.logger.info("Event copied", { eventType });
 
     return true;
   }
 
-  canPasteEventToSelected(){
-    if(
-      this.state.mode !== "edit" ||
-      this.state.selectedFloorIds.size !== 1
-    ){
+  canPasteEventToSelected() {
+    if (this.state.mode !== "edit" || this.state.selectedFloorIds.size !== 1) {
       return false;
     }
 
-    const copiedAction =
-      this.eventClipboard?.action;
-    const floorId =
-      this.state.activeFloorId;
-    const eventType =
-      copiedAction?.eventType;
+    const copiedAction = this.eventClipboard?.action;
+    const floorId = this.state.activeFloorId;
+    const eventType = copiedAction?.eventType;
 
-    if(!floorId || !eventType){
+    if (!floorId || !eventType) {
       return false;
     }
 
-    return this.doc.canAddAction(
-      floorId,
-      eventType
-    );
+    return this.doc.canAddAction(floorId, eventType);
   }
 
-  pasteEventToSelected(){
-    if(!this.canPasteEventToSelected()){
+  pasteEventToSelected() {
+    if (!this.canPasteEventToSelected()) {
       return null;
     }
 
-    const floorId =
-      this.state.activeFloorId;
-    const copied =
-      structuredClone(this.eventClipboard.action);
-    const eventType =
-      copied.eventType;
+    const floorId = this.state.activeFloorId;
+    const copied = structuredClone(this.eventClipboard.action);
+    const eventType = copied.eventType;
 
     delete copied.eventType;
     delete copied.floorId;
 
     this.recordHistoryBeforeEdit();
 
-    const action =
-      this.doc.addAction(
-        floorId,
-        eventType,
-        copied
-      );
+    const action = this.doc.addAction(floorId, eventType, copied);
 
-    if(!action){
+    if (!action) {
       return null;
     }
 
     this.rebuild();
 
-    this.showToast(
-      `${eventType} pasted.`,
-      "success",
-      2200
-    );
-    this.logger.info(
-      "Event pasted",
-      { eventType, floorId }
-    );
+    this.showToast(`${eventType} pasted.`, "success", 2200);
+    this.logger.info("Event pasted", { eventType, floorId });
 
     return action;
   }
 
+  initFloorNavigation() {
+    this.prevFloorButton = document.getElementById("prev-floor-button");
 
-  initFloorNavigation(){
+    this.nextFloorButton = document.getElementById("next-floor-button");
 
-    this.prevFloorButton =
-      document.getElementById(
-        "prev-floor-button"
-      );
-  
-    this.nextFloorButton =
-      document.getElementById(
-        "next-floor-button"
-      );
-  
-  
-    if(!this.prevFloorButton){
-      throw new Error(
-        "prev-floor-button not found"
-      );
+    if (!this.prevFloorButton) {
+      throw new Error("prev-floor-button not found");
     }
-  
-    if(!this.nextFloorButton){
-      throw new Error(
-        "next-floor-button not found"
-      );
+
+    if (!this.nextFloorButton) {
+      throw new Error("next-floor-button not found");
     }
-  
-  
-    this.prevFloorButton
-      .addEventListener(
-        "click",
-        () => {
-  
-          this.moveFloorSelection(-1);
-        }
-      );
-  
-  
-    this.nextFloorButton
-      .addEventListener(
-        "click",
-        () => {
-  
-          this.moveFloorSelection(1);
-        }
-      );
+
+    this.prevFloorButton.addEventListener("click", () => {
+      this.moveFloorSelection(-1);
+    });
+
+    this.nextFloorButton.addEventListener("click", () => {
+      this.moveFloorSelection(1);
+    });
   }
-  
-  moveFloorSelection(direction){
 
+  moveFloorSelection(direction) {
     /*
       편집 모드에서만 허용
     */
-    if(
-      this.state.mode !== "edit"
-    ){
+    if (this.state.mode !== "edit") {
       return false;
     }
-  
-  
-    const currentId =
-      this.state.activeFloorId;
-  
-  
+
+    const currentId = this.state.activeFloorId;
+
     /*
       선택된 타일이 없으면
       이동 기준 자체가 없음
     */
-    if(!currentId){
+    if (!currentId) {
       return false;
     }
-  
-  
-    const currentIndex =
-      this.doc.indexOfId(
-        currentId
-      );
-  
-  
-    if(currentIndex < 0){
+
+    const currentIndex = this.doc.indexOfId(currentId);
+
+    if (currentIndex < 0) {
       return false;
     }
-  
-  
-    const targetIndex =
-      currentIndex + direction;
-  
-  
+
+    const targetIndex = currentIndex + direction;
+
     /*
       맵 범위 밖
     */
-    if(
-      targetIndex < 0 ||
-      targetIndex >=
-        this.doc.ids.length
-    ){
+    if (targetIndex < 0 || targetIndex >= this.doc.ids.length) {
       return false;
     }
-  
-  
-    const targetId =
-      this.doc.ids[
-        targetIndex
-      ];
-  
-  
+
+    const targetId = this.doc.ids[targetIndex];
+
     /* =========================
        Ctrl + Arrow
   
        누적 선택
     ========================= */
-  
-    if(
-      this.modifierKeys.isCtrl()
-    ){
-  
+
+    if (this.modifierKeys.isCtrl()) {
       /*
         이미 선택된 타일이어도
         제거하지 않는다.
@@ -12094,174 +7111,105 @@ class EditorApp{
         "선택을 추가하면서 이동"
         역할로 고정.
       */
-      this.state
-        .selectedFloorIds
-        .add(
-          targetId
-        );
-  
-  
-      this.state.activeFloorId =
-        targetId;
-  
-  
+      this.state.selectedFloorIds.add(targetId);
+
+      this.state.activeFloorId = targetId;
+
       /*
         이후 Shift로 전환했을 때
         현재 위치를 기준으로 사용
       */
-      this.state.selectionAnchorId =
-        targetId;
-  
-  
-      this.runtime.highlightFloorById(
-        targetId,
-        true
-      );
-  
-  
-      const group =
-        this.runtime
-          .meshByFloorId
-          .get(
-            targetId
-          );
-  
-  
-      if(group){
-  
-        this.cameraSystem.requestFocusTo(
-          group.position.x,
-          group.position.y
-        );
+      this.state.selectionAnchorId = targetId;
+
+      this.runtime.highlightFloorById(targetId, true);
+
+      const group = this.runtime.meshByFloorId.get(targetId);
+
+      if (group) {
+        this.cameraSystem.requestFocusTo(group.position.x, group.position.y);
       }
-  
-  
+
       this.updateEditorUI();
-  
+
       return true;
     }
-  
-  
+
     /* =========================
        Shift / 일반 이동
   
        기존 selectFloor() 재사용
     ========================= */
-  
-    this.selectFloor(
-      targetId,
-      true
-    );
-  
-  
+
+    this.selectFloor(targetId, true);
+
     return true;
   }
-  
-  updateFloorNavigationButtons(){
 
-    if(
-      !this.prevFloorButton ||
-      !this.nextFloorButton
-    ){
+  updateFloorNavigationButtons() {
+    if (!this.prevFloorButton || !this.nextFloorButton) {
       return;
     }
-  
-  
+
     let index = -1;
-  
-  
-    if(
-      this.state.activeFloorId
-    ){
-  
-      index =
-        this.doc.indexOfId(
-          this.state.activeFloorId
-        );
+
+    if (this.state.activeFloorId) {
+      index = this.doc.indexOfId(this.state.activeFloorId);
     }
-  
-  
-    const canNavigate =
-      this.state.mode === "edit" &&
-      index >= 0;
-  
-  
+
+    const canNavigate = this.state.mode === "edit" && index >= 0;
+
     /*
       첫 번째 타일이면 이전 불가
     */
-    this.prevFloorButton.disabled =
-      !canNavigate ||
-      index <= 0;
-  
-  
+    this.prevFloorButton.disabled = !canNavigate || index <= 0;
+
     /*
       마지막 타일이면 다음 불가
     */
     this.nextFloorButton.disabled =
-      !canNavigate ||
-      index >=
-        this.doc.ids.length - 1;
+      !canNavigate || index >= this.doc.ids.length - 1;
   }
-  
-  rebuild(){
-    const compiled = this.compiler.compile(this.doc);
-    this.runtime.setFloor(
-  compiled.floors,
-  compiled.eventMarkers
-);
-    
-    this.compiled = compiled;
-    
-  
-  
-    for(const id of [...this.state.selectedFloorIds]){
 
+  rebuild() {
+    const compiled = this.compiler.compile(this.doc);
+    this.runtime.setFloor(compiled.floors, compiled.eventMarkers);
+
+    this.compiled = compiled;
+
+    for (const id of [...this.state.selectedFloorIds]) {
       // 삭제된 타일이면 선택 목록에서도 제거
-      if(this.doc.indexOfId(id) < 0){
+      if (this.doc.indexOfId(id) < 0) {
         this.state.selectedFloorIds.delete(id);
         continue;
       }
-    
-      this.runtime.highlightFloorById(
-        id,
-        true
-      );
+
+      this.runtime.highlightFloorById(id, true);
     }
-    
-    
+
     // active 타일 검증
-    if(
+    if (
       this.state.activeFloorId &&
       this.doc.indexOfId(this.state.activeFloorId) < 0
-    ){
-      const remaining =
-        [...this.state.selectedFloorIds];
-    
-      this.state.activeFloorId =
-        remaining.at(-1) ?? null;
+    ) {
+      const remaining = [...this.state.selectedFloorIds];
+
+      this.state.activeFloorId = remaining.at(-1) ?? null;
     }
-    
-    
+
     // anchor 검증
-    if(
+    if (
       this.state.selectionAnchorId &&
-      this.doc.indexOfId(
-        this.state.selectionAnchorId
-      ) < 0
-    ){
-      this.state.selectionAnchorId =
-        this.state.activeFloorId;
+      this.doc.indexOfId(this.state.selectionAnchorId) < 0
+    ) {
+      this.state.selectionAnchorId = this.state.activeFloorId;
     }
-    
+
     this.updateEditorUI();
 
-    this.logger.info(
-      "Level compiled",
-      {
-        tiles: compiled.floors?.length ?? 0,
-        events: this.doc?.actions?.length ?? 0
-      }
-    );
+    this.logger.info("Level compiled", {
+      tiles: compiled.floors?.length ?? 0,
+      events: this.doc?.actions?.length ?? 0,
+    });
 
     /*
       Most actual level edits end in rebuild(). Debounce the write
@@ -12270,558 +7218,303 @@ class EditorApp{
     */
     this.scheduleAutosave();
   }
-  
-  initResponsiveViewport(){
 
-    const viewport =
-      document.getElementById(
-        "map-viewport"
-      );
-  
-  
-    if(!viewport){
-  
-      throw new Error(
-        "map-viewport not found"
-      );
+  initResponsiveViewport() {
+    const viewport = document.getElementById("map-viewport");
+
+    if (!viewport) {
+      throw new Error("map-viewport not found");
     }
-  
-  
+
     let resizeRaf = null;
-  
-  
+
     const resize = () => {
-  
       resizeRaf = null;
-  
-  
-      const rect =
-        viewport.getBoundingClientRect();
-  
-  
-      if(
-        rect.width <= 0 ||
-        rect.height <= 0
-      ){
+
+      const rect = viewport.getBoundingClientRect();
+
+      if (rect.width <= 0 || rect.height <= 0) {
         return;
       }
-  
-  
-      this.cameraSystem.resize(
-        rect.width,
-        rect.height
-      );
-  
-  
-      this.runtime.resize(
-        rect.width,
-        rect.height
-      );
+
+      this.cameraSystem.resize(rect.width, rect.height);
+
+      this.runtime.resize(rect.width, rect.height);
     };
-  
-  
+
     const requestResize = () => {
-  
-      if(resizeRaf !== null){
+      if (resizeRaf !== null) {
         return;
       }
-  
-  
-      resizeRaf =
-        requestAnimationFrame(
-          resize
-        );
+
+      resizeRaf = requestAnimationFrame(resize);
     };
-  
-  
-    this.resizeObserver =
-      new ResizeObserver(
-        requestResize
-      );
-  
-  
-    this.resizeObserver.observe(
-      viewport
-    );
-  
-  
+
+    this.resizeObserver = new ResizeObserver(requestResize);
+
+    this.resizeObserver.observe(viewport);
+
     requestResize();
   }
-  
-  getSelectedAngleEditorInfo(){
 
+  getSelectedAngleEditorInfo() {
     const result = {
       editable: false,
-  
+
       angle: null,
-  
+
       rawAngle: null,
-  
+
       label: "—",
-  
-      special: null
+
+      special: null,
     };
-  
-  
-    if(
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
+
+    if (this.state.selectedFloorIds.size !== 1) {
       return result;
     }
-  
-  
-    const id =
-      this.state.activeFloorId;
-  
-  
-    if(!id){
+
+    const id = this.state.activeFloorId;
+
+    if (!id) {
       return result;
     }
-  
-  
-    const index =
-      this.doc.indexOfId(
-        id
-      );
-  
-  
+
+    const index = this.doc.indexOfId(id);
+
     /*
       마지막 타일은
       다음 방향이 없으므로 수정 불가
     */
-    if(
-      index < 0 ||
-      index >=
-        this.doc.ids.length - 1
-    ){
-  
+    if (index < 0 || index >= this.doc.ids.length - 1) {
       result.label = "END";
-  
+
       return result;
     }
-  
-  
+
     result.editable = true;
-  
-  
-    const rawAngle =
-      this.doc.angles[
-        index + 1
-      ];
-  
-  
-    const floor =
-      this.compiled
-        ?.floors?.[
-          index
-        ];
-  
-  
+
+    const rawAngle = this.doc.angles[index + 1];
+
+    const floor = this.compiled?.floors?.[index];
+
     /*
       Midspin
     */
-    if(
-      rawAngle === 999 ||
-      floor?.option?.isMidspin
-    ){
-  
-      result.label =
-        "MID";
-  
-      result.special =
-        "midspin";
-  
+    if (rawAngle === 999 || floor?.option?.isMidspin) {
+      result.label = "MID";
+
+      result.special = "midspin";
+
       return result;
     }
-  
-  
-    const normalized =
-      normalizeAngle(
-        rawAngle
-      );
-  
-  
-    result.rawAngle =
-      normalized;
-  
-  
+
+    const normalized = normalizeAngle(rawAngle);
+
+    result.rawAngle = normalized;
+
     /*
       Fullspin
     */
-    if(
-      floor?.option?.isFullspin
-    ){
-  
-      result.label =
-        "360°";
-  
-      result.special =
-        "fullspin";
-  
+    if (floor?.option?.isFullspin) {
+      result.label = "360°";
+
+      result.special = "fullspin";
+
       return result;
     }
-  
-  
-    result.angle =
-      normalized;
-  
-    result.label =
-      `${normalized}°`;
-  
-  
+
+    result.angle = normalized;
+
+    result.label = `${normalized}°`;
+
     return result;
   }
-  
-  updateEditorUI(){
 
-    if(!this.editorUI){
+  updateEditorUI() {
+    if (!this.editorUI) {
       return;
     }
-  
-  
-    const selectedCount =
-      this.state
-        .selectedFloorIds
-        .size;
-  
-  
+
+    const selectedCount = this.state.selectedFloorIds.size;
+
     let selectedIndex = -1;
-  
-  
-    if(
-      this.state.activeFloorId
-    ){
-  
-      selectedIndex =
-        this.doc.indexOfId(
-          this.state.activeFloorId
-        );
+
+    if (this.state.activeFloorId) {
+      selectedIndex = this.doc.indexOfId(this.state.activeFloorId);
     }
-    
+
     let selectedActions = [];
 
-
-    if(
-      this.state.activeFloorId
-    ){
-
-      selectedActions = this.doc.getActionsByFloorId(
-        this.state.activeFloorId
-      );
+    if (this.state.activeFloorId) {
+      selectedActions = this.doc.getActionsByFloorId(this.state.activeFloorId);
     }
 
+    const eventTabGroups = createEventTabGroups(selectedActions);
 
-    const eventTabGroups =
-      createEventTabGroups(
-        selectedActions
-      );
-  
-  
     const canAdd =
-      this.state.mode === "edit" &&
-      selectedCount === 1 &&
-      selectedIndex >= 0;
-      
+      this.state.mode === "edit" && selectedCount === 1 && selectedIndex >= 0;
+
     const canDelete =
       this.state.mode === "edit" &&
       selectedCount === 1 &&
       selectedIndex > 0 &&
       this.doc.ids.length > 1;
-    
-    const eventPaletteItems =
-    Object
-      .entries(
-        EVENT_TAB_DEFS
-      )
-      .map(
-        (
-          [
-            eventType,
-            def
-          ]
-        ) => {
 
-          return {
+    const eventPaletteItems = Object.entries(EVENT_TAB_DEFS)
+      .map(([eventType, def]) => {
+        return {
+          eventType,
 
-            eventType,
+          key: def.key,
 
-            key:
-              def.key,
+          title: def.title,
 
-            title:
-              def.title,
+          iconSrc: def.iconSrc,
 
-            iconSrc:
-              def.iconSrc,
+          order: def.order,
 
-            order:
-              def.order,
-
-            /*
+          /*
               EVENT_TAB_DEFS가 생성 후 탭 이동 동작까지 결정한다.
               속성이 없는 미래 이벤트는 기존 동작과의 호환을 위해 true.
             */
-            openTabOnCreate:
-              def.openTabOnCreate !==
-              false,
+          openTabOnCreate: def.openTabOnCreate !== false,
 
-            canAdd:
-              this.state.mode ===
-                "edit"
-              &&
-              selectedCount === 1
-              &&
-              !!this.state
-                .activeFloorId
-              &&
-              this.doc.canAddAction(
-                this.state
-                  .activeFloorId,
-                eventType
-              )
-          };
-        }
-      )
-      .sort(
-        (a, b) =>
-          a.order - b.order
-      );
-  
-  
+          canAdd:
+            this.state.mode === "edit" &&
+            selectedCount === 1 &&
+            !!this.state.activeFloorId &&
+            this.doc.canAddAction(this.state.activeFloorId, eventType),
+        };
+      })
+      .sort((a, b) => a.order - b.order);
+
     this.editorUI.update({
-  
-      mode:
-        this.state.mode,
-    
+      mode: this.state.mode,
+
       selectedCount,
-    
+
       canAdd,
-    
+
       canDelete,
-      
+
       eventTabGroups,
 
       eventPaletteItems,
 
-      canPasteEvent:
-        this.canPasteEventToSelected(),
+      canPasteEvent: this.canPasteEventToSelected(),
 
-      eventClipboardType:
-        this.eventClipboard?.action?.eventType ?? null,
+      eventClipboardType: this.eventClipboard?.action?.eventType ?? null,
 
-      hitsoundOptions:
-        this.hitSound
-          ?.getAvailableHitsoundOptions?.()
-        ??
-        [
-          {
-            value: "None",
-            label: "None"
-          },
-          {
-            value: "Kick",
-            label: "Kick"
-          }
-        ],
-    
-      label:
-        selectedIndex >= 0
-          ? `#${selectedIndex}`
-          : "—"
-    
+      hitsoundOptions: this.hitSound?.getAvailableHitsoundOptions?.() ?? [
+        {
+          value: "None",
+          label: "None",
+        },
+        {
+          value: "Kick",
+          label: "Kick",
+        },
+      ],
+
+      label: selectedIndex >= 0 ? `#${selectedIndex}` : "—",
     });
-    
+
     this.updateFloorNavigationButtons();
     this.updateHistoryButtons();
     this.updateClipboardButtons();
   }
-  
-  setSelectedOutgoingAngle(
-    angle
-  ){
-  
-    if(
-      this.state.mode !== "edit"
-    ){
-      return false;
-    }
-  
-  
-    if(
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
-      return false;
-    }
-  
-  
-    const selectedId =
-      this.state.activeFloorId;
-  
-  
-    const index =
-      this.doc.indexOfId(
-        selectedId
-      );
-  
-  
-    if(
-      index < 0 ||
-      index >=
-        this.doc.ids.length - 1
-    ){
-      return false;
-    }
-  
-  
-    const nextFloorId =
-      this.doc.ids[
-        index + 1
-      ];
-  
-  
-    const nextAngle =
-      normalizeAngle(angle);
 
+  setSelectedOutgoingAngle(angle) {
+    if (this.state.mode !== "edit") {
+      return false;
+    }
 
-    if(
-      Object.is(
-        this.doc.angles[index + 1],
-        nextAngle
-      )
-    ){
+    if (this.state.selectedFloorIds.size !== 1) {
+      return false;
+    }
+
+    const selectedId = this.state.activeFloorId;
+
+    const index = this.doc.indexOfId(selectedId);
+
+    if (index < 0 || index >= this.doc.ids.length - 1) {
+      return false;
+    }
+
+    const nextFloorId = this.doc.ids[index + 1];
+
+    const nextAngle = normalizeAngle(angle);
+
+    if (Object.is(this.doc.angles[index + 1], nextAngle)) {
       return true;
     }
 
-
     this.recordHistoryBeforeEdit();
 
+    this.doc.setAngle(nextFloorId, nextAngle);
 
-    this.doc.setAngle(
-      nextFloorId,
-      nextAngle
-    );
-  
-  
     /*
       선택 상태는 stable ID라
       rebuild 후에도 그대로 살아 있음.
     */
     this.rebuild();
 
-    this.logger.info(
-      "Outgoing angle changed",
-      {
-        floorIndex: index,
-        nextAngle
-      }
-    );
-  
+    this.logger.info("Outgoing angle changed", {
+      floorIndex: index,
+      nextAngle,
+    });
+
     return true;
   }
-  
-  setSelectedMidspin(){
 
-    if(
-      this.state.mode !== "edit" ||
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
+  setSelectedMidspin() {
+    if (this.state.mode !== "edit" || this.state.selectedFloorIds.size !== 1) {
       return false;
     }
-  
-  
-    const index =
-      this.doc.indexOfId(
-        this.state.activeFloorId
-      );
-  
-  
-    if(
-      index < 0 ||
-      index >=
-        this.doc.ids.length - 1
-    ){
+
+    const index = this.doc.indexOfId(this.state.activeFloorId);
+
+    if (index < 0 || index >= this.doc.ids.length - 1) {
       return false;
     }
-  
-  
-    const nextId =
-      this.doc.ids[
-        index + 1
-      ];
-  
-  
-    if(
-      this.doc.angles[index + 1] ===
-      999
-    ){
+
+    const nextId = this.doc.ids[index + 1];
+
+    if (this.doc.angles[index + 1] === 999) {
       return true;
     }
 
-
     this.recordHistoryBeforeEdit();
 
+    this.doc.setAngle(nextId, 999);
 
-    this.doc.setAngle(
-      nextId,
-      999
-    );
-  
     this.rebuild();
 
-    this.logger.info(
-      "Outgoing angle changed to MID",
-      { floorIndex: index }
-    );
-  
+    this.logger.info("Outgoing angle changed to MID", { floorIndex: index });
+
     return true;
   }
-  
-  setSelectedFullspin(){
 
-    if(
-      this.state.mode !== "edit" ||
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
+  setSelectedFullspin() {
+    if (this.state.mode !== "edit" || this.state.selectedFloorIds.size !== 1) {
       return false;
     }
-  
-  
-    const index =
-      this.doc.indexOfId(
-        this.state.activeFloorId
-      );
-  
-  
-    if(
-      index < 0 ||
-      index >=
-        this.doc.ids.length - 1
-    ){
+
+    const index = this.doc.indexOfId(this.state.activeFloorId);
+
+    if (index < 0 || index >= this.doc.ids.length - 1) {
       return false;
     }
-  
-  
-    const floor =
-      this.compiled.floors[
-        index
-      ];
-  
-  
-    if(!floor){
+
+    const floor = this.compiled.floors[index];
+
+    if (!floor) {
       return false;
     }
-  
-  
-    const nextId =
-      this.doc.ids[
-        index + 1
-      ];
-  
-  
+
+    const nextId = this.doc.ids[index + 1];
+
     /*
       Floor.startAngle은
       reverseAngle(nowAngle)이므로
@@ -12829,193 +7522,137 @@ class EditorApp{
       이 값을 다음 raw angle로 넣으면
       Compiler에서 fullspin이 된다.
     */
-    const fullspinAngle =
-      normalizeAngle(
-        floor.startAngle
-      );
+    const fullspinAngle = normalizeAngle(floor.startAngle);
 
-
-    if(
-      Object.is(
-        this.doc.angles[index + 1],
-        fullspinAngle
-      )
-    ){
+    if (Object.is(this.doc.angles[index + 1], fullspinAngle)) {
       return true;
     }
 
-
     this.recordHistoryBeforeEdit();
-  
-  
-    this.doc.setAngle(
-      nextId,
-      fullspinAngle
-    );
-  
+
+    this.doc.setAngle(nextId, fullspinAngle);
+
     this.rebuild();
 
-    this.logger.info(
-      "Outgoing angle changed to 360°",
-      { floorIndex: index }
-    );
-  
+    this.logger.info("Outgoing angle changed to 360°", { floorIndex: index });
+
     return true;
   }
-  
-  //콜백함수
-  selectFloor(floorId, isFocus = true){
 
+  //콜백함수
+  selectFloor(floorId, isFocus = true) {
     const selected = this.state.selectedFloorIds;
-  
+
     const isCtrl = this.modifierKeys.isCtrl();
     const isShift = this.modifierKeys.isShift();
-  
+
     // 빈 공간 클릭
-    if(floorId == null){
+    if (floorId == null) {
       this.clearSelection();
       return;
     }
-  
-  
+
     /* =========================
        Shift : 범위 선택
     ========================= */
-    if(isShift){
-  
+    if (isShift) {
       // 기준점이 없다면 현재 클릭한 타일을 기준점으로
       const anchorId =
-        this.state.selectionAnchorId ??
-        this.state.activeFloorId ??
-        floorId;
-  
+        this.state.selectionAnchorId ?? this.state.activeFloorId ?? floorId;
+
       const anchorIndex = this.doc.indexOfId(anchorId);
       const targetIndex = this.doc.indexOfId(floorId);
-  
-      if(anchorIndex < 0 || targetIndex < 0){
+
+      if (anchorIndex < 0 || targetIndex < 0) {
         return;
       }
-  
+
       const start = Math.min(anchorIndex, targetIndex);
       const end = Math.max(anchorIndex, targetIndex);
-  
+
       // Shift는 기존 선택을 범위 선택으로 교체
-      for(const id of selected){
+      for (const id of selected) {
         this.runtime.highlightFloorById(id, false);
       }
-  
+
       selected.clear();
-  
-      for(let i = start; i <= end; i++){
-  
+
+      for (let i = start; i <= end; i++) {
         const id = this.doc.ids[i];
-  
+
         selected.add(id);
         this.runtime.highlightFloorById(id, true);
       }
-  
+
       // 클릭한 마지막 타일을 active로
       this.state.activeFloorId = floorId;
-  
+
       // anchor는 그대로 유지
       this.state.selectionAnchorId = anchorId;
-    }
-  
-  
+    } else if (isCtrl) {
+
     /* =========================
        Ctrl : 선택 추가 / 제거
     ========================= */
-    else if(isCtrl){
-  
-      if(selected.has(floorId)){
-  
+      if (selected.has(floorId)) {
         // 이미 선택된 타일이면 제거
         selected.delete(floorId);
-  
-        this.runtime.highlightFloorById(
-          floorId,
-          false
-        );
-  
+
+        this.runtime.highlightFloorById(floorId, false);
+
         // active 타일을 해제했다면
-        if(this.state.activeFloorId === floorId){
-  
+        if (this.state.activeFloorId === floorId) {
           const remaining = [...selected];
-  
-          this.state.activeFloorId =
-            remaining.at(-1) ?? null;
+
+          this.state.activeFloorId = remaining.at(-1) ?? null;
         }
-  
+
         // anchor도 제거된 타일이었다면 새 기준 설정
-        if(this.state.selectionAnchorId === floorId){
-          this.state.selectionAnchorId =
-            this.state.activeFloorId;
+        if (this.state.selectionAnchorId === floorId) {
+          this.state.selectionAnchorId = this.state.activeFloorId;
         }
-  
-      }
-      else{
-  
+      } else {
         // 선택 추가
         selected.add(floorId);
-  
-        this.runtime.highlightFloorById(
-          floorId,
-          true
-        );
-  
+
+        this.runtime.highlightFloorById(floorId, true);
+
         this.state.activeFloorId = floorId;
-  
+
         // Ctrl로 마지막 선택한 타일을
         // 다음 Shift 선택의 기준으로 사용
         this.state.selectionAnchorId = floorId;
       }
-    }
-  
-  
+    } else {
+
     /* =========================
        일반 클릭
     ========================= */
-    else{
-  
       // 정확히 이 타일 하나만 이미 선택되어 있다면
       // 기존 동작처럼 선택 해제
-      if(
-        selected.size === 1 &&
-        selected.has(floorId)
-      ){
+      if (selected.size === 1 && selected.has(floorId)) {
         this.clearSelection();
         return;
       }
-  
+
       // 그 외에는 단일 선택
-      this.setSingleSelection(
-        floorId,
-        false
-      );
+      this.setSingleSelection(floorId, false);
     }
-  
-  
+
     /* =========================
        Focus
     ========================= */
-  
-    if(
-      isFocus &&
-      selected.has(floorId)
-    ){
-      const g =
-        this.runtime.meshByFloorId.get(floorId);
-  
-      if(g){
-        this.cameraSystem.requestFocusTo(
-          g.position.x,
-          g.position.y
-        );
+
+    if (isFocus && selected.has(floorId)) {
+      const g = this.runtime.meshByFloorId.get(floorId);
+
+      if (g) {
+        this.cameraSystem.requestFocusTo(g.position.x, g.position.y);
       }
     }
-    
+
     this.updateEditorUI();
-  
+
     /*
     console.log(
       "selected:",
@@ -13027,7 +7664,7 @@ class EditorApp{
     );
     */
   }
-  
+
   /* =========================================================
      Camera follow for newly-created tiles
 
@@ -13036,21 +7673,14 @@ class EditorApp{
      restart this short easing from the current camera position, so
      the viewport continuously follows level construction.
   ========================================================= */
-  focusFloorById(
-    floorId,
-    durationSec = 0.22
-  ){
-
-    if(!floorId){
+  focusFloorById(floorId, durationSec = 0.22) {
+    if (!floorId) {
       return false;
     }
 
-    const group =
-      this.runtime
-        ?.meshByFloorId
-        ?.get(floorId);
+    const group = this.runtime?.meshByFloorId?.get(floorId);
 
-    if(!group){
+    if (!group) {
       return false;
     }
 
@@ -13058,12 +7688,11 @@ class EditorApp{
       group.position.x,
       group.position.y,
       durationSec,
-      "outexpo"
+      "outexpo",
     );
 
     return true;
   }
-
 
   /* =========================================================
      Advanced FREE angle base
@@ -13074,27 +7703,12 @@ class EditorApp{
      Compiler가 MID(999)를 이미 절대방향으로 해석했으므로
      compiled floor를 우선 사용한다.
   ========================================================= */
-  getResolvedAbsoluteAngleAt(
-    index
-  ){
+  getResolvedAbsoluteAngleAt(index) {
+    const floor = this.compiled?.floors?.[index];
 
-    const floor =
-      this.compiled
-        ?.floors?.[index];
+    const compiledStartAngle = Number(floor?.startAngle);
 
-
-    const compiledStartAngle =
-      Number(
-        floor?.startAngle
-      );
-
-
-    if(
-      Number.isFinite(
-        compiledStartAngle
-      )
-    ){
-
+    if (Number.isFinite(compiledStartAngle)) {
       /*
         Compiler에서
           floor.startAngle = reverseAngle(nowAngle)
@@ -13102,78 +7716,38 @@ class EditorApp{
         이므로 다시 reverse하면 현재 타일의
         해석된 절대각(nowAngle)을 얻는다.
       */
-      return normalizeAngle(
-        reverseAngle(
-          compiledStartAngle
-        )
-      );
+      return normalizeAngle(reverseAngle(compiledStartAngle));
     }
 
+    const rawAngle = Number(this.doc?.angles?.[index]);
 
-    const rawAngle =
-      Number(
-        this.doc
-          ?.angles?.[index]
-      );
-
-
-    if(
-      Number.isFinite(rawAngle)
-      &&
-      rawAngle !== 999
-    ){
-
-      return normalizeAngle(
-        rawAngle
-      );
+    if (Number.isFinite(rawAngle) && rawAngle !== 999) {
+      return normalizeAngle(rawAngle);
     }
-
 
     return null;
   }
 
-
-  addFloorAfterSelected(
-    angle = 0,
-    {
-      relative = false
-    } = {}
-  ){
-
-    if(
-      this.state.mode !== "edit"
-    ){
+  addFloorAfterSelected(angle = 0, { relative = false } = {}) {
+    if (this.state.mode !== "edit") {
       return false;
     }
 
-
-    if(
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
+    if (this.state.selectedFloorIds.size !== 1) {
       return false;
     }
 
+    const selectedId = this.state.activeFloorId;
 
-    const selectedId =
-      this.state.activeFloorId;
-
-
-    if(!selectedId){
+    if (!selectedId) {
       return false;
     }
 
+    const index = this.doc.indexOfId(selectedId);
 
-    const index =
-      this.doc.indexOfId(
-        selectedId
-      );
-
-
-    if(index < 0){
+    if (index < 0) {
       return false;
     }
-
 
     /*
       999는 Midspin이므로
@@ -13181,31 +7755,16 @@ class EditorApp{
     */
     let rawAngle;
 
+    if (angle === 999) {
+      rawAngle = 999;
+    } else {
+      const requestedAngle = Number(angle);
 
-    if(angle === 999){
-
-      rawAngle =
-        999;
-    }
-    else{
-
-      const requestedAngle =
-        Number(
-          angle
-        );
-
-
-      if(
-        !Number.isFinite(
-          requestedAngle
-        )
-      ){
+      if (!Number.isFinite(requestedAngle)) {
         return false;
       }
 
-
-      if(relative){
-
+      if (relative) {
         /*
           ADOFAI Advanced FREE는 절대각 입력이 아니라
           "현재 선택 타일의 절대각 + 자유각도" 방식이다.
@@ -13225,20 +7784,11 @@ class EditorApp{
           따라서:
             nowAngle = reverseAngle(floor.startAngle)
         */
-        const baseAngle =
-          this.getResolvedAbsoluteAngleAt(
-            index
-          );
+        const baseAngle = this.getResolvedAbsoluteAngleAt(index);
 
-
-        if(
-          !Number.isFinite(
-            baseAngle
-          )
-        ){
+        if (!Number.isFinite(baseAngle)) {
           return false;
         }
-
 
         /*
           예:
@@ -13249,149 +7799,96 @@ class EditorApp{
             90 -> 100 -> 110 -> 120 ...
           로 누적된다.
         */
-        rawAngle =
-          normalizeAngle(
-            baseAngle +
-            requestedAngle
-          );
-      }
-      else{
-
+        rawAngle = normalizeAngle(baseAngle + requestedAngle);
+      } else {
         /*
           일반 방향 버튼과 Advanced SNAP은
           기존과 동일하게 절대각도 입력.
         */
-        rawAngle =
-          normalizeAngle(
-            requestedAngle
-          );
+        rawAngle = normalizeAngle(requestedAngle);
       }
     }
 
-
     this.recordHistoryBeforeEdit();
 
+    const newId = this.doc.insertAfter(selectedId, rawAngle);
 
-    const newId =
-      this.doc.insertAfter(
-        selectedId,
-        rawAngle
-      );
-  
-  
     /*
       새 타일을 바로 선택
     */
-    this.state
-      .selectedFloorIds
-      .clear();
-  
-    this.state
-      .selectedFloorIds
-      .add(
-        newId
-      );
-  
-  
-    this.state.activeFloorId =
-      newId;
-  
-    this.state.selectionAnchorId =
-      newId;
-  
-  
+    this.state.selectedFloorIds.clear();
+
+    this.state.selectedFloorIds.add(newId);
+
+    this.state.activeFloorId = newId;
+
+    this.state.selectionAnchorId = newId;
+
     this.rebuild();
 
     /*
       Newly created tile becomes the active selection, so keep the
       map camera following the construction point as tiles are added.
     */
-    this.focusFloorById(
-      newId
-    );
+    this.focusFloorById(newId);
 
-    this.logger.info(
-      "Tile added",
-      {
-        afterIndex: index,
-        floorId: newId,
-        angle: rawAngle,
-        relative
-      }
-    );
-  
+    this.logger.info("Tile added", {
+      afterIndex: index,
+      floorId: newId,
+      angle: rawAngle,
+      relative,
+    });
+
     return true;
   }
-  
-  deleteSelectedFloor(){
 
+  deleteSelectedFloor() {
     /*
       편집 중에만 삭제
     */
-    if(
-      this.state.mode !== "edit"
-    ){
+    if (this.state.mode !== "edit") {
       return false;
     }
-  
-  
+
     /*
       반드시 타일 하나만 선택
     */
-    if(
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
+    if (this.state.selectedFloorIds.size !== 1) {
       return false;
     }
-  
-  
-    const selectedId =
-      this.state.activeFloorId;
-  
-  
-    if(!selectedId){
+
+    const selectedId = this.state.activeFloorId;
+
+    if (!selectedId) {
       return false;
     }
-  
-  
-    const index =
-      this.doc.indexOfId(
-        selectedId
-      );
-  
-  
+
+    const index = this.doc.indexOfId(selectedId);
+
     /*
       index 0 = 시작 타일
       삭제 금지
     */
-    if(index <= 0){
+    if (index <= 0) {
       return false;
     }
-  
-  
+
     /*
       타일이 하나뿐이라면
       삭제 금지
     */
-    if(
-      this.doc.ids.length <= 1
-    ){
+    if (this.doc.ids.length <= 1) {
       return false;
     }
-  
-  
+
     /*
       삭제 후에는 항상 바로 이전 타일을 선택한다.
 
       index > 0만 삭제할 수 있으므로
       index - 1은 항상 유효한 이전 타일이다.
     */
-    const nextSelectedId =
-      this.doc.ids[index - 1] ??
-      null;
-  
-  
+    const nextSelectedId = this.doc.ids[index - 1] ?? null;
+
     /*
       실제 삭제
   
@@ -13400,110 +7897,65 @@ class EditorApp{
     */
     this.recordHistoryBeforeEdit();
 
+    const removed = this.doc.removeById(selectedId);
 
-    const removed =
-      this.doc.removeById(
-        selectedId
-      );
-  
-  
-    if(!removed){
+    if (!removed) {
       return false;
     }
-  
-  
+
     /*
       selection 상태를
       삭제된 ID에서 새 ID로 변경
     */
-    this.state
-      .selectedFloorIds
-      .clear();
-  
-  
-    if(nextSelectedId){
-  
-      this.state
-        .selectedFloorIds
-        .add(
-          nextSelectedId
-        );
-  
-  
-      this.state.activeFloorId =
-        nextSelectedId;
-  
-      this.state.selectionAnchorId =
-        nextSelectedId;
+    this.state.selectedFloorIds.clear();
+
+    if (nextSelectedId) {
+      this.state.selectedFloorIds.add(nextSelectedId);
+
+      this.state.activeFloorId = nextSelectedId;
+
+      this.state.selectionAnchorId = nextSelectedId;
+    } else {
+      this.state.activeFloorId = null;
+
+      this.state.selectionAnchorId = null;
     }
-    else{
-  
-      this.state.activeFloorId =
-        null;
-  
-      this.state.selectionAnchorId =
-        null;
-    }
-  
-  
+
     /*
       새 Document 기준으로
       타일 전체 재구축
     */
     this.rebuild();
 
-    this.logger.info(
-      "Tile deleted",
-      {
-        floorIndex: index,
-        floorId: selectedId
-      }
-    );
-  
+    this.logger.info("Tile deleted", {
+      floorIndex: index,
+      floorId: selectedId,
+    });
+
     return true;
   }
-  
-  addMidspinAfterSelected(){
-  
-    return this.addFloorAfterSelected(
-      999
-    );
+
+  addMidspinAfterSelected() {
+    return this.addFloorAfterSelected(999);
   }
-  
-  addFullspinAfterSelected(){
-  
-    if(
-      this.state.mode !== "edit" ||
-      this.state.selectedFloorIds
-        .size !== 1
-    ){
+
+  addFullspinAfterSelected() {
+    if (this.state.mode !== "edit" || this.state.selectedFloorIds.size !== 1) {
       return false;
     }
-  
-  
-    const index =
-      this.doc.indexOfId(
-        this.state.activeFloorId
-      );
-  
-  
-    if(index < 0){
+
+    const index = this.doc.indexOfId(this.state.activeFloorId);
+
+    if (index < 0) {
       return false;
     }
-  
-  
-    const floor =
-      this.compiled
-        ?.floors?.[
-          index
-        ];
-  
-  
-    if(!floor){
+
+    const floor = this.compiled?.floors?.[index];
+
+    if (!floor) {
       return false;
     }
-  
-  
+
     /*
       네 Compiler에서
   
@@ -13514,63 +7966,46 @@ class EditorApp{
       삽입하면 angle == 0,
       즉 Fullspin 처리된다.
     */
-    const fullspinAngle =
-      normalizeAngle(
-        floor.startAngle
-      );
-  
-  
-    return this.addFloorAfterSelected(
-      fullspinAngle
-    );
-  }
-  
-  removeSelectedFloors(){
+    const fullspinAngle = normalizeAngle(floor.startAngle);
 
-    const ids = [
-      ...this.state.selectedFloorIds
-    ];
-  
-    if(ids.length === 0){
+    return this.addFloorAfterSelected(fullspinAngle);
+  }
+
+  removeSelectedFloors() {
+    const ids = [...this.state.selectedFloorIds];
+
+    if (ids.length === 0) {
       return false;
     }
-  
+
     // 삭제 가능한 타일만
     // index 0은 시작 타일이라 보호
-    const removableIds = ids.filter(id => {
+    const removableIds = ids.filter((id) => {
       return this.doc.indexOfId(id) > 0;
     });
-  
-    if(removableIds.length === 0){
+
+    if (removableIds.length === 0) {
       return false;
     }
 
     this.recordHistoryBeforeEdit();
-  
-    for(const id of removableIds){
+
+    for (const id of removableIds) {
       this.doc.removeById(id);
     }
-  
+
     this.state.selectedFloorIds.clear();
     this.state.activeFloorId = null;
     this.state.selectionAnchorId = null;
-  
+
     this.rebuild();
 
-    this.logger.info(
-      "Tiles deleted",
-      { count: removableIds.length }
-    );
-  
+    this.logger.info("Tiles deleted", { count: removableIds.length });
+
     return true;
   }
-  
-  setSingleSelection(
-    floorId,
-    isFocus = true,
-    updateUI = true
-  ){
 
+  setSingleSelection(floorId, isFocus = true, updateUI = true) {
     /*
       기존 선택의 highlight만 제거.
 
@@ -13578,307 +8013,180 @@ class EditorApp{
       clearSelection()은 UI render까지
       발생시키기 때문.
     */
-    for(
-      const id
-      of this.state
-        .selectedFloorIds
-    ){
-
-      this.runtime
-        .highlightFloorById(
-          id,
-          false
-        );
+    for (const id of this.state.selectedFloorIds) {
+      this.runtime.highlightFloorById(id, false);
     }
 
+    this.state.selectedFloorIds.clear();
 
-    this.state
-      .selectedFloorIds
-      .clear();
+    if (!floorId) {
+      this.state.activeFloorId = null;
 
+      this.state.selectionAnchorId = null;
 
-    if(!floorId){
-
-      this.state.activeFloorId =
-        null;
-
-      this.state.selectionAnchorId =
-        null;
-
-
-      if(updateUI){
-
+      if (updateUI) {
         this.updateEditorUI();
       }
 
       return;
     }
 
+    this.state.selectedFloorIds.add(floorId);
 
-    this.state
-      .selectedFloorIds
-      .add(
-        floorId
-      );
+    this.state.activeFloorId = floorId;
 
+    this.state.selectionAnchorId = floorId;
 
-    this.state.activeFloorId =
-      floorId;
+    this.runtime.highlightFloorById(floorId, true);
 
-    this.state.selectionAnchorId =
-      floorId;
+    if (isFocus) {
+      const g = this.runtime.meshByFloorId.get(floorId);
 
-
-    this.runtime.highlightFloorById(
-      floorId,
-      true
-    );
-
-
-    if(isFocus){
-
-      const g =
-        this.runtime
-          .meshByFloorId
-          .get(
-            floorId
-          );
-
-
-      if(g){
-
-        this.cameraSystem
-          .requestFocusTo(
-            g.position.x,
-            g.position.y
-          );
+      if (g) {
+        this.cameraSystem.requestFocusTo(g.position.x, g.position.y);
       }
     }
 
-
-    if(updateUI){
-
+    if (updateUI) {
       this.updateEditorUI();
     }
   }
-  
-  clearSelection(){
-    for(const id of this.state.selectedFloorIds){
+
+  clearSelection() {
+    for (const id of this.state.selectedFloorIds) {
       this.runtime.highlightFloorById(id, false);
     }
-  
+
     this.state.selectedFloorIds.clear();
     this.state.activeFloorId = null;
     this.state.selectionAnchorId = null;
-    
+
     this.updateEditorUI();
   }
-  
-  async togglePlayback(){
 
-    if(this.state.mode === "play"){
-  
+  async togglePlayback() {
+    if (this.state.mode === "play") {
       this.stopPlay();
-  
-    }
-    else{
-  
+    } else {
       await this.setPlay();
-  
     }
   }
-  
-  
-  async setPlay(){
 
+  async setPlay() {
     await this.hitSound.resume();
 
-    const pitch =
-      Number(
-        this.doc?.settings?.pitch ??
-        100
-      );
+    const pitch = Number(this.doc?.settings?.pitch ?? 100);
 
-    const playbackRate =
-      Number.isFinite(pitch) &&
-      pitch > 0
-        ? pitch / 100
-        : 1;
+    const playbackRate = Number.isFinite(pitch) && pitch > 0 ? pitch / 100 : 1;
 
     /*
       The same timeline speed is applied to the level clock,
       song playback, and hitsound scheduling.
       Hitsound source pitch itself is not changed.
     */
-    this.clock.setPlaybackRate(
-      playbackRate
-    );
+    this.clock.setPlaybackRate(playbackRate);
 
-    this.song.setPlaybackRate(
-      playbackRate
-    );
+    this.song.setPlaybackRate(playbackRate);
 
-    this.hitSound.setTimelineRate(
-      playbackRate
-    );
+    this.hitSound.setTimelineRate(playbackRate);
 
     this.state.mode = "play";
-    
-    this.runtime
-      .setPlaybackVisualMode(
-        true
-      );
-    
-    this.modifierKeys.setEnabled(
-      false
-    );
-    
+
+    this.runtime.setPlaybackVisualMode(true);
+
+    this.modifierKeys.setEnabled(false);
+
     this.updateEditorUI();
-  
+
     this.input.setEnabled(false);
-  
-    
-  
-  
+
     /*
       아무 선택도 없다면
       시작 타일 f_0 선택
     */
-    if(!this.state.activeFloorId){
-  
-      this.setSingleSelection(
-        this.doc.ids[0],
-        false
-      );
+    if (!this.state.activeFloorId) {
+      this.setSingleSelection(this.doc.ids[0], false);
     }
-  
-  
-    let selectedIndex =
-      this.doc.indexOfId(
-        this.state.activeFloorId
-      );
-  
-    if(selectedIndex < 0){
+
+    let selectedIndex = this.doc.indexOfId(this.state.activeFloorId);
+
+    if (selectedIndex < 0) {
       return false;
     }
-  
-  
+
     /*
       f_0은 시작용 타일.
   
       f_0에서 Play를 누른 경우
       실제 진행 목표는 f_1.
     */
-    let targetIndex =
-      selectedIndex;
-  
-    if(
-      targetIndex === 0 &&
-      this.doc.ids.length > 1
-    ){
+    let targetIndex = selectedIndex;
+
+    if (targetIndex === 0 && this.doc.ids.length > 1) {
       targetIndex = 1;
     }
-  
-  
-    const target_us =
-      this.compiled.floorStarts_us[
-        targetIndex
-      ];
-  
-  
+
+    const target_us = this.compiled.floorStarts_us[targetIndex];
+
     /*
       settings.bpm 기준 3박
     */
-    const baseBeat_us =
-      60000000 /
-      this.doc.settings.bpm;
-  
-    const countIn_us =
-      3 * baseBeat_us;
-  
-  
+    const baseBeat_us = 60000000 / this.doc.settings.bpm;
+
+    const countIn_us = 3 * baseBeat_us;
+
     /*
       실제 Clock은 목표 지점보다
       3박 전부터 시작한다.
     */
-    const preRollStart_us =
-      target_us -
-      countIn_us;
-  
-  
-    this.playTargetIndex =
-      targetIndex;
-  
-    this.playTarget_us =
-      target_us;
-  
-    this.levelStarted =
-      false;
-  
-  
+    const preRollStart_us = target_us - countIn_us;
+
+    this.playTargetIndex = targetIndex;
+
+    this.playTarget_us = target_us;
+
+    this.levelStarted = false;
+
     /*
       pre-roll 중에는 현재 선택을 유지.
   
       f_0에서 시작하면 f_0을 보여주고,
       중간 타일에서 시작하면 해당 타일을 보여준다.
     */
-    this.playbackFloorIndex =
-      selectedIndex;
-  
-  
+    this.playbackFloorIndex = selectedIndex;
+
     // focus 애니메이션 제거
     this.cameraSystem.cancelFocus();
-  
-  
+
     // 재생 시 줌 초기화
-    this.cameraSystem.setZoomPercent(
-      100
-    );
-  
-  
+    this.cameraSystem.setZoomPercent(100);
+
     /*
       Seed playback camera from the tile the user actually selected.
       For a middle start, older camera transitions must not leak into
       the new playback session. The next tile transition is then
       consumed normally by Evaluator.evaluateAt().
     */
-    this.evaluator.init(
+    this.evaluator.init(this.compiled, this.playTarget_us, selectedIndex);
+
+    const initialCameraFrame = this.evaluator.evaluateAt(
       this.compiled,
       this.playTarget_us,
-      selectedIndex
+      this.playTargetIndex,
     );
 
-    const initialCameraFrame =
-      this.evaluator.evaluateAt(
-        this.compiled,
-        this.playTarget_us,
-        this.playTargetIndex
-      );
-
-    if(
-      initialCameraFrame
-        ?.camera
-    ){
-      this.cameraSystem.applyCameraFrame(
-        initialCameraFrame.camera
-      );
+    if (initialCameraFrame?.camera) {
+      this.cameraSystem.applyCameraFrame(initialCameraFrame.camera);
     }
-  
-  
+
     /*
       Clock, Song 모두
       정확히 같은 AudioContext 시점에서 시작.
     */
-    const ctxStartTime =
-      this.hitSound.ctx.currentTime;
-  
-  
-    this.clock.startAt(
-      preRollStart_us,
-      ctxStartTime
-    );
-  
-  
+    const ctxStartTime = this.hitSound.ctx.currentTime;
+
+    this.clock.startAt(preRollStart_us, ctxStartTime);
+
     /*
       곡 역시 3박 전 위치부터 시작.
   
@@ -13892,13 +8200,8 @@ class EditorApp{
       The editor-only compensation is applied only when evaluating
       visualTime_us below.
     */
-    this.song.playFromLevelTime(
-      preRollStart_us,
-      ctxStartTime,
-      0
-    );
-  
-  
+    this.song.playFromLevelTime(preRollStart_us, ctxStartTime, 0);
+
     /*
       Hitsounds are armed BEFORE the pre-roll finishes.
 
@@ -13909,173 +8212,111 @@ class EditorApp{
       crossed the target tile.
     */
     this.hitSound.start(
-      this.compiled
-        .hitSoundEvents,
+      this.compiled.hitSoundEvents,
 
-      this.compiled
-        .countdownHitTimes_us,
+      this.compiled.countdownHitTimes_us,
 
-      this.playTarget_us
+      this.playTarget_us,
     );
-  
-  
-    this.playButton.setPlaying(
-      true
-    );
-  
-  
-    this.renderEngine.onFrame =
-      () => {
-  
-        this.clock.update();
-  
-        const t_us =
-          this.clock.getTime_us();
 
-        /*
+    this.playButton.setPlaying(true);
+
+    this.renderEngine.onFrame = () => {
+      this.clock.update();
+
+      const t_us = this.clock.getTime_us();
+
+      /*
           Always advance the audio scheduler, including during
           pre-roll. Events before playTarget_us were filtered by
           HitSoundSystem.start(), so this remains silent before the
           chosen start but lets the first target hit land exactly.
         */
-        this.hitSound.update(
-          t_us
-        );
-          
-        const visualTime_us =
-          Math.max(
-            this.playTarget_us ?? -Infinity,
-            t_us -
-            this.editorVisualOffset_ms * 1000
-          );
-  
-        /*
+      this.hitSound.update(t_us);
+
+      const visualTime_us = Math.max(
+        this.playTarget_us ?? -Infinity,
+        t_us - this.editorVisualOffset_ms * 1000,
+      );
+
+      /*
           ==========================
           3박 pre-roll
           ==========================
         */
-  
-        if(
-          t_us <
-          this.playTarget_us
-        ){
-  
-          // 카메라는 선택 위치에 그대로
-          this.cameraSystem.update(
-            this.runtime.renderer.domElement
-          );
-  
-          return;
-        }
-  
-  
-        /*
+
+      if (t_us < this.playTarget_us) {
+        // 카메라는 선택 위치에 그대로
+        this.cameraSystem.update(this.runtime.renderer.domElement);
+
+        return;
+      }
+
+      /*
           ==========================
           실제 레벨 시작 순간
           ==========================
         */
-  
-        if(!this.levelStarted){
-  
-          this.levelStarted =
-            true;
 
-            
-  
-  
-          /*
+      if (!this.levelStarted) {
+        this.levelStarted = true;
+
+        /*
             첫 실제 타일로 선택 이동
   
             f_0부터 시작한 경우
             여기서 f_1로 넘어감.
           */
-          const targetId =
-            this.doc.ids[
-              this.playTargetIndex
-            ];
-  
-          if(targetId){
-  
-            this.setSingleSelection(
-              targetId,
-              false,
-              false
-            );
-          }
-  
-  
-          this.playbackFloorIndex =
-            this.playTargetIndex;
+        const targetId = this.doc.ids[this.playTargetIndex];
+
+        if (targetId) {
+          this.setSingleSelection(targetId, false, false);
         }
-  
-  
-        /*
+
+        this.playbackFloorIndex = this.playTargetIndex;
+      }
+
+      /*
           ==========================
           현재 타일 표시
           ==========================
         */
-  
-        const currentFloorIndex =
-          this.evaluator
-            .findFloorIndexByTime_us(
-              visualTime_us
-            );
-  
-  
-        if(
-          currentFloorIndex !==
-          this.playbackFloorIndex
-        ){
-  
-          this.playbackFloorIndex =
-            currentFloorIndex;
-  
-          const id =
-            this.doc.ids[
-              currentFloorIndex
-            ];
-  
-          if(id){
-  
-            this.setSingleSelection(
-              id,
-              false,
-              false
-            );
-          }
+
+      const currentFloorIndex =
+        this.evaluator.findFloorIndexByTime_us(visualTime_us);
+
+      if (currentFloorIndex !== this.playbackFloorIndex) {
+        this.playbackFloorIndex = currentFloorIndex;
+
+        const id = this.doc.ids[currentFloorIndex];
+
+        if (id) {
+          this.setSingleSelection(id, false, false);
         }
-  
-  
-        /*
+      }
+
+      /*
           ==========================
           카메라
           ==========================
         */
-  
-        const frameState =
-          this.evaluator.evaluateAt(
-            this.compiled,
-            visualTime_us,
-            currentFloorIndex
-          );
-  
-  
-        this.cameraSystem.applyCameraFrame(
-          frameState.camera
-        );
-  
-  
-        this.cameraSystem.update(
-          this.runtime.renderer.domElement
-        );
-  
-  
-        /*
+
+      const frameState = this.evaluator.evaluateAt(
+        this.compiled,
+        visualTime_us,
+        currentFloorIndex,
+      );
+
+      this.cameraSystem.applyCameraFrame(frameState.camera);
+
+      this.cameraSystem.update(this.runtime.renderer.domElement);
+
+      /*
           ==========================
           레벨 끝 자동 정지
           ==========================
         */
-  /*
+      /*
         const lastIndex =
           this.compiled.floors.length - 1;
   
@@ -14092,150 +8333,96 @@ class EditorApp{
           this.stopPlay();
         }
         */
-      };
-  
-  
-    this.logger.info(
-      "Playback started",
-      {
-        targetIndex: this.playTargetIndex,
-        target_us: this.playTarget_us,
-        pitch: this.doc?.settings?.pitch ?? 100
-      }
-    );
+    };
+
+    this.logger.info("Playback started", {
+      targetIndex: this.playTargetIndex,
+      target_us: this.playTarget_us,
+      pitch: this.doc?.settings?.pitch ?? 100,
+    });
 
     return true;
   }
-  
-  stopPlay(){
 
-    if(this.state.mode !== "play"){
+  stopPlay() {
+    if (this.state.mode !== "play") {
       return false;
     }
-  
-  
+
     this.clock.update();
-  
-    const t_us =
-      this.clock.getTime_us();
-  
-  
+
+    const t_us = this.clock.getTime_us();
+
     let index;
-  
-  
+
     /*
       아직 3박 countdown 중이면
       원래 시작하려던 타일 위치 유지
     */
-    if(!this.levelStarted){
-  
-      index =
-        this.playTargetIndex;
-    }
-    else{
+    if (!this.levelStarted) {
+      index = this.playTargetIndex;
+    } else {
+      const visualTime_us = Math.max(
+        this.playTarget_us ?? -Infinity,
+        t_us - this.editorVisualOffset_ms * 1000,
+      );
 
-      const visualTime_us =
-        Math.max(
-          this.playTarget_us ?? -Infinity,
-          t_us -
-          this.editorVisualOffset_ms *
-          1000
-        );
-  
-      index =
-        this.evaluator
-          .findFloorIndexByTime_us(
-            visualTime_us
-          );
+      index = this.evaluator.findFloorIndexByTime_us(visualTime_us);
     }
-  
-  
-    const floorId =
-      this.doc.ids[index];
-  
-  
+
+    const floorId = this.doc.ids[index];
+
     // 곡 즉시 중단
     this.song.stop();
-  
+
     // 예약된 히트사운드 중단
     this.hitSound.stop();
-  
-  
+
     this.setEdit();
-  
-  
-    if(floorId){
-  
-      this.setSingleSelection(
-        floorId,
-        false
-      );
+
+    if (floorId) {
+      this.setSingleSelection(floorId, false);
     }
 
-    this.logger.info(
-      "Playback stopped",
-      { index }
-    );
-  
+    this.logger.info("Playback stopped", { index });
+
     return true;
   }
-  
-  setEdit(){
 
+  setEdit() {
     this.state.mode = "edit";
-    
-    this.runtime
-      .setPlaybackVisualMode(
-        false
-      );
+
+    this.runtime.setPlaybackVisualMode(false);
 
     this.input.setEnabled(true);
-    
-    this.modifierKeys.setEnabled(
-      true
-    );
-  
-  
+
+    this.modifierKeys.setEnabled(true);
+
     this.song.stop();
-  
+
     this.hitSound.stop();
-  
+
     this.clock.stop();
-  
-  
+
     this.playbackFloorIndex = null;
-  
+
     this.playTargetIndex = null;
     this.playTarget_us = null;
-  
+
     this.levelStarted = false;
-  
-  
+
     this.playButton?.setPlaying(false);
-  
-  
-    this.renderEngine.onFrame =
-      () => {
-  
-        this.cameraSystem.update(
-          this.runtime.renderer.domElement
-        );
-      };
+
+    this.renderEngine.onFrame = () => {
+      this.cameraSystem.update(this.runtime.renderer.domElement);
+    };
     this.updateEditorUI();
   }
-  
-  setEditorOffset(
-    ms,
-    {
-      persist = true,
-      log = true
-    } = {}
-  ){
 
-    const value =
-      Number(ms);
+  setEditorOffset(ms, { persist = true, log = true } = {}) {
+    const value = Number(ms);
 
-    if(!Number.isFinite(value)){
+    if (!Number.isFinite(value)) {
       return false;
     }
 
@@ -14243,30 +8430,19 @@ class EditorApp{
       A single editor offset must never desynchronize audio channels.
       Apply it only to the visual evaluator.
     */
-    this.editorVisualOffset_ms =
-      value;
+    this.editorVisualOffset_ms = value;
 
-    this.editorGlobalOffset_ms =
-      0;
+    this.editorGlobalOffset_ms = 0;
 
-    if(persist){
-      this.writeEditorPreference(
-        "adofai-editor-offset-ms",
-        value
-      );
+    if (persist) {
+      this.writeEditorPreference("adofai-editor-offset-ms", value);
     }
 
-    if(log){
-      this.logger.info(
-        "Editor offset changed",
-        {
-          ms: value,
-          meaning:
-            value >= 0
-              ? "visuals delayed"
-              : "visuals advanced"
-        }
-      );
+    if (log) {
+      this.logger.info("Editor offset changed", {
+        ms: value,
+        meaning: value >= 0 ? "visuals delayed" : "visuals advanced",
+      });
     }
 
     return true;
@@ -14277,44 +8453,26 @@ class EditorApp{
     that shifted only the song. Redirect it to the safe visual-only
     editor offset instead.
   */
-  setEditorGlobalOffset(ms){
+  setEditorGlobalOffset(ms) {
     return this.setEditorOffset(ms);
   }
 
-  setLevelLoading(
-    loading,
-    text = "loading..."
-  ){
+  setLevelLoading(loading, text = "loading...") {
+    const element = document.getElementById("level-loading");
 
-    const element =
-      document.getElementById(
-        "level-loading"
-      );
-
-
-    if(!element){
+    if (!element) {
       return;
     }
 
+    element.textContent = text;
 
-    element.textContent =
-      text;
-
-
-    if(loading){
-
-      element.classList.remove(
-        "hidden"
-      );
-    }
-    else{
-
-      element.classList.add(
-        "hidden"
-      );
+    if (loading) {
+      element.classList.remove("hidden");
+    } else {
+      element.classList.add("hidden");
     }
   }
-  
+
   /* =========================================================
      Level title markup
 
@@ -14328,51 +8486,50 @@ class EditorApp{
      so a tag may open in Artist and close in Song.
   ========================================================= */
 
-  normalizeTitleColor(value){
+  normalizeTitleColor(value) {
+    const match = String(value ?? "")
+      .trim()
+      .match(
+        /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/,
+      );
 
-    const match =
-      String(value ?? "")
-        .trim()
-        .match(
-          /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
-        );
-
-    if(!match){
+    if (!match) {
       return null;
     }
 
-    const hex =
-      match[1].toLowerCase();
+    const hex = match[1].toLowerCase();
 
-    if(hex.length === 3){
-      return "#" +
+    if (hex.length === 3) {
+      return (
+        "#" +
         hex
           .split("")
-          .map(ch => ch + ch)
-          .join("");
+          .map((ch) => ch + ch)
+          .join("")
+      );
     }
 
-    if(hex.length === 4){
+    if (hex.length === 4) {
       /*
         Match the requested ADOFAI-like behavior:
         #ffff -> #ffffff
         The fourth short-form digit is ignored.
       */
-      return "#" +
+      return (
+        "#" +
         hex
           .slice(0, 3)
           .split("")
-          .map(ch => ch + ch)
-          .join("");
+          .map((ch) => ch + ch)
+          .join("")
+      );
     }
 
     return `#${hex}`;
   }
 
-  parseLevelTitleMarkup(rawText){
-
-    const raw =
-      String(rawText ?? "");
+  parseLevelTitleMarkup(rawText) {
+    const raw = String(rawText ?? "");
 
     const tokens = [];
     let cursor = 0;
@@ -14381,93 +8538,67 @@ class EditorApp{
        Tokenize
     ========================= */
 
-    while(cursor < raw.length){
+    while (cursor < raw.length) {
+      const openIndex = raw.indexOf("<", cursor);
 
-      const openIndex =
-        raw.indexOf("<", cursor);
-
-      if(openIndex < 0){
+      if (openIndex < 0) {
         tokens.push({
           type: "text",
-          value: raw.slice(cursor)
+          value: raw.slice(cursor),
         });
         break;
       }
 
-      if(openIndex > cursor){
+      if (openIndex > cursor) {
         tokens.push({
           type: "text",
-          value: raw.slice(
-            cursor,
-            openIndex
-          )
+          value: raw.slice(cursor, openIndex),
         });
       }
 
-      const closeIndex =
-        raw.indexOf(">", openIndex + 1);
+      const closeIndex = raw.indexOf(">", openIndex + 1);
 
       /* Wrong bracket syntax -> display the whole source literally. */
-      if(closeIndex < 0){
+      if (closeIndex < 0) {
         return {
           valid: false,
           raw,
           plainText: raw,
-          fragment: null
+          fragment: null,
         };
       }
 
-      const source =
-        raw.slice(
-          openIndex,
-          closeIndex + 1
-        );
+      const source = raw.slice(openIndex, closeIndex + 1);
 
-      const body =
-        raw.slice(
-          openIndex + 1,
-          closeIndex
-        );
+      const body = raw.slice(openIndex + 1, closeIndex);
 
-      const closing =
-        body.match(
-          /^\/([A-Za-z][A-Za-z0-9]*)$/
-        );
+      const closing = body.match(/^\/([A-Za-z][A-Za-z0-9]*)$/);
 
-      const opening =
-        body.match(
-          /^([A-Za-z][A-Za-z0-9]*)(?:=([^<>]*))?$/
-        );
+      const opening = body.match(/^([A-Za-z][A-Za-z0-9]*)(?:=([^<>]*))?$/);
 
-      if(closing){
+      if (closing) {
         tokens.push({
           type: "close",
           name: closing[1].toLowerCase(),
-          source
+          source,
         });
-      }
-      else if(opening){
+      } else if (opening) {
         tokens.push({
           type: "open",
           name: opening[1].toLowerCase(),
-          value:
-            opening[2] === undefined
-              ? null
-              : opening[2],
-          source
+          value: opening[2] === undefined ? null : opening[2],
+          source,
         });
-      }
-      else{
+      } else {
         return {
           valid: false,
           raw,
           plainText: raw,
-          fragment: null
+          fragment: null,
         };
       }
 
-      cursor =
-        closeIndex + 1;
+      cursor = closeIndex + 1;
     }
 
     /* =========================
@@ -14479,24 +8610,19 @@ class EditorApp{
 
     const validationStack = [];
 
-    for(const token of tokens){
-
-      if(token.type === "open"){
-        validationStack.push(
-          token.name
-        );
-      }
-      else if(token.type === "close"){
-
-        if(
+    for (const token of tokens) {
+      if (token.type === "open") {
+        validationStack.push(token.name);
+      } else if (token.type === "close") {
+        if (
           validationStack.length === 0 ||
           validationStack.at(-1) !== token.name
-        ){
+        ) {
           return {
             valid: false,
             raw,
             plainText: raw,
-            fragment: null
+            fragment: null,
           };
         }
 
@@ -14504,12 +8630,12 @@ class EditorApp{
       }
     }
 
-    if(validationStack.length > 0){
+    if (validationStack.length > 0) {
       return {
         valid: false,
         raw,
         plainText: raw,
-        fragment: null
+        fragment: null,
       };
     }
 
@@ -14518,151 +8644,100 @@ class EditorApp{
        Raw HTML is never assigned through innerHTML.
     ========================= */
 
-    const fragment =
-      document.createDocumentFragment();
+    const fragment = document.createDocumentFragment();
 
     const stack = [
       {
         name: null,
         node: fragment,
         size: 85,
-        hidden: false
-      }
+        hidden: false,
+      },
     ];
 
     let plainText = "";
 
-    for(const token of tokens){
+    for (const token of tokens) {
+      const current = stack.at(-1);
 
-      const current =
-        stack.at(-1);
+      if (token.type === "text") {
+        current.node.appendChild(document.createTextNode(token.value));
 
-      if(token.type === "text"){
-
-        current.node.appendChild(
-          document.createTextNode(
-            token.value
-          )
-        );
-
-        if(!current.hidden){
+        if (!current.hidden) {
           plainText += token.value;
         }
 
         continue;
       }
 
-      if(token.type === "close"){
+      if (token.type === "close") {
         stack.pop();
         continue;
       }
 
-      const parent =
-        stack.at(-1);
+      const parent = stack.at(-1);
 
-      const name =
-        token.name;
+      const name = token.name;
 
-      let node =
-        parent.node;
+      let node = parent.node;
 
-      let nextSize =
-        parent.size;
+      let nextSize = parent.size;
 
-      let hidden =
-        parent.hidden;
+      let hidden = parent.hidden;
 
       const isSupported =
-        name === "b" ||
-        name === "i" ||
-        name === "color" ||
-        name === "size";
+        name === "b" || name === "i" || name === "color" || name === "size";
 
-      if(isSupported){
+      if (isSupported) {
+        const span = document.createElement("span");
 
-        const span =
-          document.createElement(
-            "span"
-          );
+        span.className = "level-title-rich-node";
 
-        span.className =
-          "level-title-rich-node";
+        if (name === "b") {
+          span.style.fontWeight = "800";
+        } else if (name === "i") {
+          span.style.fontStyle = "italic";
+        } else if (name === "color") {
+          const color = this.normalizeTitleColor(token.value);
 
-        if(name === "b"){
-          span.style.fontWeight =
-            "800";
-        }
-        else if(name === "i"){
-          span.style.fontStyle =
-            "italic";
-        }
-        else if(name === "color"){
-
-          const color =
-            this.normalizeTitleColor(
-              token.value
-            );
-
-          if(color){
-            span.style.color =
-              color;
+          if (color) {
+            span.style.color = color;
           }
-        }
-        else if(name === "size"){
-
+        } else if (name === "size") {
           /*
             parseFloat-like leading-number behavior:
               100      -> 100
               100px    -> 100
               85abc    -> 85
           */
-          const sizeMatch =
-            String(token.value ?? "")
-              .trim()
-              .match(
-                /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)/
-              );
+          const sizeMatch = String(token.value ?? "")
+            .trim()
+            .match(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)/);
 
-          if(sizeMatch){
+          if (sizeMatch) {
+            const parsedSize = Number(sizeMatch[0]);
 
-            const parsedSize =
-              Number(sizeMatch[0]);
+            if (Number.isFinite(parsedSize) && parsedSize >= 0) {
+              nextSize = parsedSize;
 
-            if(
-              Number.isFinite(parsedSize) &&
-              parsedSize >= 0
-            ){
-
-              nextSize =
-                parsedSize;
-
-              if(parsedSize === 0){
-                span.style.display =
-                  "none";
+              if (parsedSize === 0) {
+                span.style.display = "none";
 
                 hidden = true;
-              }
-              else if(parent.size > 0){
-
+              } else if (parent.size > 0) {
                 /*
                   Size values are absolute relative to the ADOFAI
                   baseline 85, not multiplicative when nested.
                 */
-                const relativePercent =
-                  parsedSize /
-                  parent.size *
-                  100;
+                const relativePercent = (parsedSize / parent.size) * 100;
 
-                span.style.fontSize =
-                  `${relativePercent}%`;
+                span.style.fontSize = `${relativePercent}%`;
               }
             }
           }
         }
 
-        parent.node.appendChild(
-          span
-        );
+        parent.node.appendChild(span);
 
         node = span;
       }
@@ -14675,7 +8750,7 @@ class EditorApp{
         name,
         node,
         size: nextSize,
-        hidden
+        hidden,
       });
     }
 
@@ -14683,70 +8758,41 @@ class EditorApp{
       valid: true,
       raw,
       plainText,
-      fragment
+      fragment,
     };
   }
 
-  updateProjectTitle(){
+  updateProjectTitle() {
+    const settings = this.doc?.settings ?? {};
 
-    const settings =
-      this.doc?.settings ?? {};
+    const artist = String(settings.artist ?? "").trim() || "Artist";
 
-    const artist =
-      String(
-        settings.artist ?? ""
-      ).trim() ||
-      "Artist";
-
-    const song =
-      String(
-        settings.song ?? ""
-      ).trim() ||
-      "Song";
+    const song = String(settings.song ?? "").trim() || "Song";
 
     /*
       Parse only after joining the two settings fields. This is what
       lets an opening tag in Artist close inside Song.
     */
-    const rawTitle =
-      `${artist} - ${song}`;
+    const rawTitle = `${artist} - ${song}`;
 
-    const parsed =
-      this.parseLevelTitleMarkup(
-        rawTitle
-      );
+    const parsed = this.parseLevelTitleMarkup(rawTitle);
 
-    const browserTitle =
-      parsed.valid
-        ? parsed.plainText
-        : rawTitle;
+    const browserTitle = parsed.valid ? parsed.plainText : rawTitle;
 
-    document.title =
-      browserTitle ||
-      "ADOFAI Web Editor";
+    document.title = browserTitle || "ADOFAI Web Editor";
 
-    const element =
-      document.getElementById(
-        "level-title"
-      );
+    const element = document.getElementById("level-title");
 
-    if(element){
-
+    if (element) {
       element.replaceChildren();
 
-      if(parsed.valid){
-        element.appendChild(
-          parsed.fragment
-        );
-      }
-      else{
-        element.textContent =
-          rawTitle;
+      if (parsed.valid) {
+        element.appendChild(parsed.fragment);
+      } else {
+        element.textContent = rawTitle;
       }
 
-      element.title =
-        browserTitle ||
-        rawTitle;
+      element.title = browserTitle || rawTitle;
     }
 
     return rawTitle;
@@ -14756,148 +8802,95 @@ class EditorApp{
      Editor info overlay
   ========================================================= */
 
-  setEditorInfoVisible(visible){
+  setEditorInfoVisible(visible) {
+    this.editorInfoVisible = Boolean(visible);
 
-    this.editorInfoVisible =
-      Boolean(visible);
-
-    if(!this.editorInfoElement){
-      this.editorInfoElement =
-        document.getElementById(
-          "editor-info"
-        );
+    if (!this.editorInfoElement) {
+      this.editorInfoElement = document.getElementById("editor-info");
     }
 
-    if(this.editorInfoElement){
-      this.editorInfoElement.hidden =
-        !this.editorInfoVisible;
+    if (this.editorInfoElement) {
+      this.editorInfoElement.hidden = !this.editorInfoVisible;
     }
 
-    if(this.editorInfoVisible){
+    if (this.editorInfoVisible) {
       this.updateEditorInfo();
     }
   }
 
-  updateEditorInfo(){
-
-    if(!this.editorInfoVisible){
+  updateEditorInfo() {
+    if (!this.editorInfoVisible) {
       return;
     }
 
     const element =
-      this.editorInfoElement ??
-      document.getElementById(
-        "editor-info"
-      );
+      this.editorInfoElement ?? document.getElementById("editor-info");
 
-    if(!element){
+    if (!element) {
       return;
     }
 
-    this.editorInfoElement =
-      element;
+    this.editorInfoElement = element;
 
-    const finite = value => {
+    const finite = (value) => {
       const number = Number(value);
-      return Number.isFinite(number)
-        ? number
-        : null;
+      return Number.isFinite(number) ? number : null;
     };
 
-    const angleText = value => {
+    const angleText = (value) => {
       const number = finite(value);
-      return number === null
-        ? "—"
-        : `${Number(number.toFixed(4))}°`;
+      return number === null ? "—" : `${Number(number.toFixed(4))}°`;
     };
 
-    const numberText = (
-      value,
-      digits = 4
-    ) => {
+    const numberText = (value, digits = 4) => {
       const number = finite(value);
-      return number === null
-        ? "—"
-        : Number(
-            number.toFixed(digits)
-          ).toString();
+      return number === null ? "—" : Number(number.toFixed(digits)).toString();
     };
 
-    const frame =
-      this.renderEngine?.frameCount ?? 0;
+    const frame = this.renderEngine?.frameCount ?? 0;
 
-    const fps =
-      Number(
-        this.renderEngine?.fps ?? 0
-      );
+    const fps = Number(this.renderEngine?.fps ?? 0);
 
-    const tileCount =
-      this.doc?.ids?.length ?? 0;
+    const tileCount = this.doc?.ids?.length ?? 0;
 
-    const eventCount =
-      this.doc?.actions?.length ?? 0;
+    const eventCount = this.doc?.actions?.length ?? 0;
 
-    const cameraX =
-      Number(
-        this.cameraSystem?.tgt?.x ?? 0
-      );
+    const cameraX = Number(this.cameraSystem?.tgt?.x ?? 0);
 
-    const cameraY =
-      Number(
-        this.cameraSystem?.tgt?.y ?? 0
-      );
+    const cameraY = Number(this.cameraSystem?.tgt?.y ?? 0);
 
-    const zoom =
-      Number(
-        this.cameraSystem?.getZoomPercent?.() ??
-        100
-      );
+    const zoom = Number(this.cameraSystem?.getZoomPercent?.() ?? 100);
 
     const lines = [
       `Frame: ${frame}  FPS: ${fps.toFixed(1)}`,
       `Tiles: ${tileCount}  Events: ${eventCount}`,
-      `Camera: (${cameraX.toFixed(2)}, ${cameraY.toFixed(2)})  Zoom: ${zoom.toFixed(0)}%`
+      `Camera: (${cameraX.toFixed(2)}, ${cameraY.toFixed(2)})  Zoom: ${zoom.toFixed(0)}%`,
     ];
 
-    const mode =
-      String(
-        this.state?.mode ?? "edit"
-      ).toUpperCase();
+    const mode = String(this.state?.mode ?? "edit").toUpperCase();
 
-    const activeId =
-      this.state?.activeFloorId ?? null;
+    const activeId = this.state?.activeFloorId ?? null;
 
-    const selectedCount =
-      this.state?.selectedFloorIds?.size ?? 0;
+    const selectedCount = this.state?.selectedFloorIds?.size ?? 0;
 
     let activeIndex = -1;
 
-    if(activeId && this.doc){
-      activeIndex =
-        this.doc.indexOfId(
-          activeId
-        );
+    if (activeId && this.doc) {
+      activeIndex = this.doc.indexOfId(activeId);
     }
 
-    if(activeIndex >= 0){
+    if (activeIndex >= 0) {
+      const floor = this.compiled?.floors?.[activeIndex];
 
-      const floor =
-        this.compiled?.floors?.[
-          activeIndex
-        ];
-
-      if(floor){
+      if (floor) {
         lines.push(
-          `Selected: #${activeIndex} (${selectedCount})  Tile: (${Number(floor.x).toFixed(2)}, ${Number(floor.y).toFixed(2)})`
+          `Selected: #${activeIndex} (${selectedCount})  Tile: (${Number(floor.x).toFixed(2)}, ${Number(floor.y).toFixed(2)})`,
         );
 
-        const isTwirled =
-          Boolean(
-            floor.option?.isTwirled
-          );
+        const isTwirled = Boolean(floor.option?.isTwirled);
 
         lines.push(
-          `isTwirled: ${isTwirled}  Orbit: ${isTwirled ? "Counterclockwise (CCW)" : "Clockwise (CW)"}`
+          `isTwirled: ${isTwirled}  Orbit: ${isTwirled ? "Counterclockwise (CCW)" : "Clockwise (CW)"}`,
         );
 
         /*
@@ -14907,306 +8900,175 @@ class EditorApp{
           This also works after a 999/MID run where doc.angles itself is
           deliberately still 999.
         */
-        const currentAbsolute =
-          normalizeAngle(
-            reverseAngle(
-              Number(floor.startAngle)
-            )
-          );
+        const currentAbsolute = normalizeAngle(
+          reverseAngle(Number(floor.startAngle)),
+        );
 
         const previousFloor =
-          activeIndex > 0
-            ? this.compiled?.floors?.[
-                activeIndex - 1
-              ]
-            : null;
+          activeIndex > 0 ? this.compiled?.floors?.[activeIndex - 1] : null;
 
         const nextFloor =
           activeIndex + 1 < tileCount
-            ? this.compiled?.floors?.[
-                activeIndex + 1
-              ]
+            ? this.compiled?.floors?.[activeIndex + 1]
             : null;
 
-        const previousAbsolute =
-          previousFloor
-            ? normalizeAngle(
-                reverseAngle(
-                  Number(
-                    previousFloor.startAngle
-                  )
-                )
-              )
-            : null;
+        const previousAbsolute = previousFloor
+          ? normalizeAngle(reverseAngle(Number(previousFloor.startAngle)))
+          : null;
 
-        const nextAbsolute =
-          nextFloor
-            ? normalizeAngle(
-                reverseAngle(
-                  Number(
-                    nextFloor.startAngle
-                  )
-                )
-              )
-            : finite(
-                floor.endAngle
-              );
+        const nextAbsolute = nextFloor
+          ? normalizeAngle(reverseAngle(Number(nextFloor.startAngle)))
+          : finite(floor.endAngle);
 
-        const rawAngle =
-          this.doc?.angles?.[
-            activeIndex
-          ];
+        const rawAngle = this.doc?.angles?.[activeIndex];
 
-        const relativeAngle =
-          finite(
-            this.compiled
-              ?.relativeAngles?.[
-                activeIndex
-              ]
-          );
+        const relativeAngle = finite(
+          this.compiled?.relativeAngles?.[activeIndex],
+        );
 
-        const totalBeat =
-          finite(
-            this.compiled?.beats?.[
-              activeIndex
-            ]
-          );
+        const totalBeat = finite(this.compiled?.beats?.[activeIndex]);
 
-        const baseBeat =
-          relativeAngle !== null
-            ? relativeAngle / 180
-            : null;
+        const baseBeat = relativeAngle !== null ? relativeAngle / 180 : null;
 
         const pauseBeat =
-          (
-            totalBeat !== null &&
-            baseBeat !== null
-          )
-            ? Math.max(
-                0,
-                totalBeat - baseBeat
-              )
+          totalBeat !== null && baseBeat !== null
+            ? Math.max(0, totalBeat - baseBeat)
             : null;
 
-        const bpm =
-          finite(
-            this.compiled?.bpms?.[
-              activeIndex
-            ]
-          );
+        const bpm = finite(this.compiled?.bpms?.[activeIndex]);
 
         const relativeBpm =
-          (
-            bpm !== null &&
-            baseBeat !== null &&
-            baseBeat > 0
-          )
+          bpm !== null && baseBeat !== null && baseBeat > 0
             ? bpm / baseBeat
             : null;
 
         lines.push(
-          `Absolute: ${angleText(currentAbsolute)}${rawAngle === 999 ? "  Raw: MID(999)" : ""}`
+          `Absolute: ${angleText(currentAbsolute)}${rawAngle === 999 ? "  Raw: MID(999)" : ""}`,
         );
 
         lines.push(
-          `Angles: ${angleText(previousAbsolute)} → ${angleText(currentAbsolute)} → ${angleText(nextAbsolute)}`
+          `Angles: ${angleText(previousAbsolute)} → ${angleText(currentAbsolute)} → ${angleText(nextAbsolute)}`,
         );
 
         lines.push(
-          `Tile Arms: ${angleText(floor.startAngle)} → ${angleText(floor.endAngle)}`
+          `Tile Arms: ${angleText(floor.startAngle)} → ${angleText(floor.endAngle)}`,
         );
 
         lines.push(
-          `Timing Angle: ${angleText(relativeAngle)}  Base Beat: ${numberText(baseBeat, 6)}`
+          `Timing Angle: ${angleText(relativeAngle)}  Base Beat: ${numberText(baseBeat, 6)}`,
         );
 
-        if(
-          totalBeat !== null
-        ){
-          if(
-            pauseBeat !== null &&
-            pauseBeat > 0.000001
-          ){
+        if (totalBeat !== null) {
+          if (pauseBeat !== null && pauseBeat > 0.000001) {
             lines.push(
-              `Actual Beat: ${numberText(totalBeat, 6)}  (${numberText(baseBeat, 6)} angle + ${numberText(pauseBeat, 6)} pause)`
+              `Actual Beat: ${numberText(totalBeat, 6)}  (${numberText(baseBeat, 6)} angle + ${numberText(pauseBeat, 6)} pause)`,
             );
-          }
-          else{
-            lines.push(
-              `Actual Beat: ${numberText(totalBeat, 6)}`
-            );
+          } else {
+            lines.push(`Actual Beat: ${numberText(totalBeat, 6)}`);
           }
         }
 
         lines.push(
-          `BPM: ${numberText(bpm, 3)}  Relative BPM: ${relativeBpm === null ? "—" : numberText(relativeBpm, 3)}`
+          `BPM: ${numberText(bpm, 3)}  Relative BPM: ${relativeBpm === null ? "—" : numberText(relativeBpm, 3)}`,
         );
 
-        const floorStart_us =
-          finite(
-            this.compiled?.floorStarts_us?.[
-              activeIndex
-            ]
-          );
+        const floorStart_us = finite(
+          this.compiled?.floorStarts_us?.[activeIndex],
+        );
 
-        const floorDuration_us =
-          finite(
-            this.compiled?.floorDurations_us?.[
-              activeIndex
-            ]
-          );
+        const floorDuration_us = finite(
+          this.compiled?.floorDurations_us?.[activeIndex],
+        );
 
-        if(
-          floorStart_us !== null &&
-          floorDuration_us !== null
-        ){
-          const startSec =
-            floorStart_us / 1000000;
+        if (floorStart_us !== null && floorDuration_us !== null) {
+          const startSec = floorStart_us / 1000000;
 
-          const endSec =
-            (
-              floorStart_us +
-              floorDuration_us
-            ) / 1000000;
+          const endSec = (floorStart_us + floorDuration_us) / 1000000;
 
           lines.push(
-            `Timeline: ${startSec.toFixed(4)}s → ${endSec.toFixed(4)}s  (${(floorDuration_us / 1000).toFixed(2)}ms)`
+            `Timeline: ${startSec.toFixed(4)}s → ${endSec.toFixed(4)}s  (${(floorDuration_us / 1000).toFixed(2)}ms)`,
           );
         }
+      } else {
+        lines.push(`Selected: #${activeIndex} (${selectedCount})`);
       }
-      else{
-        lines.push(
-          `Selected: #${activeIndex} (${selectedCount})`
-        );
-      }
-    }
-    else{
-      lines.push(
-        `Selected: — (${selectedCount})`
-      );
+    } else {
+      lines.push(`Selected: — (${selectedCount})`);
     }
 
-    const pitch =
-      Number(
-        this.doc?.settings?.pitch ??
-        100
-      );
+    const pitch = Number(this.doc?.settings?.pitch ?? 100);
 
-    let statusLine =
-      `Mode: ${mode}`;
+    let statusLine = `Mode: ${mode}`;
 
-    if(Number.isFinite(pitch)){
-      statusLine +=
-        `  Pitch: ${pitch}%`;
+    if (Number.isFinite(pitch)) {
+      statusLine += `  Pitch: ${pitch}%`;
     }
 
-    const editorOffset =
-      Number(this.editorVisualOffset_ms);
+    const editorOffset = Number(this.editorVisualOffset_ms);
 
-    if(Number.isFinite(editorOffset)){
-      const sign =
-        editorOffset > 0
-          ? "+"
-          : "";
+    if (Number.isFinite(editorOffset)) {
+      const sign = editorOffset > 0 ? "+" : "";
 
-      statusLine +=
-        `  Editor Offset: ${sign}${editorOffset}ms`;
+      statusLine += `  Editor Offset: ${sign}${editorOffset}ms`;
     }
 
     lines.push(statusLine);
 
-    if(
-      this.state?.mode === "play" &&
-      this.clock
-    ){
-      const levelTimeSec =
-        Number(
-          this.clock.getTime_us()
-        ) /
-        1000000;
+    if (this.state?.mode === "play" && this.clock) {
+      const levelTimeSec = Number(this.clock.getTime_us()) / 1000000;
 
       /*
         Song and hitsounds share the unshifted level clock.
         Editor Offset affects visuals only.
       */
-      const songTimeSec =
-        levelTimeSec;
+      const songTimeSec = levelTimeSec;
 
-      const songDurationSec =
-        finite(
-          this.song?.buffer?.duration
-        );
+      const songDurationSec = finite(this.song?.buffer?.duration);
 
-      if(songDurationSec !== null){
+      if (songDurationSec !== null) {
         lines.push(
-          `Playback: ${this.formatPlaybackTime(songTimeSec)} / ${this.formatPlaybackTime(songDurationSec)}`
+          `Playback: ${this.formatPlaybackTime(songTimeSec)} / ${this.formatPlaybackTime(songDurationSec)}`,
         );
-      }
-      else{
-        const lastIndex =
-          (this.compiled?.floors?.length ?? 0) - 1;
+      } else {
+        const lastIndex = (this.compiled?.floors?.length ?? 0) - 1;
 
         const levelEnd_us =
           lastIndex >= 0
-            ? Number(
-                this.compiled.floorStarts_us[
-                  lastIndex
-                ]
-              ) +
-              Number(
-                this.compiled.floorDurations_us[
-                  lastIndex
-                ] ?? 0
-              )
+            ? Number(this.compiled.floorStarts_us[lastIndex]) +
+              Number(this.compiled.floorDurations_us[lastIndex] ?? 0)
             : NaN;
 
         lines.push(
           Number.isFinite(levelEnd_us)
             ? `Level Time: ${this.formatPlaybackTime(levelTimeSec)} / ${this.formatPlaybackTime(levelEnd_us / 1000000)}`
-            : `Level Time: ${this.formatPlaybackTime(levelTimeSec)}`
+            : `Level Time: ${this.formatPlaybackTime(levelTimeSec)}`,
         );
       }
     }
 
-    element.textContent =
-      lines.join("\n");
+    element.textContent = lines.join("\n");
   }
 
-  addEventToSelected(
-    eventType
-  ){
-
+  addEventToSelected(eventType) {
     /*
       편집 모드에서만
     */
-    if(
-      this.state.mode !==
-      "edit"
-    ){
+    if (this.state.mode !== "edit") {
       return null;
     }
-
 
     /*
       반드시 타일 하나 선택
     */
-    if(
-      this.state
-        .selectedFloorIds
-        .size !== 1
-    ){
+    if (this.state.selectedFloorIds.size !== 1) {
       return null;
     }
 
+    const floorId = this.state.activeFloorId;
 
-    const floorId =
-      this.state.activeFloorId;
-
-
-    if(!floorId){
+    if (!floorId) {
       return null;
     }
-
 
     /*
       Document가
@@ -15216,30 +9078,17 @@ class EditorApp{
 
       모두 검사한다.
     */
-    if(
-      !this.doc.canAddAction(
-        floorId,
-        eventType
-      )
-    ){
+    if (!this.doc.canAddAction(floorId, eventType)) {
       return null;
     }
-
 
     this.recordHistoryBeforeEdit();
 
+    const action = this.doc.addAction(floorId, eventType);
 
-    const action =
-      this.doc.addAction(
-        floorId,
-        eventType
-      );
-
-
-    if(!action){
+    if (!action) {
       return null;
     }
-
 
     /*
       즉시 컴파일.
@@ -15250,13 +9099,10 @@ class EditorApp{
     */
     this.rebuild();
 
-    this.logger.info(
-      "Event added",
-      {
-        eventType,
-        floorId
-      }
-    );
+    this.logger.info("Event added", {
+      eventType,
+      floorId,
+    });
 
     return action;
   }
@@ -15268,19 +9114,12 @@ class EditorApp{
     editorDebug.toText()
     editorDebug.entries
 */
-window.editorDebug =
-  EDITOR_LOGGER;
+window.editorDebug = EDITOR_LOGGER;
 
 window.app = new EditorApp();
 
-app.loadProject("./level.adofai")
-  .catch(error => {
-    app.setLevelLoading(
-      false
-    );
+app.loadProject("./level.adofai").catch((error) => {
+  app.setLevelLoading(false);
 
-    app.reportError(
-      error,
-      "Editor startup failed"
-    );
-  });
+  app.reportError(error, "Editor startup failed");
+});

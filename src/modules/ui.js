@@ -27,7 +27,7 @@ export class TileEditorUI {
     return {
       tabs: this.renderTabs(),
       palette: this.renderEventPalette(),
-      selectedTab: this.selectedTab
+      selectedTab: this.selectedTab,
     };
   }
 }
