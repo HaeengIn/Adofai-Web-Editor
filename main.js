@@ -27,6 +27,7 @@ import {
 import { CameraSystem } from "./src/modules/camera-system.js";
 import { RuntimeScene } from "./src/modules/runtime-scene.js";
 import { EditorSettingsController } from "./src/modules/editor-settings.js";
+import { KeyboardShortcutManager } from "./src/modules/shortcuts.js";
 
 const EDITOR_LOGGER = new EditorLogger();
 
@@ -117,8 +118,7 @@ function createEventMarkerInfo(
           10,
         );
       } else if (ratio > 1.05) {
-
-      /* 의미 있게 빨라짐 */
+        /* 의미 있게 빨라짐 */
         setMarker(
           {
             type: "speed-up",
@@ -134,8 +134,7 @@ function createEventMarkerInfo(
           30,
         );
       } else if (ratio < 0.95) {
-
-      /* 의미 있게 느려짐 */
+        /* 의미 있게 느려짐 */
         setMarker(
           {
             type: "speed-down",
@@ -4359,6 +4358,11 @@ class EditorApp {
 
     this.levelStarted = false;
 
+    /* =========================
+       Keyboard Shortcuts
+    ========================= */
+    this.keyboardShortcutManager = new KeyboardShortcutManager(this);
+
     this.initDiagnostics();
   }
 
@@ -4999,6 +5003,8 @@ class EditorApp {
     };
 
     this.modifierKeys.init();
+
+    this.keyboardShortcutManager.init();
 
     this.playButton.init(() => {
       this.togglePlayback();
@@ -7590,8 +7596,7 @@ class EditorApp {
       // anchor는 그대로 유지
       this.state.selectionAnchorId = anchorId;
     } else if (isCtrl) {
-
-    /* =========================
+      /* =========================
        Ctrl : 선택 추가 / 제거
     ========================= */
       if (selected.has(floorId)) {
@@ -7624,8 +7629,7 @@ class EditorApp {
         this.state.selectionAnchorId = floorId;
       }
     } else {
-
-    /* =========================
+      /* =========================
        일반 클릭
     ========================= */
       // 정확히 이 타일 하나만 이미 선택되어 있다면
