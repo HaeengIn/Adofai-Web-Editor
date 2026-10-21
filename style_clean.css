@@ -5882,6 +5882,28 @@ img.editor-tab-icon {
   opacity: 0.24;
 }
 
+#tile-transform-toolbar {
+  position: absolute;
+
+  top: calc(
+    47px +
+    env(safe-area-inset-top)
+  );
+
+  right: 8px;
+
+  z-index: 86;
+
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  pointer-events: auto;
+}
+
+#tile-transform-toolbar .history-button {
+  font-size: 20px;
+}
 
 /* =========================================================
    Phone portrait
@@ -7040,6 +7062,21 @@ img.editor-tab-icon {
   #level-title {
     max-width: 62vw;
   }
+
+  #tile-transform-toolbar {
+    top: calc(
+      76px +
+      env(safe-area-inset-top)
+    );
+
+    right: 14px;
+
+    gap: 10px;
+  }
+
+  #tile-transform-toolbar .history-button {
+    font-size: 28px;
+  }
 }
 
 /* =========================================================
@@ -7352,6 +7389,19 @@ img.editor-tab-icon {
 
   #history-toolbar {
     right: 7px;
+  }
+
+  #tile-transform-toolbar {
+    top: calc(
+      46px +
+      env(safe-area-inset-top)
+    );
+
+    right: 7px;
+  }
+
+  #tile-transform-toolbar .history-button {
+    font-size: 20px;
   }
 
   #single-angle-editor {

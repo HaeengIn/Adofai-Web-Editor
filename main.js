@@ -5013,6 +5013,7 @@ class EditorApp {
     this.initFloorNavigation();
 
     this.initHistoryControls();
+    this.initTileTransformControls();
     this.resetHistory();
 
     this.initClipboardControls();
@@ -6577,6 +6578,90 @@ class EditorApp {
 
     this.historyInitialized = true;
     this.updateHistoryButtons();
+  }
+
+  initTileTransformControls() {
+    const flipHorizontalButton = document.getElementById(
+      "flip-horizontal-button",
+    );
+
+    const flipVerticalButton = document.getElementById("flip-vertical-button");
+
+    if (!flipHorizontalButton || !flipVerticalButton) {
+      throw new Error("tile transform controls not found");
+    }
+
+    flipHorizontalButton.addEventListener("click", () => {
+      this.flipSelectedTiles("horizontal");
+    });
+
+    flipVerticalButton.addEventListener("click", () => {
+      this.flipSelectedTiles("vertical");
+    });
+  }
+
+  flipSelectedTiles(direction) {
+    if (
+      this.state.mode !== "edit" ||
+      !this.doc ||
+      this.state.selectedFloorIds.size === 0
+    ) {
+      return false;
+    }
+
+    const selectedIndices = [...this.state.selectedFloorIds]
+      .map((id) => this.doc.indexOfId(id))
+      .filter((index) => index > 0);
+
+    if (selectedIndices.length === 0) {
+      return false;
+    }
+
+    const changes = [];
+
+    for (const index of selectedIndices) {
+      const angle = Number(this.doc.angles[index]);
+
+      // MID 타일은 각도값 999로 표현되므로 일반 각도 반전에서 제외합니다.
+      if (!Number.isFinite(angle) || angle === 999) {
+        continue;
+      }
+
+      const nextAngle =
+        direction === "horizontal"
+          ? normalizeAngle(180 - angle)
+          : normalizeAngle(-angle);
+
+      if (nextAngle !== angle) {
+        changes.push({
+          index,
+          angle: nextAngle,
+        });
+      }
+    }
+
+    if (changes.length === 0) {
+      return false;
+    }
+
+    // 기존 Undo/Redo 기록 체계에 편집 전 상태를 저장합니다.
+    if (!this.recordHistoryBeforeEdit()) {
+      return false;
+    }
+
+    for (const change of changes) {
+      this.doc.angles[change.index] = change.angle;
+    }
+
+    // 타일 렌더링, 편집기 UI 및 자동 저장을 갱신합니다.
+    this.rebuild();
+
+    this.logger.info("Flip selected tiles", {
+      direction,
+      count: changes.length,
+    });
+
+    return true;
   }
 
   createHistorySnapshot() {
