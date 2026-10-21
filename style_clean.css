@@ -9343,3 +9343,15 @@ img.editor-tab-icon {
       );
   }
 }
+
+/* Keep Debug Info below the undo/redo and flip buttons. */
+#editor-info {
+  top: calc(
+    132px +
+    env(safe-area-inset-top)
+  );
+  right: 10px;
+  max-width: min(68vw, 560px);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
