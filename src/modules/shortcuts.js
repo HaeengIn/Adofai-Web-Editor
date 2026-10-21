@@ -114,14 +114,24 @@ export class KeyboardShortcutManager {
     // ===========================
 
     // Ctrl+L: Flip horizontally (left-right)
-    if (ctrl && !shift && key === "l" && !isEditingField) {
+    if (
+      ctrl &&
+      !shift &&
+      (key === "l" || e.code === "KeyL") &&
+      !isEditingField
+    ) {
       e.preventDefault();
       this.flipSelectedTilesHorizontal();
       return;
     }
 
     // Ctrl+Shift+L: Flip vertically (up-down)
-    if (ctrl && shift && key === "l" && !isEditingField) {
+    if (
+      ctrl &&
+      shift &&
+      (key === "l" || e.code === "KeyL") &&
+      !isEditingField
+    ) {
       e.preventDefault();
       this.flipSelectedTilesVertical();
       return;
@@ -260,7 +270,12 @@ export class KeyboardShortcutManager {
     // Ctrl+L / Ctrl+Shift+L (Flip shortcuts)
     if (
       ctrl &&
-      (key === "s" || key === "o" || key === "z" || key === "y" || key === "l")
+      (key === "s" ||
+        key === "o" ||
+        key === "z" ||
+        key === "y" ||
+        key === "l" ||
+        e.code === "KeyL")
     ) {
       return true;
     }

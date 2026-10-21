@@ -19,30 +19,61 @@ export class ModifierKeyController {
       throw new Error("shift-button not found");
     }
 
+    /**
+     * Ctrl button click for mobile
+     */
     this.ctrlButton.addEventListener("click", () => {
       if (!this.enabled) return;
-      this.setCtrl(!this.ctrl);
+      const next = !this.ctrl;
+      this.ctrl = next;
+      if (next) this.shift = false;
+      this.updateVisual();
     });
 
+    /**
+     * Shift button click for mobile
+     */
     this.shiftButton.addEventListener("click", () => {
       if (!this.enabled) return;
-      this.setShift(!this.shift);
+      const next = !this.shift;
+      this.shift = next;
+      if (next) this.ctrl = false;
+      this.updateVisual();
     });
 
+    /**
+     * Keyboard input event for desktop
+     */
     window.addEventListener("keydown", (e) => {
       if (!this.enabled) return;
-      if (e.key === "Control") this.setCtrl(true);
-      if (e.key === "Shift") this.setShift(true);
+      if (e.key === "Control") {
+        this.ctrl = true;
+        this.updateVisual();
+      }
+      if (e.key === "Shift") {
+        this.shift = true;
+        this.updateVisual();
+      }
     });
 
+    /**
+     * Keyboard release event for desktop
+     */
     window.addEventListener("keyup", (e) => {
-      if (e.key === "Control") this.setCtrl(false);
-      if (e.key === "Shift") this.setShift(false);
+      if (e.key === "Control") {
+        this.ctrl = false;
+        this.updateVisual();
+      }
+      if (e.key === "Shift") {
+        this.shift = false;
+        this.updateVisual();
+      }
     });
 
     window.addEventListener("blur", () => {
-      this.setCtrl(false);
-      this.setShift(false);
+      this.ctrl = false;
+      this.shift = false;
+      this.updateVisual();
     });
 
     this.updateVisual();
@@ -62,17 +93,11 @@ export class ModifierKeyController {
 
   setCtrl(value) {
     this.ctrl = Boolean(value);
-    if (this.ctrl) {
-      this.shift = false;
-    }
     this.updateVisual();
   }
 
   setShift(value) {
     this.shift = Boolean(value);
-    if (this.shift) {
-      this.ctrl = false;
-    }
     this.updateVisual();
   }
 
