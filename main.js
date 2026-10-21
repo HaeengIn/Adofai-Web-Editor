@@ -6598,6 +6598,27 @@ class EditorApp {
     flipVerticalButton.addEventListener("click", () => {
       this.flipSelectedTiles("vertical");
     });
+
+    this.updateTileTransformButtons();
+  }
+
+  updateTileTransformButtons() {
+    const canFlip =
+      this.state.mode === "edit" && this.state.selectedFloorIds.size >= 2;
+
+    const flipHorizontalButton = document.getElementById(
+      "flip-horizontal-button",
+    );
+
+    const flipVerticalButton = document.getElementById("flip-vertical-button");
+
+    if (flipHorizontalButton) {
+      flipHorizontalButton.disabled = !canFlip;
+    }
+
+    if (flipVerticalButton) {
+      flipVerticalButton.disabled = !canFlip;
+    }
   }
 
   flipSelectedTiles(direction) {
@@ -7428,6 +7449,8 @@ class EditorApp {
     }
 
     const selectedCount = this.state.selectedFloorIds.size;
+
+    this.updateTileTransformButtons();
 
     let selectedIndex = -1;
 
