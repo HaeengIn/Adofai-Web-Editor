@@ -31,6 +31,19 @@ export class KeyboardShortcutManager {
    * Main keydown handler
    */
   handleKeyDown(e) {
+    // Ctrl+A / Cmd+A: Select all tiles
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      !e.shiftKey &&
+      !e.altKey &&
+      e.key.toLowerCase() === "a"
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.selectAllTiles();
+      return;
+    }
+
     // Tab: Add a midspin tile
     if (
       e.key === "Tab" &&
@@ -439,6 +452,30 @@ export class KeyboardShortcutManager {
     if (button) {
       button.click();
     }
+  }
+
+  /**
+   * Select all tiles
+   */
+  selectAllTiles() {
+    if (!this.app?.state || !this.app?.doc) {
+      return;
+    }
+
+    const { selectedFloorIds } = this.app.state;
+    const { ids } = this.app.doc;
+
+    selectedFloorIds.clear();
+
+    for (const id of ids) {
+      selectedFloorIds.add(id);
+    }
+
+    if (!ids.includes(this.app.state.activeFloorId)) {
+      this.app.state.activeFloorId = ids[0] ?? null;
+    }
+
+    this.app.rebuild();
   }
 
   /**
