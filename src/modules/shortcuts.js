@@ -167,17 +167,21 @@ export class KeyboardShortcutManager {
     // EVENT SHORTCUTS
     // ===========================
 
-    if (!ctrl && !shift && !alt && !isEditingField) {
-      const eventShortcuts = {
-        1: "SetSpeed", // 1: SetSpeed event
-        2: "Twirl", // 2: Twirl event
-        3: "Pause", // 3: Pause event
-        4: "SetHitsound", // 4: SetHitsound event
-      };
+    if (!ctrl && !shift && !alt && !isEditingField && /^[1-9]$/.test(key)) {
+      const eventButtons = document.querySelectorAll(
+        "#event-palette-list .event-palette-button",
+      );
 
-      if (eventShortcuts[key] !== undefined) {
+      const buttonIndex = Number(key) - 1;
+      const eventButton = eventButtons[buttonIndex];
+
+      if (eventButton) {
         e.preventDefault();
-        this.addEventToSelected(eventShortcuts[key]);
+
+        if (!eventButton.disabled) {
+          eventButton.click();
+        }
+
         return;
       }
     }
