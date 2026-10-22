@@ -76,6 +76,32 @@ export class KeyboardShortcutManager {
       return;
     }
 
+    // Ctrl+C / Cmd+C: Copy selected tiles
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      !e.shiftKey &&
+      !e.altKey &&
+      (e.key.toLowerCase() === "c" || e.code === "KeyC") &&
+      !isEditingField
+    ) {
+      e.preventDefault();
+      document.getElementById("copy-tiles-button")?.click();
+      return;
+    }
+
+    // Ctrl+V / Cmd+V: Paste tiles after selected tile
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      !e.shiftKey &&
+      !e.altKey &&
+      (e.key.toLowerCase() === "v" || e.code === "KeyV") &&
+      !isEditingField
+    ) {
+      e.preventDefault();
+      document.getElementById("paste-tiles-button")?.click();
+      return;
+    }
+
     // Track backtick for combined shortcuts
     if (e.key === "`") {
       this.backtickPressed = true;
