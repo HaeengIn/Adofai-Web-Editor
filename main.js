@@ -28,6 +28,8 @@ import { CameraSystem } from "./src/modules/camera-system.js";
 import { RuntimeScene } from "./src/modules/runtime-scene.js";
 import { EditorSettingsController } from "./src/modules/editor-settings.js";
 import { KeyboardShortcutManager } from "./src/modules/shortcuts.js";
+import { InitExpressionInput } from "./src/modules/expression-input.js";
+import { CalculateExpression } from "./src/modules/expression-calculator.js";
 
 const EDITOR_LOGGER = new EditorLogger();
 
@@ -883,15 +885,10 @@ class TileEditorUI {
     label,
     value,
     defaultValue = 0,
-
-    step = "any",
     min = null,
-
     max = null,
-
     integer = false,
     disabled = false,
-
     onCommit = null,
   }) {
     const row = document.createElement("label");
@@ -901,28 +898,14 @@ class TileEditorUI {
     const labelElement = document.createElement("span");
 
     labelElement.className = "event-form-label";
-
     labelElement.textContent = label;
 
     const input = document.createElement("input");
 
     input.className = "event-form-input";
-
-    input.type = "number";
-
-    input.step = step;
-
-    input.inputMode = integer ? "numeric" : "decimal";
-
+    input.type = "text";
+    input.inputMode = "text";
     input.disabled = disabled;
-
-    if (min !== null) {
-      input.min = String(min);
-    }
-
-    if (max !== null) {
-      input.max = String(max);
-    }
 
     let initialValue = Number(value);
 
@@ -933,11 +916,16 @@ class TileEditorUI {
     input.value = String(initialValue);
 
     const commit = () => {
-      let nextValue = Number(input.value);
+      let nextValue;
 
-      if (!Number.isFinite(nextValue)) {
-        nextValue = defaultValue;
+      try {
+        nextValue = CalculateExpression(input.value);
+      } catch {
+        input.setCustomValidity("올바른 계산식을 입력하세요.");
+        return;
       }
+
+      input.setCustomValidity("");
 
       if (integer) {
         nextValue = Math.trunc(nextValue);
@@ -957,20 +945,24 @@ class TileEditorUI {
         return;
       }
 
+      initialValue = nextValue;
+
       onCommit?.(nextValue);
     };
 
+    input.addEventListener("input", () => {
+      input.setCustomValidity("");
+    });
+
     /*
-      매 글자마다 rebuild하지 않는다.
-  
-      입력이 끝난 시점에만 적용.
-    */
+    입력이 끝난 시점에만 값을 계산하고 적용한다.
+    매 글자마다 이벤트 편집 화면을 다시 구성하지 않는다.
+  */
     input.addEventListener("change", commit);
 
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
         input.blur();
       }
     });
@@ -5005,6 +4997,8 @@ class EditorApp {
     this.modifierKeys.init();
 
     this.keyboardShortcutManager.init();
+
+    InitExpressionInput();
 
     this.playButton.init(() => {
       this.togglePlayback();
