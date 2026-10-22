@@ -13,7 +13,7 @@ export class KeyboardShortcutManager {
    * Initialize keyboard shortcuts
    */
   init() {
-    document.addEventListener("keydown", (e) => this.handleKeyDown(e));
+    document.addEventListener("keydown", (e) => this.handleKeyDown(e), true);
     document.addEventListener("keyup", (e) => this.handleKeyUp(e));
   }
 
@@ -31,6 +31,19 @@ export class KeyboardShortcutManager {
    * Main keydown handler
    */
   handleKeyDown(e) {
+    // Tab: Add a midspin tile
+    if (
+      e.key === "Tab" &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      this.app.addMidspinAfterSelected();
+      return;
+    }
+
     // Don't process shortcuts when in editing field
     const target = e.target;
     const isEditingField =
@@ -53,6 +66,12 @@ export class KeyboardShortcutManager {
     const ctrl = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
     const alt = e.altKey;
+
+    if (key === "tab" && !ctrl && !shift && !alt) {
+      e.preventDefault();
+      this.app.addMidspinAfterSelected();
+      return;
+    }
 
     // ===========================
     // TILE PLACEMENT SHORTCUTS
@@ -264,6 +283,11 @@ export class KeyboardShortcutManager {
     const key = e.key.toLowerCase();
     const ctrl = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
+    const alt = e.altKey;
+
+    if (key === "tab" && !ctrl && !shift && !alt) {
+      return true;
+    }
 
     // Allow these shortcuts to override browser defaults:
     // Ctrl+S (Save), Ctrl+O (Open), Ctrl+Z (Undo), Ctrl+Y (Redo)
