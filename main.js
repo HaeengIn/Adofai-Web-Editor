@@ -28,7 +28,7 @@ import { CameraSystem } from "./src/modules/camera-system.js";
 import { RuntimeScene } from "./src/modules/runtime-scene.js";
 import { EditorSettingsController } from "./src/modules/editor-settings.js";
 import { KeyboardShortcutManager } from "./src/modules/shortcuts.js";
-import { InitExpressionInput } from "./modules/expression-input.js";
+import { InitExpressionInput } from "./src/modules/expression-input.js";
 
 const EDITOR_LOGGER = new EditorLogger();
 
@@ -5007,7 +5007,6 @@ class EditorApp {
 
     this.keyboardShortcutManager.init();
 
-    this.keyboardShortcutManager.init();
     InitExpressionInput();
 
     this.playButton.init(() => {
