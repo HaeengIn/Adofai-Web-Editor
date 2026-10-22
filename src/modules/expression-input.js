@@ -23,15 +23,24 @@ function HandleExpressionInput(event) {
   try {
     const result = CalculateExpression(input.value);
 
+    input.setCustomValidity("");
     input.value = String(result);
 
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   } catch (error) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    input.setCustomValidity("올바른 계산식을 입력하세요.");
+
     console.warn("Invalid mathematical expression:", error);
   }
 }
 
+/**
+ * Initialize expression input handling.
+ */
 export function InitExpressionInput() {
   document.addEventListener("keydown", HandleExpressionInput, true);
 }
