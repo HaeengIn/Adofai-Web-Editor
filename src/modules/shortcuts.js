@@ -44,6 +44,13 @@ export class KeyboardShortcutManager {
       return;
     }
 
+    // Space: Add a 360-degree tile
+    if (e.key === " " && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      this.app.addFullspinAfterSelected();
+      return;
+    }
+
     // Don't process shortcuts when in editing field
     const target = e.target;
     const isEditingField =
