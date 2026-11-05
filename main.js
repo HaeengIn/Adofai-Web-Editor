@@ -5567,8 +5567,12 @@ class EditorApp {
         return;
       }
 
-      const file =
-        files.find((item) => /\.adofai$/i.test(item.name)) ?? files[0];
+      const file = files.find((item) => /\.adofai$/i.test(item.name));
+
+      if (!file) {
+        this.showToast("Please select an .adofai file.", "warning");
+        return;
+      }
 
       await this.loadProjectFromFile(file, files);
     });
@@ -6154,6 +6158,31 @@ class EditorApp {
     return true;
   }
 
+  async readFileAsText(file) {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("Failed to read file as text."));
+          return;
+        }
+
+        resolve(reader.result);
+      };
+
+      reader.onerror = () => {
+        reject(reader.error ?? new Error("Failed to read file."));
+      };
+
+      reader.onabort = () => {
+        reject(new Error("File reading was aborted."));
+      };
+
+      reader.readAsText(file, "UTF-8");
+    });
+  }
+
   async loadProjectFromFile(file, files = [file]) {
     if (!file) {
       return false;
@@ -6162,7 +6191,7 @@ class EditorApp {
     this.setLevelLoading(true, "Loading level...");
 
     try {
-      const text = await file.text();
+      const text = await this.readFileAsText(file);
 
       const json = JSON5.parse(text.replace(/\r/g, "").replace(/\n/g, ""));
 
